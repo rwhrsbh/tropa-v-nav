@@ -17,8 +17,7 @@ use nav_core::Event;
 
 pub const CARD_W: f32 = 220.0;
 pub const CARD_H: f32 = 310.0;
-/// Where the hand rests: low, the field kept clear, but with each card's name and the top of its
-/// picture showing even at the fan's ends.
+/// Original resting height; the optional raised layout lifts it by 90 stage pixels.
 const HAND_TOP: f32 = 905.0;
 /// Where the top of a card in focus comes to, wherever it lay in the fan: the whole of it on the
 /// stage, its text with it, even grown and from the fan's low ends.
@@ -425,14 +424,18 @@ fn hand_spacing(n: usize) -> f32 {
     (860.0 / n.max(1) as f32).min(CARD_W * 0.78)
 }
 
-fn hand_slot(i: usize, n: usize) -> Vec2 {
+fn hand_top(raised: bool) -> f32 {
+    HAND_TOP - if raised { 90.0 } else { 0.0 }
+}
+
+fn hand_slot(i: usize, n: usize, raised: bool) -> Vec2 {
     let spacing = hand_spacing(n);
     let total = spacing * (n.max(1) - 1) as f32;
     let x = STAGE_W / 2.0 - total / 2.0 + spacing * i as f32 - CARD_W / 2.0;
     // a shallow arc: the ends of the fan sit a little lower
     let mid = (n as f32 - 1.0) / 2.0;
     let off = (i as f32 - mid).abs();
-    Vec2::new(x, HAND_TOP + off * off * 1.5)
+    Vec2::new(x, hand_top(raised) + off * off * 1.5)
 }
 
 // ---- screen setup ----
@@ -1940,10 +1943,11 @@ fn stage_pointer(pointers: &Query<(&bevy::picking::pointer::PointerId, &bevy::pi
     Some((at - origin) / scale)
 }
 
-/// The hand lies low until the cursor comes down to it. Then the card nearest the cursor is
+/// When the cursor reaches the hand, the nearest card is
 /// the one in focus, and it stays so while the cursor travels up over the risen card.
 fn pick_hover(
     session: Res<Session>,
+    profile: Res<crate::profile::Profile>,
     cards: Query<&CardWidget>,
     pointers: Query<(&bevy::picking::pointer::PointerId, &bevy::picking::pointer::PointerLocation)>,
     window: Single<&Window, With<bevy::window::PrimaryWindow>>,
@@ -1960,7 +1964,7 @@ fn pick_hover(
     *reaching = match cursor {
         Some(c) if n > 0 && (c.x - STAGE_W / 2.0).abs() <= span => {
             // reaching in starts at the visible strip; once in, the whole risen card keeps it
-            c.y >= HAND_TOP - 20.0 || (*reaching && c.y >= HAND_RISEN - 15.0)
+            c.y >= hand_top(profile.settings.raised_hand) - 20.0 || (*reaching && c.y >= HAND_RISEN - 15.0)
         }
         _ => false,
     };
@@ -1971,7 +1975,7 @@ fn pick_hover(
     let best = dragging.or_else(|| {
         let x = x?;
         (0..n).min_by(|a, b| {
-            let d = |i: usize| (hand_slot(i, n).x + CARD_W / 2.0 - x).abs();
+            let d = |i: usize| (hand_slot(i, n, profile.settings.raised_hand).x + CARD_W / 2.0 - x).abs();
             d(*a).total_cmp(&d(*b))
         })
         .map(|i| hand[i].uid)
@@ -1983,6 +1987,7 @@ fn pick_hover(
 
 fn layout_hand(
     session: Res<Session>,
+    profile: Res<crate::profile::Profile>,
     db: Res<Db>,
     time: Res<Time>,
     top: Res<HoverTop>,
@@ -2002,7 +2007,7 @@ fn layout_hand(
             node.top = px(w.pos.y);
             continue;
         }
-let rest = hand_slot(i, n);
+        let rest = hand_slot(i, n, profile.settings.raised_hand);
         let mut target = rest;
         let lifted = top.0 == Some(w.uid);
         // the nearer the cursor, the higher the card: full height under it, falling away

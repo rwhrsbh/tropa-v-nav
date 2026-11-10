@@ -195,6 +195,9 @@ menu-continue = Продолжить: { $hero }, акт { $act }
 
 menu-settings = Настройки
 settings-speed = Скорость анимаций
+settings-hand = Положение карт
+settings-hand-default = Обычное
+settings-hand-raised = Чуть выше
 settings-shake = Меньше тряски
 settings-ink = Режим «Чернила»
 settings-music = Музыка

@@ -219,6 +219,7 @@ fn enter_settings(
         (format!("{}: {}x", l10n.t("settings-speed"), s.anim_speed), |s| s.anim_speed = if s.anim_speed < 1.25 { 1.5 } else if s.anim_speed < 1.75 { 2.0 } else { 1.0 }),
         (format!("{}: {}", l10n.t("settings-shake"), on_off(s.less_shake)), |s| s.less_shake = !s.less_shake),
         (format!("{}: {}", l10n.t("settings-ink"), on_off(s.ink)), |s| s.ink = !s.ink),
+        (format!("{}: {}", l10n.t("settings-hand"), l10n.t(if s.raised_hand { "settings-hand-raised" } else { "settings-hand-default" })), |s| s.raised_hand = !s.raised_hand),
         (format!("{}: {}", l10n.t("settings-voice-lang"), l10n.t(&format!("settings-voice-lang-{}", s.voice_lang.min(3)))), |s| s.voice_lang = (s.voice_lang.min(3) + 1) % 4),
         (format!("{}: {}", l10n.t("settings-screen"), l10n.t(&format!("settings-screen-{}", s.screen.min(2)))), |s| s.screen = (s.screen.min(2) + 1) % 3),
         ({

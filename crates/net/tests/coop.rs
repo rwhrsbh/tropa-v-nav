@@ -4,6 +4,70 @@ use std::path::PathBuf;
 
 const HEROES: [&str; 4] = ["bogatyr", "volhv", "volkolak", "znaharka"];
 
+#[test]
+fn map_ink_is_shared_in_both_directions_without_changing_the_run() {
+    let c = content();
+    let mut hub = party(&c, 3, 42);
+    let before = hashes(&hub);
+    for node in &mut hub.nodes { node.take_notes(); }
+    let changes = vec![
+        InkChange::Begin([10.0, 20.0]),
+        InkChange::Point([100.0, 20.0]),
+        InkChange::Rub { from: [50.0, 0.0], to: [50.0, 40.0] },
+        InkChange::Clear,
+    ];
+    for sender in 1..=3 {
+        for change in &changes { hub.node(sender).map_ink(To::All, change.clone()); }
+        hub.pump(&c);
+        for node in &mut hub.nodes {
+            let received: Vec<_> = node.take_notes().into_iter().filter_map(|n| match n {
+                Note::MapInk { from, change, .. } => { assert_eq!(from, (sender - 1) as u8); Some(change) }
+                _ => None,
+            }).collect();
+            assert_eq!(received, if node.me == sender { vec![] } else { changes.clone() });
+        }
+    }
+    assert_eq!(hashes(&hub), before);
+}
+
+#[test]
+fn map_ink_snapshot_can_be_requested_after_rejoining() {
+    let c = content();
+    let mut hub = party(&c, 2, 42);
+    hub.offline.push(2);
+    hub.node(1).peer_left(2);
+    hub.offline.clear();
+    hub.node(2).rejoin();
+    hub.pump(&c);
+    for node in &mut hub.nodes { node.take_notes(); }
+    hub.node(2).request_map_ink();
+    hub.pump(&c);
+    assert!(hub.node(1).take_notes().iter().any(|n| matches!(n, Note::MapInkRequest { from: 2, .. })));
+    let all = InkChange::Snapshot(vec![vec![[10.0, 20.0], [30.0, 40.0]]]);
+    hub.node(1).map_ink(To::One(2), all.clone());
+    hub.pump(&c);
+    assert!(hub.node(2).take_notes().iter().any(|n| matches!(n, Note::MapInk { from: 0, change, .. } if *change == all)));
+}
+
+#[test]
+fn map_ink_rejects_other_runs_acts_unknown_senders_and_invalid_points() {
+    let c = content();
+    let mut hub = party(&c, 2, 42);
+    let node = hub.node(1);
+    node.take_notes();
+    let run = node.state.as_ref().unwrap();
+    let (seed, act) = (run.seed, run.act);
+    for (from, seed, act, change) in [
+        (2, seed + 1, act, InkChange::Clear),
+        (2, seed, act + 1, InkChange::Clear),
+        (99, seed, act, InkChange::Clear),
+        (2, seed, act, InkChange::Point([f32::NAN, 0.0])),
+    ] {
+        node.handle(&c, from, Msg::MapInk { seed, act, change });
+    }
+    assert!(node.take_notes().is_empty());
+}
+
 fn content() -> Content {
     Content::load_dir(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/data")).unwrap()
 }

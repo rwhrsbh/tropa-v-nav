@@ -1,19 +1,23 @@
 //! Pencil marks on the path map, as in Slay the Spire 2: the right mouse button held down draws a
 //! line on the sheet, or, when the eraser is the tool (or Shift is held), rubs out the marks where a
 //! broad round eraser is drawn over them, cutting a stroke where it passes; the little tray at the left picks the tool and wipes this player's own marks,
-//! as Delete does. The marks are this player's own, kept until the act ends, and never press a
+//! as Delete does. Marks are shared with the party, kept until the act ends, and never press a
 //! node: the nodes take the left button only.
 
 use crate::l10n::L10n;
 use crate::map_party::{MapScroll, MapSheet, SHEET_H};
-use crate::net::Net;
+use crate::net::{Net, NetStatus};
+use nav_net::{InkChange, Note, To};
+use std::collections::BTreeMap;
 use crate::theme::{self, Fonts};
 use crate::{AppState, Stage};
 use bevy::prelude::*;
 use bevy::ui_widgets::{observe, Activate, Button};
 
 pub fn plugin(app: &mut App) {
-    app.init_resource::<MapInk>().add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().run_if(in_state(AppState::Map)));
+    app.init_resource::<MapInk>()
+        .add_systems(Update, sync_ink)
+        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Map)));
 }
 
 /// What the right button does on the map.
@@ -28,7 +32,11 @@ pub enum Tool {
 #[derive(Resource, Default)]
 pub struct MapInk {
     act: u8,
+    seed: Option<u64>,
     strokes: Vec<Vec<Vec2>>,
+    others: BTreeMap<u8, Vec<Vec<Vec2>>>,
+    pending: Vec<InkChange>,
+    remote_dirty: bool,
     /// A stroke is being drawn now.
     drawing: bool,
     /// Where the eraser was last frame, while it is rubbing: it rubs the whole way between.
@@ -39,6 +47,9 @@ pub struct MapInk {
 /// One piece of a pencil stroke, child of the sheet.
 #[derive(Component)]
 struct InkDot;
+
+#[derive(Component)]
+struct RemoteInk;
 
 /// The eraser's round outline under the pointer while it rubs.
 #[derive(Component)]
@@ -64,7 +75,7 @@ const EDGE: Color = Color::srgb(0.42, 0.33, 0.22);
 
 /// A piece of line from `a` to `b`: a bar with round ends turned along the way, so the pieces of a
 /// stroke overlap into one unbroken line (a lone point is a round dot).
-fn piece(commands: &mut Commands, sheet: Entity, a: Vec2, b: Vec2) {
+fn piece(commands: &mut Commands, sheet: Entity, a: Vec2, b: Vec2) -> Entity {
     let d = b - a;
     let mid = (a + b) / 2.0;
     let w = d.length() + DOT;
@@ -76,7 +87,7 @@ fn piece(commands: &mut Commands, sheet: Entity, a: Vec2, b: Vec2) {
         GlobalZIndex(5),
         Pickable::IGNORE,
         ChildOf(sheet),
-    ));
+    )).id()
 }
 
 /// How far `p` is from the segment `a`-`b`.
@@ -129,7 +140,7 @@ fn rub(strokes: &mut Vec<Vec<Vec2>>, from: Vec2, to: Vec2) -> bool {
 fn lay_stroke(commands: &mut Commands, sheet: Entity, stroke: &[Vec2]) {
     match stroke {
         [] => {}
-        [p] => piece(commands, sheet, *p, *p),
+        [p] => { piece(commands, sheet, *p, *p); }
         _ => {
             for w in stroke.windows(2) {
                 piece(commands, sheet, w[0], w[1]);
@@ -140,15 +151,82 @@ fn lay_stroke(commands: &mut Commands, sheet: Entity, stroke: &[Vec2]) {
 
 /// The map is drawn anew whenever the run changes: the marks are put back on each new sheet, and
 /// forgotten when a new act begins.
-fn redraw_ink(mut commands: Commands, mut ink: ResMut<MapInk>, net: Option<Res<Net>>, sheets: Query<Entity, Added<MapSheet>>) {
-    let act = net.as_ref().and_then(|n| n.node.state.as_ref()).map(|r| r.act).unwrap_or(0);
-    if act != ink.act {
-        ink.act = act;
-        ink.strokes.clear();
+fn redraw_ink(mut commands: Commands, mut ink: ResMut<MapInk>, sheets: Query<(Entity, Ref<MapSheet>)>, dots: Query<Entity, With<RemoteInk>>) {
+    for (sheet, marker) in &sheets {
+        if marker.is_added() {
+            for stroke in &ink.strokes {
+                lay_stroke(&mut commands, sheet, stroke);
+            }
+        }
+        if marker.is_added() || ink.remote_dirty {
+            for e in &dots {
+                commands.entity(e).despawn();
+            }
+            for strokes in ink.others.values() {
+                for stroke in strokes {
+                    for (a, b) in stroke.first().map(|p| (*p, *p)).into_iter().chain(stroke.windows(2).map(|w| (w[0], w[1]))) {
+                        let e = piece(&mut commands, sheet, a, b);
+                        commands.entity(e).insert((RemoteInk, BackgroundColor(Color::srgb(0.25, 0.36, 0.48))));
+                    }
+                }
+            }
+            ink.remote_dirty = false;
+        }
     }
-    for sheet in &sheets {
-        for stroke in &ink.strokes {
-            lay_stroke(&mut commands, sheet, stroke);
+}
+
+fn snapshot(ink: &MapInk) -> InkChange {
+    InkChange::Snapshot(ink.strokes.iter().map(|s| s.iter().map(|p| p.to_array()).collect()).collect())
+}
+
+fn apply_change(strokes: &mut Vec<Vec<Vec2>>, change: InkChange) {
+    match change {
+        InkChange::Begin(p) => strokes.push(vec![Vec2::from_array(p)]),
+        InkChange::Point(p) => {
+            if let Some(stroke) = strokes.last_mut() {
+                stroke.push(Vec2::from_array(p));
+            }
+        }
+        InkChange::Rub { from, to } => { rub(strokes, Vec2::from_array(from), Vec2::from_array(to)); }
+        InkChange::Clear => strokes.clear(),
+        InkChange::Snapshot(all) => *strokes = all.into_iter().map(|s| s.into_iter().map(Vec2::from_array).collect()).collect(),
+    }
+}
+
+/// Receive even with the map closed; sheet coordinates do not depend on either player's scroll.
+fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMut<NetStatus>) {
+    let Some(mut net) = net else {
+        *ink = MapInk::default();
+        status.ink.clear();
+        status.ink_resync = false;
+        return;
+    };
+    let Some(run) = net.node.state.as_ref() else { return };
+    let (seed, act) = (run.seed, run.act);
+    let changed = ink.seed != Some(seed) || ink.act != act;
+    if changed {
+        *ink = MapInk { seed: Some(seed), act, ..default() };
+    }
+    // Flush earlier edits before answering a snapshot request so reliable ordering cannot
+    // append those same points again after the snapshot.
+    for change in std::mem::take(&mut ink.pending) {
+        net.node.map_ink(To::All, change);
+    }
+    let resync = std::mem::take(&mut status.ink_resync);
+    if changed || resync {
+        net.node.request_map_ink();
+        net.node.map_ink(To::All, snapshot(&ink));
+    }
+    for note in std::mem::take(&mut status.ink) {
+        match note {
+            Note::MapInk { from, seed: s, act: a, change } if s == seed && a == act => {
+                apply_change(ink.others.entry(from).or_default(), change);
+                ink.remote_dirty = true;
+            }
+            Note::MapInkRequest { from, seed: s, act: a } if s == seed && a == act => {
+                net.node.map_ink(To::One(from), snapshot(&ink));
+            }
+            _ => {}
         }
     }
 }
@@ -170,8 +248,9 @@ fn tray_button(commands: &mut ChildSpawnerCommands, label: String, icon: Option<
     button.id()
 }
 
-fn wipe(commands: &mut Commands, ink: &mut MapInk, dots: &Query<Entity, With<InkDot>>) {
+fn wipe(commands: &mut Commands, ink: &mut MapInk, dots: &Query<Entity, (With<InkDot>, Without<RemoteInk>)>) {
     ink.strokes.clear();
+    ink.pending.push(InkChange::Clear);
     ink.drawing = false;
     ink.rubbed_from = None;
     for e in dots {
@@ -200,7 +279,7 @@ fn tray(mut commands: Commands, trays: Query<(), With<InkTray>>, stage: Single<E
             let eraser = tray_button(p, l10n.t("map-ink-eraser"), icon("eraser"), &fonts);
             p.commands().entity(eraser).insert((ToolButton(Tool::Eraser), observe(|_: On<Activate>, mut ink: ResMut<MapInk>| ink.tool = Tool::Eraser)));
             let clear = tray_button(p, l10n.t("map-ink-clear"), icon("wipe"), &fonts);
-            p.commands().entity(clear).insert(observe(|_: On<Activate>, mut commands: Commands, mut ink: ResMut<MapInk>, dots: Query<Entity, With<InkDot>>| wipe(&mut commands, &mut ink, &dots)));
+            p.commands().entity(clear).insert(observe(|_: On<Activate>, mut commands: Commands, mut ink: ResMut<MapInk>, dots: Query<Entity, (With<InkDot>, Without<RemoteInk>)>| wipe(&mut commands, &mut ink, &dots)));
         });
 }
 
@@ -224,7 +303,7 @@ fn draw_ink(
     mut moves: MessageReader<bevy::window::WindowEvent>,
     mut cursor: Local<Option<Vec2>>,
     sheet: Query<Entity, With<MapSheet>>,
-    dots: Query<Entity, With<InkDot>>,
+    dots: Query<Entity, (With<InkDot>, Without<RemoteInk>)>,
     rings: Query<Entity, With<EraserRing>>,
     mut ink: ResMut<MapInk>,
 ) {
@@ -277,6 +356,7 @@ fn draw_ink(
         let from = ink.rubbed_from.replace(at).unwrap_or(at);
         ring(&mut commands, Some((sheet, at)));
         if rub(&mut ink.strokes, from, at) {
+            ink.pending.push(InkChange::Rub { from: from.to_array(), to: at.to_array() });
             for e in &dots {
                 commands.entity(e).despawn();
             }
@@ -293,6 +373,7 @@ fn draw_ink(
     if !ink.drawing || mouse.just_pressed(MouseButton::Right) {
         ink.drawing = true;
         ink.strokes.push(vec![at]);
+        ink.pending.push(InkChange::Begin(at.to_array()));
         piece(&mut commands, sheet, at, at);
         return;
     }
@@ -303,12 +384,55 @@ fn draw_ink(
     }
     // the piece from the last point reaches the pointer whole, however quick the stroke
     stroke.push(at);
+    ink.pending.push(InkChange::Point(at.to_array()));
     piece(&mut commands, sheet, last, at);
 }
 
 #[cfg(test)]
 mod tests {
     use bevy::math::Vec2;
+
+    #[test]
+    fn clearing_my_marks_preserves_the_other_players_marks_on_the_sheet() {
+        use super::*;
+        use bevy::ecs::system::RunSystemOnce;
+        let mut app = App::new();
+        app.init_resource::<MapInk>().add_systems(Update, redraw_ink);
+        app.world_mut().spawn(MapSheet);
+        {
+            let mut ink = app.world_mut().resource_mut::<MapInk>();
+            ink.strokes.push(vec![Vec2::new(10.0, 20.0)]);
+            ink.others.insert(1, vec![vec![Vec2::new(30.0, 40.0)]]);
+        }
+        app.update();
+        app.world_mut().run_system_once(|mut commands: Commands, mut ink: ResMut<MapInk>, dots: Query<Entity, (With<InkDot>, Without<RemoteInk>)>| {
+            wipe(&mut commands, &mut ink, &dots);
+        }).unwrap();
+        assert_eq!(app.world_mut().query_filtered::<Entity, With<RemoteInk>>().iter(app.world()).count(), 1);
+        assert_eq!(app.world_mut().query_filtered::<Entity, (With<InkDot>, Without<RemoteInk>)>().iter(app.world()).count(), 0);
+        assert_eq!(app.world().resource::<MapInk>().pending, vec![InkChange::Clear]);
+    }
+
+    #[test]
+    fn received_strokes_and_erasing_match_the_local_drawing() {
+        use nav_net::InkChange;
+        let mut local = vec![vec![Vec2::new(0.0, 0.0), Vec2::new(400.0, 0.0)]];
+        let mut remote = Vec::new();
+        super::apply_change(&mut remote, InkChange::Begin([0.0, 0.0]));
+        super::apply_change(&mut remote, InkChange::Point([400.0, 0.0]));
+        assert_eq!(remote, local);
+        super::rub(&mut local, Vec2::new(200.0, 0.0), Vec2::new(200.0, 20.0));
+        super::apply_change(&mut remote, InkChange::Rub { from: [200.0, 0.0], to: [200.0, 20.0] });
+        assert_eq!(remote, local);
+        let ink = super::MapInk { strokes: local.clone(), ..Default::default() };
+        // A replacement is idempotent, even if some of its points arrived before the snapshot.
+        super::apply_change(&mut remote, super::snapshot(&ink));
+        super::apply_change(&mut remote, super::snapshot(&ink));
+        assert_eq!(remote, local);
+        super::apply_change(&mut remote, InkChange::Clear);
+        assert!(remote.is_empty());
+        assert!(!local.is_empty());
+    }
 
     #[test]
     fn the_eraser_rubs_out_only_what_it_passes_over() {

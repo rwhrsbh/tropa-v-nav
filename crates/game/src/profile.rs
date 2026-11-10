@@ -14,6 +14,8 @@ pub struct Settings {
     /// Animation speed: 1.0, 1.5 or 2.0.
     pub anim_speed: f32,
     pub less_shake: bool,
+    /// Lift resting cards slightly, while keeping them below the units' HP bars.
+    pub raised_hand: bool,
     /// "Ink": blood is drawn as black ink.
     pub ink: bool,
     pub music: f32,
@@ -40,7 +42,7 @@ pub const WINDOW_SIZES: [(u32, u32); 5] = [(1280, 720), (1600, 900), (1920, 1080
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { anim_speed: 1.0, less_shake: false, ink: false, music: 0.6, sfx: 0.8, narrator: 1.0, voices: 0.8, voice_lang: 0, text_lang: 0, screen: 0, window_size: 1 }
+        Settings { anim_speed: 1.0, less_shake: false, raised_hand: false, ink: false, music: 0.6, sfx: 0.8, narrator: 1.0, voices: 0.8, voice_lang: 0, text_lang: 0, screen: 0, window_size: 1 }
     }
 }
 

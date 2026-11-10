@@ -76,6 +76,28 @@ fn build() -> u64 {
     BUILD.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Pencil changes are cosmetic, ordered by the reliable transport, and owned by their sender.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum InkChange {
+    Begin([f32; 2]),
+    Point([f32; 2]),
+    Rub { from: [f32; 2], to: [f32; 2] },
+    Clear,
+    Snapshot(Vec<Vec<[f32; 2]>>),
+}
+
+impl InkChange {
+    fn valid(&self) -> bool {
+        let point = |p: &[f32; 2]| p.iter().all(|v| v.is_finite() && v.abs() <= 100_000.0);
+        match self {
+            Self::Begin(p) | Self::Point(p) => point(p),
+            Self::Rub { from, to } => point(from) && point(to),
+            Self::Clear => true,
+            Self::Snapshot(strokes) => strokes.iter().flatten().all(point),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Msg {
     /// Client -> host on joining or rejoining, with the client's build.
@@ -119,6 +141,8 @@ pub enum Msg {
     BookCarry { page: String, piece: u32, point: Option<u16>, at: [f32; 3] },
     /// Everyone: where my cursor is over the path map, in stage pixels.
     MapPointer { at: [f32; 2] },
+    MapInk { seed: u64, act: u8, change: InkChange },
+    MapInkRequest { seed: u64, act: u8 },
     /// Everyone: hurry up, I have long since chosen this node of the map.
     Nudge { node: u8 },
 }
@@ -161,6 +185,8 @@ pub enum Note {
     BookCarry { from: u8, page: String, piece: u32, point: Option<u16>, at: [f32; 3] },
     /// Another player's cursor over the map, and their nudge at the node they chose.
     MapPointer { from: u8, at: [f32; 2] },
+    MapInk { from: u8, seed: u64, act: u8, change: InkChange },
+    MapInkRequest { from: Peer, seed: u64, act: u8 },
     Nudge { from: u8, node: u8 },
     HostChanged,
     /// The host plays another build of the game and did not let us in.
@@ -490,6 +516,20 @@ impl Node {
         self.out.push((To::All, Msg::MapPointer { at }));
     }
 
+    pub fn map_ink(&mut self, to: To, change: InkChange) {
+        if let Some(run) = &self.state {
+            if change.valid() {
+                self.out.push((to, Msg::MapInk { seed: run.seed, act: run.act, change }));
+            }
+        }
+    }
+
+    pub fn request_map_ink(&mut self) {
+        if let Some(run) = &self.state {
+            self.out.push((To::All, Msg::MapInkRequest { seed: run.seed, act: run.act }));
+        }
+    }
+
     /// Hurries the others along, from the map node I chose.
     pub fn nudge(&mut self, node: u8) {
         self.out.push((To::All, Msg::Nudge { node }));
@@ -625,6 +665,18 @@ impl Node {
             Msg::MapPointer { at } => {
                 if let Some(slot) = self.lobby.slot_of(from) {
                     self.notes.push(Note::MapPointer { from: slot, at });
+                }
+            }
+            Msg::MapInk { seed, act, change } => {
+                if from != self.me && change.valid() && self.state.as_ref().is_some_and(|r| r.seed == seed && r.act == act) {
+                    if let Some(slot) = self.lobby.slot_of(from) {
+                        self.notes.push(Note::MapInk { from: slot, seed, act, change });
+                    }
+                }
+            }
+            Msg::MapInkRequest { seed, act } => {
+                if from != self.me && self.lobby.slot_of(from).is_some() && self.state.as_ref().is_some_and(|r| r.seed == seed && r.act == act) {
+                    self.notes.push(Note::MapInkRequest { from, seed, act });
                 }
             }
             Msg::Nudge { node } => {

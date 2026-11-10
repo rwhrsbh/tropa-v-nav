@@ -79,6 +79,8 @@ pub struct NetStatus {
     /// The other players' cursors over the map and their nudges, as last heard.
     pub pointers: Vec<(u8, [f32; 2])>,
     pub nudges: Vec<(u8, u8)>,
+    pub ink: Vec<Note>,
+    pub ink_resync: bool,
     /// Seconds the host has not been heard from, once that is long enough to call it lost.
     pub lost: Option<f32>,
     /// The connection is lost: the transport is to try again (Steam joins the lobby anew, the
@@ -669,6 +671,7 @@ fn notes(
             }
             Note::Resynced => {
                 status.run_dirty = true;
+                status.ink_resync = true;
                 if let (Some(combat), Some(me)) = (net.node.state.as_ref().and_then(|r| r.combat.clone()), net.node.my_slot()) {
                     // no animation to catch up on: show the fight as it now stands
                     commands.insert_resource(Session::from_state(combat, me, []));
@@ -689,6 +692,7 @@ fn notes(
             note @ Note::CardHeld { .. } => status.held.push(note),
             note @ (Note::BookHand { .. } | Note::BookTear { .. } | Note::BookTurn { .. } | Note::BookCarry { .. }) => status.book.push(note),
             Note::MapPointer { from, at } => status.pointers.push((from, at)),
+            note @ (Note::MapInk { .. } | Note::MapInkRequest { .. }) => status.ink.push(note),
             Note::Nudge { from, node } => status.nudges.push((from, node)),
         }
     }

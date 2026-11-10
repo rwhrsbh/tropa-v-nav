@@ -195,6 +195,9 @@ menu-continue = Continue: { $hero }, act { $act }
 
 menu-settings = Settings
 settings-speed = Animation speed
+settings-hand = Card position
+settings-hand-default = Default
+settings-hand-raised = Slightly raised
 settings-shake = Less screen shake
 settings-ink = "Ink" mode
 settings-music = Music
