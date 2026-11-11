@@ -269,6 +269,30 @@ fn enter_settings(
             menu_button(l10n.t("coop-back"), &fonts),
             observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Menu)),
         ));
+        // off to the side: game version and check updates button
+        p.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(40),
+                bottom: px(40),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                row_gap: px(8),
+                ..default()
+            },
+            children![
+                (theme::text(format!("v{}", crate::updater::SemVer::current().to_string()), &fonts.num, 20.0, theme::DIM)),
+                (
+                    menu_button(l10n.t("updater-check-btn"), &fonts),
+                    observe(|_: On<Activate>, mut updater: ResMut<crate::updater::UpdaterState>, mut next: ResMut<NextState<AppState>>| {
+                        updater.dismissed = false;
+                        crate::updater::trigger_check(&mut updater);
+                        next.set(AppState::Menu);
+                    }),
+                ),
+            ],
+        ));
+
         // off to the side, or the rows would not fit: where to find what to send with a bug report
         p.spawn((
             Node { position_type: PositionType::Absolute, right: px(40), bottom: px(40), ..default() },

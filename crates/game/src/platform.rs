@@ -95,6 +95,32 @@ pub fn clipboard_set(text: &str) {
 }
 
 /// This machine's IPv4 addresses, as the system lists them.
+/// Opens a URL or system path in the platform default application / browser.
+pub fn open_url(url: &str) {
+    #[cfg(windows)]
+    {
+        let _ = quiet("cmd").args(["/c", "start", "", url]).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = quiet("open").arg(url).spawn();
+    }
+    #[cfg(all(unix, not(any(target_os = "macos", target_os = "android", target_os = "ios"))))]
+    {
+        let _ = quiet("xdg-open").arg(url).spawn();
+    }
+    #[cfg(target_os = "android")]
+    {
+        if let Err(e) = android_open_url(url) {
+            bevy::log::warn!("failed to open url on android: {e}");
+        }
+    }
+    #[cfg(target_os = "ios")]
+    {
+        let _ = url;
+    }
+}
+
 pub fn local_ipv4s() -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     let mut keep = |ip: &str| {
@@ -168,6 +194,21 @@ pub fn immersive() {
 
 /// The Java half (`crates/android/java/tropa/Immersive.java`, built into `immersive.dex`) is
 /// loaded from memory and handed to the UI thread, which alone may change the bars.
+#[cfg(target_os = "android")]
+fn android_open_url(url: &str) -> Result<(), jni::errors::Error> {
+    use jni::objects::{JObject, JValue};
+    let Some(app) = bevy::android::ANDROID_APP.get() else { return Ok(()) };
+    let vm = unsafe { jni::JavaVM::from_raw(app.vm_as_ptr() as *mut _)? };
+    let mut env = vm.attach_current_thread()?;
+    let activity = unsafe { JObject::from_raw(app.activity_as_ptr() as jni::sys::jobject) };
+    let uri_str = env.new_string(url)?;
+    let uri = env.call_static_method("android/net/Uri", "parse", "(Ljava/lang/String;)Landroid/net/Uri;", &[JValue::Object(&uri_str)])?.l()?;
+    let action = env.new_string("android.intent.action.VIEW")?;
+    let intent = env.new_object("android/content/Intent", "(Ljava/lang/String;Landroid/net/Uri;)V", &[JValue::Object(&action), JValue::Object(&uri)])?;
+    env.call_method(&activity, "startActivity", "(Landroid/content/Intent;)V", &[JValue::Object(&intent)])?;
+    Ok(())
+}
+
 #[cfg(target_os = "android")]
 fn android_immersive() -> Result<(), jni::errors::Error> {
     use jni::objects::{JObject, JValue};
