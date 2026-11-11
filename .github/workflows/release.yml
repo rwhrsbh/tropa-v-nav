@@ -43,6 +43,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "desktop-${{ matrix.name }}"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -102,6 +106,15 @@ jobs:
       # the toolchain is the one rust-toolchain.toml pins; the phone's target is added to it
       - name: Rust for Android
         run: rustup target add aarch64-linux-android
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "android-aarch64"
+      - name: Cache cargo-apk binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-apk
+          key: ${{ runner.os }}-cargo-apk-v1
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -115,7 +128,7 @@ jobs:
           python -X utf8 tools/pack_assets.py mobile
       - name: Build the APK
         run: |
-          cargo install cargo-apk --locked
+          which cargo-apk || cargo install cargo-apk --locked
           export ANDROID_NDK_ROOT="$ANDROID_NDK_LATEST_HOME"
           # Use persistent release keystore so Android allows updates without signature mismatch
           if [ -f tools/release.keystore ]; then
