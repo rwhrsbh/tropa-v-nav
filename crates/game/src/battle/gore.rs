@@ -147,18 +147,20 @@ pub(super) fn blood_of(comfort: &Comfort, shown: &Combat, unit: UnitRef) -> Colo
     let def = shown.enemy(uid).map(|e| e.def.as_str()).unwrap_or("");
     match def {
         // the drowned and the ghosts: a pale cold ichor
-        "nav_soul" | "weeper" | "mara" | "drowned_maiden" | "mavka" | "koschei_shadow" | "swamp_light" | "sirin" | "vodyanoy" => Color::srgb(0.50, 0.60, 0.64),
+        "nav_soul" | "weeper" | "mara" | "drowned_maiden" | "mavka" | "koschei_shadow" | "swamp_light" | "sirin" | "vodyanoy" | "nochnitsa" | "polunochnitsa" | "morovitsa" | "sea_guard" | "vodyanoy_tsar" => Color::srgb(0.50, 0.60, 0.64),
         // wood and fungus bleed sap
-        "leshy" | "tree_guard" | "death_oak" | "death_oak_chest" | "mushroom_corpse" | "lesavka" | "chuchelo" => Color::srgb(0.42, 0.40, 0.10),
+        "leshy" | "tree_guard" | "death_oak" | "death_oak_chest" | "mushroom_corpse" | "lesavka" | "chuchelo" | "mokhovik" => Color::srgb(0.42, 0.40, 0.10),
         // things, not bodies: splinters and ash, meltwater, a dying glow
         "death_chest" | "death_egg" | "death_egg_solo" => Color::srgb(0.30, 0.25, 0.18),
-        "ice_crown" => Color::srgb(0.62, 0.74, 0.80),
+        "ice_crown" | "korochun" => Color::srgb(0.62, 0.74, 0.80),
         // bone has only dust in it
         "kostomakha" | "koschei" | "ovinnik" | "viy" => Color::srgb(0.42, 0.36, 0.26),
         // the swamp's things run green-black
         "bolotnik" | "kikimora" | "tinyak" | "shishiga" | "yrka" => Color::srgb(0.26, 0.32, 0.08),
         // old dead blood, black and thick
-        "koschei_guard" | "black_rider" | "vurdalak_elder" | "volot" | "volot_giant" => Color::srgb(0.30, 0.06, 0.04),
+        "koschei_guard" | "black_rider" | "vurdalak_elder" | "volot" | "volot_giant" | "gorynych" | "gorynych_fire" | "gorynych_poison" | "gorynych_thunder" | "gagana" => Color::srgb(0.30, 0.06, 0.04),
+        // warm brigand/beast blood
+        "solovey" | "kot_bayun" => Color::srgb(0.68, 0.08, 0.05),
         // the rest rot: a dark brown-red
         _ => Color::srgb(0.52, 0.09, 0.04),
     }

@@ -1443,6 +1443,7 @@ fn draw_end(
     l10n: Res<L10n>,
     art: Res<Art>,
     assets: Res<AssetServer>,
+    config: Option<Res<crate::Config>>,
 ) {
     let Some(mut net) = net else { return };
     let me = net.node.my_slot();
@@ -1455,6 +1456,7 @@ fn draw_end(
         if let Some(pl) = me.and_then(|m| run.players.get(m as usize)).filter(|_| !net.bot_me && !net.ephemeral) {
             let already = if banked.run == run.seed { banked.n } else { 0 };
             *opened = profile.record_run(&pl.hero, run.oberegi().saturating_sub(already), won, run.circle, run.floors_cleared, run.act);
+            crate::analytics::record_run(&run, config.as_ref().and_then(|c| c.telemetry_url.as_deref()), won);
         }
         status.run_dirty = true;
     }

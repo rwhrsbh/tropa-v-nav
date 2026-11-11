@@ -3,7 +3,9 @@
 ; only what the game loads), then
 ;   ISCC.exe tools\installer.iss
 ; It comes out as target\dist\TropaVNav-Setup-<version>.exe.
-#define Version "0.1.0"
+#ifndef Version
+  #define Version "0.1.8"
+#endif
 
 [Setup]
 AppId=TropaVNav

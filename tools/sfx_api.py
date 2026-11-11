@@ -158,6 +158,25 @@ SOUNDS.update({
     "death_death_egg": ("Egg crushed, a brittle crack and a wet squish, single sound, no music, no speech", 2.0),
     "death_koschei_shadow": ("Shadow dissolving, a cold whispering hiss fading out, single sound, no music, no speech", 2.0),
     "death_death_oak_chest": ("Cursed oak and iron chest breaking together, wood splitting and chains snapping, single sound, no music, no speech", 2.0),
+    # Expansion enemies
+    "death_kot_bayun": ("Monstrous giant cat dying, a deep guttural yowl and hissing rattle cut short, single sound, no music, no speech", 2.0),
+    "death_mokhovik": ("Ancient moss monster crumbling, deep earth thud and dry moss rustle, single sound, no music, no speech", 2.0),
+    "death_nochnitsa": ("Screeching night striga dying, a high piercing scream dissolving into night wind, single sound, no music, no speech", 2.0),
+    "death_baba_yaga": ("Evil old witch falling, a cackling croak breaking into coughing rasps, single sound, no music, no speech", 2.0),
+    "death_polunochnitsa": ("Midnight phantom dying, an eerie cold wail vanishing into silence, single sound, no music, no speech", 2.0),
+    "death_zlyden": ("Tiny misfortune imp dying, a pathetic squeaking whimper and a clatter of stolen coins, single sound, no music, no speech", 2.0),
+    "death_morovitsa": ("Death maiden dying, a mournful chilling sigh and rattling scythe clatter, single sound, no music, no speech", 2.0),
+    "death_ogneya": ("Fire spirit dying, a loud hiss of extinguishing embers and steam, single sound, no music, no speech", 2.0),
+    "death_sea_guard": ("Armored sea guard dying, wet heavy armor clatter and bubbling splash, single sound, no music, no speech", 2.0),
+    "death_gagana": ("Iron-beaked monstrous bird dying, a harsh metallic screech and heavy iron wings collapsing, single sound, no music, no speech", 2.0),
+    "death_gorynych_fire": ("Dragon head severed, a deafening reptilian roar and erupting flame sputtering out, single sound, no music, no speech", 2.2),
+    # Combat mechanics cues
+    "moss_absorb": ("Heavy axe blow thudding into thick damp moss, muffled impact with a squelch, dry, no music", 0.8),
+    "kinetic_burst": ("Explosive kinetic shockwave erupting from compressed moss and wood, booming shockwave blast, dry, no music", 1.5),
+    "spell_mirror": ("Iron bird feathers reflecting magic, sharp crystalline ring and a ricocheting screech, dry, no music", 1.0),
+    "mortar_crush": ("Brutal stone mortar slamming down onto ground, crushing heavy stone impact, dry, no music", 1.2),
+    "doom_tick": ("Dark hourglass ticking, eerie metallic clockwork chime of death counting down, dry, no music", 1.5),
+    "head_regrow": ("Monstrous three-headed dragon flesh regenerating, wet tearing sinews and guttural hiss, dry, no music", 2.0),
     "death_death_egg_solo": ("Egg crushed, a brittle crack and a wet squish, then a faint needle snapping, single sound, no music, no speech", 2.0),
 })
 

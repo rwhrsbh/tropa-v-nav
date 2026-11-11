@@ -1,0 +1,167 @@
+// Новые враги (Акты 1-4). HP для 1 игрока, масштабируется правилами круга.
+[
+    (
+        id: "kot_bayun", hp: (85, 95), flags: ["bayun_perch"],
+        moves: [
+            (id: "purr", intent: Debuff, effects: [Hook("bayun_eyelids")]),
+            (id: "claws", intent: Attack, targeted: true, effects: [Hook("bayun_claws")]),
+            (id: "pounce", intent: Attack, targeted: true, effects: [Damage(N(12), Target), Apply(Vulnerable, N(1), Target)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "mokhovik", hp: (48, 54), flags: ["kinetic_moss"],
+        moves: [
+            (id: "moss_shield", intent: Defend, effects: [Block(N(10), Me)]),
+            (id: "spore_slam", intent: Attack, targeted: true, effects: [Damage(N(9), Target), Apply(Weak, N(1), Target)]),
+            (id: "kinetic_burst", intent: Attack, targeted: true, effects: [Hook("kinetic_burst")]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "nochnitsa", hp: (22, 26), flags: ["flicker"],
+        moves: [
+            (id: "snip", intent: Attack, targeted: true, effects: [Damage(N(6), Target), AddCard(card: "dread", pile: Discard, to: Target)]),
+            (id: "shadow_glide", intent: Defend, effects: [Block(N(5), Me)]),
+            (id: "sever_fate", intent: Attack, targeted: true, effects: [Damage(N(10), Target)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "baba_yaga", hp: (360, 370), flags: ["yaga_mortar"],
+        moves: [
+            (id: "pestle_smash", intent: Attack, targeted: true, effects: [Damage(N(18), Target), Apply(Vulnerable, N(2), Target)]),
+            (id: "witch_cauldron", intent: Special, effects: [Hook("yaga_cauldron"), Block(N(15), Me)]),
+            (id: "brew_steal", intent: Debuff, targeted: true, effects: [Hook("yaga_steal_potion")]),
+            (id: "mortar_flight", intent: Defend, effects: [Block(N(25), Me), Apply(Thorns, N(3), Me)]),
+            (id: "hut_trample", intent: AttackAll, effects: [Damage(N(16), AllFoes)]),
+            (id: "bone_crusher", intent: Attack, targeted: true, effects: [Damage(N(26), Target)]),
+        ],
+        opening: [1],
+        pattern: [0, 2, 3, 0, 1],
+        phase2_at: 50,
+        phase2: [4, 5, 3, 0],
+    ),
+    (
+        id: "polunochnitsa", hp: (58, 64),
+        moves: [
+            (id: "nightmare", intent: Debuff, targeted: true, effects: [Hook("nightmare_afflict")]),
+            (id: "piercing_wail", intent: Attack, targeted: true, effects: [Damage(N(13), Target)]),
+            (id: "chill_touch", intent: Attack, targeted: true, effects: [Damage(N(7), Target), Apply(Weak, N(2), Target)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "zlyden", hp: (32, 38), flags: ["thief"],
+        moves: [
+            (id: "pickpocket", intent: Debuff, targeted: true, effects: [StealGoldPct(15), Hook("poverty_curse")]),
+            (id: "spite_bite", intent: Attack, targeted: true, effects: [Damage(N(8), Target), Apply(Weak, N(1), Target)]),
+            (id: "scurry_away", intent: Unknown, effects: [Flee]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "morovitsa", hp: (130, 145),
+        moves: [
+            (id: "doom_gaze", intent: Debuff, targeted: true, effects: [Hook("doom_clock")]),
+            (id: "plague_scythe", intent: Attack, targeted: true, effects: [Damage(N(8), Target), Damage(N(8), Target), Apply(Rot, N(2), Target)]),
+            (id: "death_shroud", intent: Defend, effects: [Block(N(16), Me)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "ogneya", hp: (68, 76), flags: ["overheat"],
+        moves: [
+            (id: "fire_whip", intent: Attack, targeted: true, effects: [Damage(N(13), Target), AddCard(card: "burn", pile: Discard, to: Target)]),
+            (id: "blaze_barrier", intent: Defend, effects: [Block(N(12), Me), Apply(Thorns, N(2), Me)]),
+            (id: "heat_lash", intent: Attack, targeted: true, effects: [Damage(N(16), Target)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "sea_guard", hp: (34, 40),
+        moves: [
+            (id: "coral_shield", intent: Defend, effects: [Block(N(8), Me)]),
+            (id: "trident_thrust", intent: Attack, targeted: true, effects: [Damage(N(9), Target)]),
+        ],
+        pattern: [0, 1],
+    ),
+    (
+        id: "gagana", hp: (160, 175), flags: ["spell_mirror"],
+        moves: [
+            (id: "iron_beak", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "storm_screech", intent: Debuff, effects: [Hook("storm_screech")]),
+            (id: "copper_talons", intent: Attack, targeted: true, effects: [Damage(N(20), Target)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        id: "gorynych_fire", hp: (60, 68), flags: ["gorynych_head"],
+        moves: [
+            (id: "fire_breath", intent: Attack, targeted: true, effects: [Damage(N(9), Target), AddCard(card: "burn", pile: Discard, to: Target)]),
+            (id: "smoke_screen", intent: Defend, effects: [Block(N(10), Me)]),
+        ],
+        pattern: [0, 1],
+    ),
+    (
+        id: "gorynych_poison", hp: (65, 75), flags: ["gorynych_head"],
+        moves: [
+            (id: "acid_spit", intent: Attack, targeted: true, effects: [Damage(N(11), Target), Apply(Vulnerable, N(2), Target)]),
+            (id: "venom_bite", intent: Attack, targeted: true, effects: [Damage(N(8), Target), Apply(Rot, N(3), Target)]),
+        ],
+        pattern: [0, 1],
+    ),
+    (
+        id: "gorynych_thunder", hp: (60, 68), flags: ["gorynych_head"],
+        moves: [
+            (id: "thunder_roar", intent: Attack, targeted: true, effects: [Damage(N(14), Target), Hook("roar_discard")]),
+            (id: "shock_shield", intent: Defend, effects: [Block(N(12), Me)]),
+        ],
+        pattern: [0, 1],
+    ),
+    (
+        id: "solovey", hp: (250, 270),
+        moves: [
+            (id: "call_gang", intent: Summon, effects: [Summon("raven", 2)]),
+            (id: "robber_whistle", intent: AttackAll, effects: [Hits(N(5), 2, AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "oak_ambush", intent: Defend, effects: [Block(N(18), Me), Apply(Thorns, N(2), Me)]),
+            (id: "whistling_arrow", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Bleed, N(2), Target)]),
+            (id: "deafening_screech", intent: Special, effects: [Hook("solovey_whistle"), Damage(N(12), AllFoes)]),
+            (id: "hurricane_volley", intent: Attack, targeted: true, effects: [Hits(N(6), 3, Target)]),
+        ],
+        opening: [0],
+        pattern: [1, 3, 2, 1, 3],
+        phase2_at: 50,
+        phase2: [4, 5, 2, 1],
+    ),
+    (
+        id: "korochun", hp: (270, 290),
+        moves: [
+            (id: "rime_curse", intent: Special, effects: [Hook("korochun_chill"), Apply(Hex, N(2), Target)]),
+            (id: "ice_scythe", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "permafrost", intent: Defend, effects: [Block(N(20), Me), Apply(Fortitude, N(2), Me)]),
+            (id: "blizzard", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "winter_solstice", intent: AttackAll, effects: [Damage(N(14), AllFoes), Apply(Hex, N(2), AllFoes)]),
+            (id: "permafrost_cleave", intent: Attack, targeted: true, effects: [Damage(N(22), Target)]),
+        ],
+        opening: [0],
+        pattern: [1, 2, 3, 1, 3],
+        phase2_at: 50,
+        phase2: [4, 5, 2, 3],
+    ),
+    (
+        id: "vodyanoy_tsar", hp: (380, 400),
+        moves: [
+            (id: "whirlpool", intent: Special, effects: [Hook("tsar_whirlpool"), Damage(N(12), AllFoes)]),
+            (id: "abyssal_trident", intent: Attack, targeted: true, effects: [Damage(N(22), Target), Apply(Bleed, N(3), Target)]),
+            (id: "deep_surge", intent: Defend, effects: [Block(N(25), Me), Heal(N(12), Me)]),
+            (id: "drown_curse", intent: Attack, targeted: true, effects: [Damage(N(15), Target), Apply(Drowse, N(2), Target)]),
+            (id: "deluge", intent: AttackAll, effects: [Damage(N(18), AllFoes)]),
+            (id: "drown_in_depths", intent: Attack, targeted: true, effects: [Hits(N(9), 3, Target)]),
+        ],
+        opening: [0],
+        pattern: [1, 2, 3, 1, 2],
+        phase2_at: 50,
+        phase2: [4, 5, 2, 1],
+    ),
+]

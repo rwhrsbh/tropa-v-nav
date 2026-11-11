@@ -131,6 +131,23 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/kostomakha", &[(Part::Head, Vec2::new(0.473, 0.143), 1.0), (Part::Shield, Vec2::new(0.888, 0.338), 0.8), (Part::Arm, Vec2::new(0.460, 0.381), 1.0)]),
     ("enemies/mara", &[(Part::Head, Vec2::new(0.54, 0.22), 1.0), (Part::Shield, Vec2::new(0.58, 0.45), 0.8), (Part::Arm, Vec2::new(0.32, 0.42), -0.5)]),
     ("enemies/poludnitsa", &[(Part::Head, Vec2::new(0.464, 0.219), 1.0), (Part::Shield, Vec2::new(0.387, 0.406), 0.8), (Part::Arm, Vec2::new(0.545, 0.406), 1.0)]),
+    ("enemies/kot_bayun", &[(Part::Head, Vec2::new(0.5, 0.396), 1.0)]),
+    ("enemies/mokhovik", &[(Part::Head, Vec2::new(0.5, 0.394), 1.0)]),
+    ("enemies/nochnitsa", &[(Part::Head, Vec2::new(0.5, 0.3), 1.0)]),
+    ("enemies/baba_yaga", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
+    ("enemies/polunochnitsa", &[(Part::Head, Vec2::new(0.499, 0.281), 1.0)]),
+    ("enemies/zlyden", &[(Part::Head, Vec2::new(0.5, 0.347), 1.0)]),
+    ("enemies/morovitsa", &[(Part::Head, Vec2::new(0.499, 0.281), 1.0)]),
+    ("enemies/ogneya", &[(Part::Head, Vec2::new(0.5, 0.3), 1.0)]),
+    ("enemies/sea_guard", &[(Part::Head, Vec2::new(0.499, 0.301), 1.0)]),
+    ("enemies/gagana", &[(Part::Head, Vec2::new(0.5, 0.375), 1.0)]),
+    ("enemies/gorynych", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
+    ("enemies/gorynych_fire", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
+    ("enemies/gorynych_poison", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
+    ("enemies/gorynych_thunder", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
+    ("enemies/solovey", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
+    ("enemies/korochun", &[(Part::Head, Vec2::new(0.499, 0.3), 1.0)]),
+    ("enemies/vodyanoy_tsar", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
 ];
 
 /// The parts `stem` is cut into, with their joints.

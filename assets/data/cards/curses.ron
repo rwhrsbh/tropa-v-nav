@@ -63,4 +63,10 @@
         id: "mire", kind: Status, rarity: Special, cost: 1,
         keywords: [Exhaust],
     ),
+    (
+        // Тяжёлые веки (Кот Баюн): стоит 1 чтобы сбросить, иначе в конце хода сжигает 1 добор
+        id: "heavy_eyelids", kind: Status, rarity: Special, cost: 1,
+        keywords: [Exhaust],
+        in_hand_end: [Flag("draw_less", 1)],
+    ),
 ]

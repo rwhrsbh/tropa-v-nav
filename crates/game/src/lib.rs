@@ -6,6 +6,7 @@
 #[cfg(any(target_os = "android", target_os = "ios"))]
 extern crate steam_stub as steamworks;
 
+mod analytics;
 mod art;
 mod audio;
 mod battle;
@@ -68,6 +69,8 @@ pub enum AppState {
     Shop,
     Omen,
     RunEnd,
+    /// Balance and card analytics dashboard.
+    Analytics,
 }
 
 /// Parent of every screen: a 1920x1080 node centred in the window.
@@ -80,12 +83,14 @@ pub struct Config {
     pub steam_app_id: u32,
     #[serde(default)]
     pub lang: Option<String>,
+    #[serde(default)]
+    pub telemetry_url: Option<String>,
 }
 
 fn load_config(art: &art::Art) -> Config {
     art.read_text("config.ron")
         .and_then(|s| ron::from_str(&s).ok())
-        .unwrap_or(Config { steam_app_id: 480, lang: None })
+        .unwrap_or(Config { steam_app_id: 480, lang: None, telemetry_url: None })
 }
 
 /// Starts the game and runs it until it is closed.
@@ -107,7 +112,7 @@ pub fn run() {
         .unwrap_or(Lang::Old);
     // the build's fingerprint: its version and every rule file it read, so a party is never
     // played by two builds that would deal one run out two ways
-    let fingerprint = std::cell::Cell::new(fnv(0xcbf2_9ce4_8422_2325, env!("CARGO_PKG_VERSION").as_bytes()));
+    let fingerprint = std::cell::Cell::new(fnv(0xcbf2_9ce4_8422_2325, env!("GAME_VERSION").as_bytes()));
     let content = match nav_core::Content::load_with(&|sub| {
         let dir = format!("data/{sub}");
         let files: Vec<(String, String)> = art.list(&dir, "ron").into_iter().filter_map(|name| art.read_text(&format!("{dir}/{name}")).map(|src| (format!("{dir}/{name}"), src))).collect();
@@ -151,7 +156,7 @@ pub fn run() {
     .add_systems(PostStartup, menu::apply_settings)
     .add_systems(Update, fit_stage)
     .add_plugins((menu::plugin, battle::plugin, net::plugin, lobby::plugin, run_ui::plugin, audio::plugin, story::plugin, book::plugin, deck_fx::plugin, card_flip::plugin, map_party::plugin, map_ink::plugin, between::plugin, preload::plugin))
-    .add_plugins((reconnect::plugin, pause::plugin, touch::plugin, updater::plugin));
+    .add_plugins((reconnect::plugin, pause::plugin, touch::plugin, updater::plugin, analytics::plugin));
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     app.add_systems(Update, window_icon);
@@ -160,7 +165,7 @@ pub fn run() {
     #[cfg(feature = "dev")]
     app.add_plugins(dev::plugin);
     app.add_plugins(lan::plugin).add_systems(Update, (logfile::note_screens, name_window));
-    info!("Tropa v Nav {} ({}), language {:?}, Steam {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, config_lang, steam.is_ok());
+    info!("Tropa v Nav {} ({}), language {:?}, Steam {}", env!("GAME_VERSION"), std::env::consts::OS, config_lang, steam.is_ok());
 
     // without Steam the game still runs: alone, or with friends over a local network
     match steam {

@@ -1,0 +1,26 @@
+// Знамения Острова Буян (Акт 4).
+[
+    (
+        id: "alatyr_stone", kind: Personal, act: 4,
+        options: [
+            (id: "pray", fx: [HpPct(35)]),
+            (id: "sharpen", fx: [UpgradeRandomCard, UpgradeRandomCard]),
+            (id: "sacrifice", fx: [HpPct(-20), Relic]),
+        ],
+    ),
+    (
+        id: "waters_of_buyan", kind: Vote, act: 4,
+        options: [
+            (id: "dead_water", fx: [SewHeadOn, MaxHp(10)]),
+            (id: "living_water", fx: [Hp(25), Potion]),
+        ],
+    ),
+    (
+        id: "buyan_oak", kind: Personal, act: 4,
+        options: [
+            (id: "climb", fx: [Relic, Card("morok")]),
+            (id: "hollow", fx: [Gold(80), HpPct(-10)]),
+            (id: "leave", fx: []),
+        ],
+    ),
+]

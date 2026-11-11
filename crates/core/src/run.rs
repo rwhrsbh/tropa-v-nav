@@ -334,7 +334,7 @@ pub fn out_of_fight_heals(effects: &[Effect]) -> Vec<(i32, bool)> {
 }
 
 /// The relics hidden in the tale's book, one per act's secret.
-pub const SECRET_RELICS: [&str; 4] = ["kotomka", "erased_name", "ice_tale", "unheard_tale"];
+pub const SECRET_RELICS: [&str; 5] = ["kotomka", "erased_name", "ice_tale", "unheard_tale", "alatyr_heart"];
 /// What the unheard tale gives each time the book is shut early.
 pub const UNHEARD_GOLD: i32 = 15;
 
@@ -522,6 +522,34 @@ pub fn generate_map(rng: &mut Rng, circle: Circle) -> Map {
         }
     }
     Map { floors }
+}
+
+/// Generates a 6-floor map for Act 4 (Buyan Island) leading to the final battle with Koschei.
+pub fn generate_buyan_map(_rng: &mut Rng, _circle: Circle) -> Map {
+    let f0 = vec![
+        MapNode { kind: NodeKind::Fight, col: 2, next: vec![0, 1] },
+        MapNode { kind: NodeKind::Fight, col: 4, next: vec![0, 1] },
+    ];
+    let f1 = vec![
+        MapNode { kind: NodeKind::Event, col: 2, next: vec![0, 1] },
+        MapNode { kind: NodeKind::Event, col: 4, next: vec![0, 1] },
+    ];
+    let f2 = vec![
+        MapNode { kind: NodeKind::Elite, col: 2, next: vec![0, 1] },
+        MapNode { kind: NodeKind::Elite, col: 4, next: vec![0, 1] },
+    ];
+    let f3 = vec![
+        MapNode { kind: NodeKind::Shop, col: 2, next: vec![0, 1] },
+        MapNode { kind: NodeKind::Rest, col: 4, next: vec![0, 1] },
+    ];
+    let f4 = vec![
+        MapNode { kind: NodeKind::Fight, col: 2, next: vec![0] },
+        MapNode { kind: NodeKind::Event, col: 4, next: vec![0] },
+    ];
+    let f5 = vec![
+        MapNode { kind: NodeKind::Rest, col: 3, next: vec![] },
+    ];
+    Map { floors: vec![f0, f1, f2, f3, f4, f5] }
 }
 
 impl Run {
@@ -1207,9 +1235,9 @@ impl Run {
             self.at = None;
             self.trail.clear();
             // a new land, rested: everyone still on their feet gets back most of what they lost (as
-            // Slay the Spire 2's ancients heal, four fifths of it). Not before Koschei: after Mara
-            // the party goes to him as it is
-            if self.act <= 3 {
+            // Slay the Spire 2's ancients heal, four fifths of it). Now that Act 4 Buyan Island has
+            // its own floors and encounters before Koschei, the party heals after Mara as well.
+            if self.act <= 4 {
                 for q in 0..self.players.len() {
                     let pl = &mut self.players[q];
                     if !pl.beheaded && pl.hp < pl.max_hp {
@@ -1225,7 +1253,7 @@ impl Run {
                     self.give_potion(c, q, ev);
                 }
             }
-            self.map = if self.act >= 4 { Map { floors: vec![] } } else { generate_map(&mut self.rng, Circle(self.circle)) };
+            self.map = if self.act >= 4 { generate_buyan_map(&mut self.rng, Circle(self.circle)) } else { generate_map(&mut self.rng, Circle(self.circle)) };
             // the boss leaves a trophy: three of their own for every player, to take one
             let offers = self.roll_trophies(c);
             if offers.iter().all(|own| !own.is_empty()) {
@@ -1733,7 +1761,7 @@ pub fn run_bot(c: &Content, run: &Run, player: u8) -> Option<RunAction> {
     let p = player as usize;
     match &run.stage {
         Stage::Map { votes } => {
-            if votes.get(p)?.is_some() {
+            if votes.get(p)?.is_some() || run.players.get(p).is_some_and(|pl| pl.beheaded) {
                 return None;
             }
             // the road is chosen by how much blood is left: the hurt look for a fire,

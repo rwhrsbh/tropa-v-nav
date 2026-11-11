@@ -62,6 +62,7 @@ jobs:
             linux) export RUSTFLAGS='-C link-arg=-Wl,-rpath,$ORIGIN' ;;
             macos) export RUSTFLAGS='-C link-arg=-Wl,-rpath,@executable_path' ;;
           esac
+          export GAME_VERSION="${TAG#v}"
           cargo build --release -p tropa
       - name: Lay out the game
         shell: bash
@@ -81,7 +82,8 @@ jobs:
         if: matrix.name == 'windows'
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" tools\installer.iss
+          $ver = $env:TAG.TrimStart('v')
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DVersion=$ver tools\installer.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           gh release upload $env:TAG (Get-ChildItem target\dist\*.exe).FullName --clobber
       - name: Upload

@@ -528,6 +528,26 @@ impl<'a> Exec<'a> {
                 let e = &mut self.s.enemies[idx];
                 // a thing of straw: no one blow does it more than so much harm
                 let d = if e.flags.contains_key("hollow") { d.min(HOLLOW_MOST) } else { d };
+                // Nochnitsa flicker: on even rounds, incoming attack damage reduced to 1
+                let d = if attack && e.flags.contains_key("flicker") && self.s.round % 2 == 0 { d.min(1) } else { d };
+                // Mokhovik kinetic moss: attacks under 6 damage are absorbed into kinetic charge
+                let d = if attack && e.flags.contains_key("kinetic_moss") && d < 6 {
+                    *e.flags.entry("kinetic_charge".into()).or_insert(0) += 1;
+                    d.min(1)
+                } else {
+                    d
+                };
+                // Baba Yaga mortar: reduces damage by 35% until 28+ damage taken in one turn
+                let d = if e.flags.contains_key("yaga_mortar") {
+                    let taken = e.flags.entry("mortar_damage".into()).or_insert(0);
+                    *taken += d;
+                    if *taken >= 28 {
+                        e.flags.remove("yaga_mortar");
+                    }
+                    d * 65 / 100
+                } else {
+                    d
+                };
                 let blocked = d.min(e.block);
                 e.block -= blocked;
                 let mut lost = (d - blocked).min(e.hp);
@@ -569,8 +589,17 @@ impl<'a> Exec<'a> {
         if attack {
             if let Some(s) = src {
                 let thorns = self.s.status(dst, S::Thorns);
-                if thorns > 0 && s != dst {
-                    self.hurt(None, s, thorns, false);
+                let bayun_perch = matches!(dst, UnitRef::Enemy(uid) if self.s.enemy(uid).is_some_and(|e| e.flags.contains_key("bayun_perch")));
+                let spell_mirror = matches!(dst, UnitRef::Enemy(uid) if self.s.enemy(uid).is_some_and(|e| e.flags.contains_key("spell_mirror")));
+                let mut reflect = thorns;
+                if bayun_perch {
+                    reflect += 2;
+                }
+                if spell_mirror {
+                    reflect += (d * 30 / 100).max(1);
+                }
+                if reflect > 0 && s != dst {
+                    self.hurt(None, s, reflect, false);
                 }
             }
         }
@@ -1926,6 +1955,34 @@ impl<'a> Exec<'a> {
             }
             self.hero(slot).hand = keep;
             self.rot_tick(UnitRef::Hero(slot));
+        }
+        // Morovitsa Doom countdown
+        for slot in self.standing() {
+            let triggered = if let Some(left) = self.s.heroes[slot as usize].flags.get_mut("doom") {
+                *left -= 1;
+                *left <= 0
+            } else {
+                false
+            };
+            if triggered {
+                self.s.heroes[slot as usize].flags.remove("doom");
+                self.lose_hp(UnitRef::Hero(slot), 45);
+            }
+        }
+        // Gorynych Head Regrowth
+        let any_head_alive = self.s.enemies.iter().any(|e| e.alive && e.flags.contains_key("gorynych_head"));
+        if any_head_alive {
+            for e in &mut self.s.enemies {
+                if !e.alive && e.flags.contains_key("gorynych_head") {
+                    let turns = e.flags.entry("gorynych_regrowth".into()).or_insert(2);
+                    *turns -= 1;
+                    if *turns <= 0 {
+                        e.alive = true;
+                        e.hp = 35;
+                        e.flags.remove("gorynych_regrowth");
+                    }
+                }
+            }
         }
         self.check_end();
         if self.s.phase != Phase::Heroes {

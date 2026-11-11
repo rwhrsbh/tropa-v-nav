@@ -4,7 +4,7 @@ members = ["crates/core", "crates/net", "crates/game", "crates/steam_stub", "cra
 
 [workspace.package]
 edition = "2021"
-version = "0.1.0"
+version = "0.1.8"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

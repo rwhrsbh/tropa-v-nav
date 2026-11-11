@@ -3851,15 +3851,16 @@ dependencies = [
 
 [[package]]
 name = "nav_core"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "ron",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "nav_net"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "nav_core",
  "ron",
@@ -5220,7 +5221,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "steam-stub"
-version = "0.1.0"
+version = "0.1.8"
 
 [[package]]
 name = "steamworks"
@@ -5585,7 +5586,7 @@ dependencies = [
 
 [[package]]
 name = "tropa"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "bevy",
  "cpal",
@@ -5605,7 +5606,7 @@ dependencies = [
 
 [[package]]
 name = "tropa-android"
-version = "0.1.0"
+version = "0.1.8"
 dependencies = [
  "bevy",
  "tropa",

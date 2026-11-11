@@ -613,7 +613,7 @@ fn a_schism_parts_the_party() {
 #[test]
 fn fifty_omens_of_all_four_kinds() {
     let c = content();
-    assert_eq!(c.events.values().filter(|e| !e.for_the_maimed).count(), 50);
+    assert_eq!(c.events.values().filter(|e| !e.for_the_maimed).count(), 53);
     for kind in [EventKind::Personal, EventKind::Vote, EventKind::Sacrifice, EventKind::Schism] {
         assert!(c.events.values().any(|e| e.kind == kind), "{kind:?}");
     }
@@ -722,7 +722,7 @@ fn the_card_pool_matches_the_design_document() {
     let count = |f: &dyn Fn(&CardDef) -> bool| real.iter().filter(|d| f(d)).count();
     assert_eq!(count(&|d| d.hero.is_empty() && !matches!(d.kind, CardType::Curse | CardType::Status) && d.rarity != Rarity::Special), 30, "neutral");
     assert_eq!(count(&|d| d.kind == CardType::Curse), 13, "curses");
-    assert_eq!(count(&|d| d.kind == CardType::Status), 8, "statuses");
+    assert_eq!(count(&|d| d.kind == CardType::Status), 9, "statuses");
     assert_eq!(count(&|d| !d.hero.is_empty()), 564, "hero cards");
 }
 
@@ -870,9 +870,9 @@ fn a_secret_of_the_book_gives_its_relic_once() {
     run.apply(&c, 1, &RunAction::FindSecret { act: 2 }).unwrap();
     assert!(run.players[1].relics.iter().any(|r| r == "erased_name"));
     assert!(!run.players[0].relics.iter().any(|r| r == "erased_name"));
-    // the same secret is not found twice in a run, and there are only four
+    // the same secret is not found twice in a run, and there are only five
     assert_eq!(run.apply(&c, 0, &RunAction::FindSecret { act: 2 }), Err(RunError::AlreadyDone));
-    assert_eq!(run.apply(&c, 0, &RunAction::FindSecret { act: 5 }), Err(RunError::BadChoice));
+    assert_eq!(run.apply(&c, 0, &RunAction::FindSecret { act: 6 }), Err(RunError::BadChoice));
     for id in SECRET_RELICS {
         assert_eq!(c.relics[id].pool, RelicPool::Book, "{id}");
     }

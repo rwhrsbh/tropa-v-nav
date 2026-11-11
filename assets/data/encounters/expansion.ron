@@ -1,0 +1,72 @@
+// Новые энкаунтеры (паки врагов, никаких одиночек).
+[
+    (
+        id: "a1_bayun", act: 1, kind: Normal,
+        enemies: ["kot_bayun", "raven", "raven"], solo: ["kot_bayun", "raven"],
+        extra3: ["raven"], extra4: ["raven"],
+    ),
+    (
+        id: "a1_mokhovik", act: 1, kind: Normal,
+        enemies: ["mokhovik", "kikimora"], solo: ["mokhovik"],
+        extra3: ["grey_wolf"], extra4: ["shishiga"],
+    ),
+    (
+        id: "a1_nochnitsy", act: 1, kind: Normal,
+        enemies: ["nochnitsa", "nochnitsa"], solo: ["nochnitsa"],
+        extra3: ["grey_wolf"], extra4: ["nochnitsa"],
+    ),
+    (
+        id: "a1_solovey", act: 1, kind: Boss,
+        enemies: ["solovey"], solo: ["solovey"],
+        extra4: ["raven"],
+    ),
+    (
+        id: "a1_korochun", act: 1, kind: Boss,
+        enemies: ["korochun"], solo: ["korochun"],
+    ),
+    (
+        id: "a2_baba_yaga", act: 2, kind: Boss,
+        enemies: ["baba_yaga"], solo: ["baba_yaga"],
+        extra4: ["anchutka"],
+    ),
+    (
+        id: "a2_vodyanoy_tsar", act: 2, kind: Boss,
+        enemies: ["vodyanoy_tsar"], solo: ["vodyanoy_tsar"],
+        extra4: ["swamp_light"],
+    ),
+    (
+        id: "a2_polunochnitsa", act: 2, kind: Normal,
+        enemies: ["polunochnitsa", "nochnitsa", "nochnitsa"], solo: ["polunochnitsa", "nochnitsa"],
+        extra4: ["igosha"],
+    ),
+    (
+        id: "a2_zlydni", act: 2, kind: Normal,
+        enemies: ["zlyden", "zlyden", "kladovik"], solo: ["zlyden", "kladovik"],
+        extra3: ["zlyden"], extra4: ["anchutka"],
+    ),
+    (
+        id: "a4_sea_guards", act: 4, kind: Normal,
+        enemies: ["sea_guard", "sea_guard", "raven_upyr"],
+        extra3: ["sea_guard"], extra4: ["sea_guard"],
+    ),
+    (
+        id: "a4_ogneya", act: 4, kind: Normal,
+        enemies: ["ogneya", "koschei_guard"],
+        extra3: ["sea_guard"], extra4: ["koschei_guard"],
+    ),
+    (
+        id: "a4_morovitsa", act: 4, kind: Elite,
+        enemies: ["morovitsa", "sea_guard", "sea_guard"], solo: ["morovitsa", "sea_guard"],
+        extra4: ["sea_guard"],
+    ),
+    (
+        id: "a4_gagana", act: 4, kind: Elite,
+        enemies: ["gagana", "sea_guard", "sea_guard"], solo: ["gagana", "sea_guard"],
+        extra3: ["sea_guard"], extra4: ["sea_guard"],
+    ),
+    (
+        id: "a4_gorynych", act: 4, kind: Elite,
+        enemies: ["gorynych_fire", "gorynych_poison", "gorynych_thunder"],
+        solo: ["gorynych_fire", "gorynych_poison", "gorynych_thunder"],
+    ),
+]

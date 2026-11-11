@@ -71,3 +71,19 @@ Single full-body creature, three-quarter view facing left, feet on the ground ne
 | `death_hare` | 512×768 | A lean grey hare in mid-leap, ears flat, wild white-rimmed eyes. |
 | `death_duck` | 512×768 | A wild duck in flight, wings fully spread, neck stretched forward. |
 | `death_egg` | 512×768 | A large pale egg with a faint crack, a thin dark needle visible inside it against the light. |
+| `sea_guard` | 512×768 | A sea guard of Buyan: an ancient drowned warrior clad in verdigris-covered bronze plate and barnacle-encrusted mail, closed helm, wielding an ornate blackened iron trident. |
+| `ogneya` | 512×768 | Ogneya, maiden of embers: a slender burning spirit woman whose hair is swirling orange embers, scorched dark skin, wielding a whip of liquid fire, trailing smoke and soot. |
+| `gagana` | 1024×1024 | Bird Gagana, the mythical iron bird of Buyan: an enormous predator bird with plumage of polished steel and dark bronze, a vicious curved iron beak that reflects light like a mirror, razor talons of solid copper. |
+| `gorynych_fire` | 1536×1536 | Zmey Gorynych, three-headed Slavic dragon: an immense coiled dragon with heavy obsidian and dark green scales, three distinct serpentine heads (flame, venom, lightning), massive bat-like wings, powerful taloned limbs. |
+
+## Новые враги дополнения (Акты 1–3)
+
+| id | размер | описание |
+| --- | --- | --- |
+| `kot_bayun` | 1024×1024 | Cat Bayun: a monstrous predatory grey tomcat the size of an ox, perched high on a rotting wooden post, eyes glowing dull amber, iron claws extending from thick paws, razor needle teeth in a purring snarl, matted pelt. |
+| `mokhovik` | 512×768 | A mokhovik, a stout moss-covered forest dweller: squat and round like an ancient damp boulder, covered in thick spongy peat and dripping green lichen, root-like arms, hollow dark eyes, absorbing kinetic shock with quiet menace. |
+| `nochnitsa` | 512×768 | A nochnitsa striga, night spirit of nightmares: a gaunt hovering shadow-figure with long tattered grey burial rags, pale spectral face partially obscured by matted hair, elongated iron shears in bone fingers, glowing faint cold white. |
+| `baba_yaga` | 1024×1024 | Baba Yaga in her flying mortar: an ancient hunched crone with an iron hooked nose, wild stringy hair, wielding an enormous bronze pestle with both gnarled hands, riding an ancient soot-blackened mortar bound with rusted bands. |
+| `polunochnitsa` | 512×768 | A polunochnitsa, midnight hag of sleep and terror: a tall gaunt phantom in a moth-eaten dark indigo shroud, faceless shadow beneath a hood with two pinprick cold violet lights, spindly claws reaching out to weave nightmares. |
+| `zlyden` | 512×768 | A zlyden, misery imp: a tiny naked scrawny grey goblin-like creature with an oversized hungry mouth full of crooked needles, clutched stolen copper coins in webbed paws, ragged ears, shifting nervously. |
+| `morovitsa` | 1024×1024 | Morovitsa, maiden of pestilence and death: a spectral tall woman in a decaying black lace shroud, pale flesh with black veins, holding an hourglass dripping dark blood and a notched rusted scythe, bringing inescapable doom. |

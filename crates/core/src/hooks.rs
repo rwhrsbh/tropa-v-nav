@@ -362,6 +362,117 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 h.flags.remove("winter");
             }
         }
+        // Kot Bayun: Heavy Eyelids into hand of standing heroes
+        "bayun_eyelids" => {
+            let heroes: Vec<u8> = ex.s.standing_heroes().map(|h| h.slot).collect();
+            for slot in heroes {
+                ex.add_card(slot, "heavy_eyelids", Pile::Hand);
+                ex.add_card(slot, "heavy_eyelids", Pile::Hand);
+            }
+        }
+        // Kot Bayun: Claws scaling with status / curse cards in hand
+        "bayun_claws" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            let statuses_in_hand = ex.s.heroes[slot as usize]
+                .hand
+                .iter()
+                .filter(|c| {
+                    ex.c.cards.get(&c.def).is_some_and(|d| matches!(d.kind, CardType::Status | CardType::Curse))
+                })
+                .count() as i32;
+            let dmg = 14 + statuses_in_hand * 6;
+            ex.hurt(Some(ctx.src), UnitRef::Hero(slot), dmg, true);
+        }
+        // Mokhovik: Kinetic Burst unleashing stored kinetic charge
+        "kinetic_burst" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            let charge = ex.s.enemies.iter().find(|e| e.uid == uid).and_then(|e| e.flags.get("kinetic_charge")).copied().unwrap_or(0);
+            let dmg = 10 + charge * 3;
+            ex.hurt(Some(ctx.src), UnitRef::Hero(slot), dmg, true);
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                e.flags.remove("kinetic_charge");
+            }
+        }
+        // Baba Yaga: Steal potion or inflict decay
+        "yaga_steal_potion" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            if !ex.s.heroes[slot as usize].potions.is_empty() {
+                ex.s.heroes[slot as usize].potions.pop();
+            } else {
+                ex.add_status(UnitRef::Hero(slot), StatusKind::Rot, 3);
+            }
+        }
+        // Polunochnitsa: Nightmare Affliction
+        "nightmare_afflict" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            ex.add_card(slot, "dread", Pile::Draw);
+            ex.hurt(Some(ctx.src), UnitRef::Hero(slot), 6, false);
+        }
+        // Zlyden: Poverty curse (energy less next turn)
+        "poverty_curse" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            ex.s.heroes[slot as usize].flags.insert("energy_less".into(), 1);
+        }
+        // Morovitsa: Doom Clock (4 stacks countdown)
+        "doom_clock" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            ex.s.heroes[slot as usize].flags.insert("doom".into(), 4);
+        }
+        // Gagana: Storm screech (discards target hand)
+        "storm_screech" => {
+            let heroes: Vec<u8> = ex.s.standing_heroes().map(|h| h.slot).collect();
+            for slot in heroes {
+                let h = &mut ex.s.heroes[slot as usize];
+                let mut cards = std::mem::take(&mut h.hand);
+                h.discard.append(&mut cards);
+            }
+        }
+        // Gorynych: Roar discard (discards 1 card)
+        "roar_discard" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            let h = &mut ex.s.heroes[slot as usize];
+            if !h.hand.is_empty() {
+                let c = h.hand.remove(0);
+                h.discard.push(c);
+            }
+        }
+        // Solovey: Deafening whistle
+        "solovey_whistle" => {
+            for slot in ex.standing() {
+                let h = &mut ex.s.heroes[slot as usize];
+                if !h.hand.is_empty() {
+                    let c = h.hand.remove(0);
+                    h.discard.push(c);
+                }
+            }
+        }
+        // Korochun: Bitter freeze
+        "korochun_chill" => {
+            for slot in ex.standing() {
+                ex.s.heroes[slot as usize].flags.insert("frozen".into(), 1);
+            }
+        }
+        // Vodyanoy Tsar: Whirlpool drag
+        "tsar_whirlpool" => {
+            for slot in ex.standing() {
+                ex.s.heroes[slot as usize].flags.insert("energy_less".into(), 1);
+            }
+        }
+        // Baba Yaga: Cauldron brew
+        "yaga_cauldron" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            for slot in ex.standing() {
+                ex.add_status(UnitRef::Hero(slot), StatusKind::Rot, 2);
+            }
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                let heal = 15.min(e.max_hp - e.hp);
+                if heal > 0 {
+                    e.hp += heal;
+                    ex.ev.push(Event::Heal { unit: UnitRef::Enemy(uid), amount: heal, hp: e.hp });
+                }
+            }
+        }
         _ => debug_assert!(false, "unknown hook `{name}`"),
     }
 }

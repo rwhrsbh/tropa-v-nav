@@ -31,6 +31,8 @@ story-again-win_circle = You know what lies in the chest. You know whose face is
 story-act2 = The forest ends in a graveyard. The graves have been dug open — from inside. Beyond it, a village: shutters closed, and from the chimneys a smell of smoke and roasting. There has been no livestock in that village for a long time. Do not ask what is roasting.
 story-act3 = Past the last fence the ground ends as if bitten off. Below runs the Smorodina, black and hot, reeking of singed hair. Across it lies the Kalinov bridge, glowing red; baked onto its rails is what remains of those who walked before you. On the far bank the sky hangs upside down. That is Nav.
 story-act4 = An iron gate. On either side, helmets on stakes — and not all of them empty: in some, something still blinks. One stake is free, and freshly sharpened. From within comes cold and the sweet rot of old gold. He knows you have come. He has laid the table.
+story-buyan_1 = Past Nav the earth ends and the Dead Sea begins. Amid the black waters rises the Isle of Buyan — a granite fang wrapped in freezing mist. Waves beat against the cliffs without a splash, heavy as quicksilver. Here lies what you sought: at the highest peak of the isle, within an iron kurgan, Koschei withers.
+story-buyan_2 = The path leads through the Sacred Grove. Beneath the roots of the Death Oak rests the white-burning Alatyr stone; from under it spring two wells — living and dead. Whoever drinks from the wrong spring shall remain a sentinel of the isle forever. Above, the bird Gagana wheels, her iron feathers clinking.
 
 ## Endings. Every one of them leads back to the gate.
 story-name-fall_forest = Brought Up by the Forest
@@ -70,4 +72,5 @@ story-secret-1 = I sat by this fire too. I was told this tale too, and I laughed
 story-secret-2 = My mother waited for me until the first snow, then she put up a cross. They scraped my name off themselves: that is what we do when a man walks into Nav alive. So he cannot find the way back.
 story-secret-3 = Mara gave me a choice: to freeze like all the others, or to serve. I chose to serve. Since then I tell the tale by the fires. Whoever hears it to the end follows me.
 story-secret-4 = Koschei is deathless not because his death is in a needle. It is because his tale is told again and again. While the circle holds, he lives. Only one who does not hear it to the end can break it.
+story-secret-5 = On Buyan I understood the truth: the needle is not Koschei's weapon. It is an anchor chain holding the world from sliding into the abyss. If drawn from the egg, the world tears; if snapped, it strangles your throat. Koschei has held it a thousand years because no one else could. Now that burden waits for you.
 story-leaf_end = The leaves beyond will not open until the path is walked.

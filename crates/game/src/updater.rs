@@ -40,7 +40,10 @@ impl SemVer {
     }
 
     pub fn current() -> Self {
-        Self::parse(env!("CARGO_PKG_VERSION")).unwrap_or(Self { major: 0, minor: 1, patch: 0 })
+        const VERSION: &str = env!("GAME_VERSION");
+        Self::parse(VERSION)
+            .or_else(|| Self::parse(env!("CARGO_PKG_VERSION")))
+            .unwrap_or(Self { major: 0, minor: 1, patch: 0 })
     }
 
     pub fn to_string(self) -> String {
@@ -469,49 +472,97 @@ fn poll_background_tasks(mut state: ResMut<UpdaterState>, exit_writer: MessageWr
 // UI Systems
 // ---------------------------------------------------------------------------
 
-#[derive(Component)]
-struct UpdateOverlay;
+#[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum OverlayPhase {
+    Available,
+    Downloading,
+    Installing,
+    Error,
+}
 
 #[derive(Component)]
-struct ProgressBarFill;
+pub struct UpdateOverlay(pub OverlayPhase);
+
+#[derive(Component)]
+pub struct ProgressBarFill;
+
+#[derive(Component)]
+pub struct ProgressBarText;
 
 fn sync_update_ui(
     mut commands: Commands,
     state: Res<UpdaterState>,
-    existing: Query<Entity, With<UpdateOverlay>>,
+    existing: Query<(Entity, &UpdateOverlay)>,
     mut fill_query: Query<&mut Node, With<ProgressBarFill>>,
+    mut text_query: Query<&mut Text, With<ProgressBarText>>,
     stage: Single<Entity, With<Stage>>,
     fonts: Res<Fonts>,
     l10n: Res<L10n>,
 ) {
-    let should_show = !state.dismissed
-        && matches!(
-            state.status,
-            UpdateStatus::Available(_) | UpdateStatus::Downloading { .. } | UpdateStatus::Installing | UpdateStatus::Error(_)
-        );
+    let target_phase = if state.dismissed {
+        None
+    } else {
+        match state.status {
+            UpdateStatus::Available(_) => Some(OverlayPhase::Available),
+            UpdateStatus::Downloading { .. } => Some(OverlayPhase::Downloading),
+            UpdateStatus::Installing => Some(OverlayPhase::Installing),
+            UpdateStatus::Error(_) => Some(OverlayPhase::Error),
+            _ => None,
+        }
+    };
 
-    if !should_show {
-        for e in &existing {
+    let Some(phase) = target_phase else {
+        for (e, _) in &existing {
             commands.entity(e).despawn();
         }
         return;
-    }
+    };
 
-    // If downloading, update progress bar fill width without respawning
-    if let UpdateStatus::Downloading { percent, .. } = state.status {
-        for mut node in &mut fill_query {
-            node.width = percent_val(percent.clamp(2.0, 100.0));
+    // If an overlay of this phase already exists: update in place without respawning
+    let existing_list: Vec<(Entity, OverlayPhase)> = existing.iter().map(|(e, o)| (e, o.0)).collect();
+    if let Some(&(_entity, existing_phase)) = existing_list.first() {
+        if existing_phase == phase && existing_list.len() == 1 {
+            if let UpdateStatus::Downloading { percent, downloaded_bytes, total_bytes } = state.status {
+                for mut node in &mut fill_query {
+                    node.width = percent_val(percent.clamp(1.0, 100.0));
+                }
+                let dl_mb = (downloaded_bytes as f32) / (1024.0 * 1024.0);
+                let text_str = if let Some(tot) = total_bytes {
+                    let tot_mb = (tot as f32) / (1024.0 * 1024.0);
+                    l10n.tf(
+                        "updater-downloading-total",
+                        &[
+                            ("percent", (percent as i32).into()),
+                            ("mb", format!("{dl_mb:.1}").into()),
+                            ("total", format!("{tot_mb:.1}").into()),
+                        ],
+                    )
+                } else {
+                    l10n.tf(
+                        "updater-downloading",
+                        &[
+                            ("percent", (percent as i32).into()),
+                            ("mb", format!("{dl_mb:.1}").into()),
+                        ],
+                    )
+                };
+                for mut text in &mut text_query {
+                    text.0 = text_str.clone();
+                }
+            }
+            return;
+        } else {
+            // Phase changed (e.g. from Available to Downloading)
+            for (e, _) in existing_list {
+                commands.entity(e).despawn();
+            }
         }
-    }
-
-    if !existing.is_empty() {
-        return;
     }
 
     // Spawn the modal dialog
     let overlay_entity = commands
         .spawn((
-            UpdateOverlay,
+            UpdateOverlay(phase),
             Node {
                 position_type: PositionType::Absolute,
                 width: px(STAGE_W),
@@ -599,46 +650,66 @@ fn sync_update_ui(
                 ));
             });
         }
-        UpdateStatus::Downloading { percent, downloaded_bytes, .. } => {
+        UpdateStatus::Downloading { percent, downloaded_bytes, total_bytes } => {
             let mb = (*downloaded_bytes as f32) / (1024.0 * 1024.0);
+            let text_str = if let Some(tot) = total_bytes {
+                let tot_mb = (*tot as f32) / (1024.0 * 1024.0);
+                l10n.tf(
+                    "updater-downloading-total",
+                    &[
+                        ("percent", (*percent as i32).into()),
+                        ("mb", format!("{mb:.1}").into()),
+                        ("total", format!("{tot_mb:.1}").into()),
+                    ],
+                )
+            } else {
+                l10n.tf(
+                    "updater-downloading",
+                    &[
+                        ("percent", (*percent as i32).into()),
+                        ("mb", format!("{mb:.1}").into()),
+                    ],
+                )
+            };
+
             commands.entity(overlay_entity).with_children(|p| {
                 p.spawn(theme::text(l10n.t("updater-title"), &fonts.title, 56.0, theme::BONE));
-                p.spawn(theme::text(
-                    l10n.tf(
-                        "updater-downloading",
-                        &[
-                            ("percent", (*percent as i32).into()),
-                            ("mb", format!("{mb:.1}").into()),
-                        ],
-                    ),
-                    &fonts.body,
-                    26.0,
-                    theme::CANDLE,
+                p.spawn((
+                    ProgressBarText,
+                    theme::text(text_str, &fonts.body, 26.0, theme::CANDLE),
                 ));
 
                 // Progress bar container
                 p.spawn((
                     Node {
-                        width: px(520),
-                        height: px(28),
-                        border: UiRect::all(px(2)),
-                        padding: UiRect::all(px(2)),
+                        width: px(600),
+                        height: px(36),
+                        border: UiRect::all(px(3)),
+                        padding: UiRect::all(px(3)),
+                        align_items: AlignItems::Center,
                         ..default()
                     },
                     BackgroundColor(theme::SOOT),
-                    BorderColor::all(Color::srgb(0.42, 0.33, 0.22)),
+                    BorderColor::all(Color::srgb(0.55, 0.44, 0.28)),
                 ))
                 .with_children(|bar| {
                     bar.spawn((
                         ProgressBarFill,
                         Node {
-                            width: percent_val(percent.clamp(2.0, 100.0)),
+                            width: percent_val(percent.clamp(1.0, 100.0)),
                             height: percent_val(100.0),
                             ..default()
                         },
-                        BackgroundColor(theme::CANDLE),
+                        BackgroundColor(Color::srgb(0.92, 0.72, 0.38)),
                     ));
                 });
+
+                p.spawn(theme::text(
+                    l10n.t("updater-download-hint"),
+                    &fonts.body,
+                    20.0,
+                    theme::DIM,
+                ));
             });
         }
         UpdateStatus::Installing => {

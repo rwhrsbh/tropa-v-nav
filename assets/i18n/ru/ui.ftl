@@ -456,6 +456,7 @@ chronicle-met = Нечисть: встречено { $n } из { $all }
 chronicle-runs = Забегов: { $runs }  ·  побед: { $wins }
 chronicle-won = { $hero }: выход из Нави на рассвет  ·  Круг { $circle }
 chronicle-fell = { $hero }: гибель в акте { $act }, пройдено этажей: { $floors }  ·  Круг { $circle }
+chronicle-analytics = Аналитика баланса
 building-shrine = Капище
 building-shrine-desc = В лобби можно выбрать другую стартовую реликвию героя: по одной новой за уровень.
 building-palisade = Частокол
@@ -548,9 +549,29 @@ updater-btn-browser = Открыть в браузере
 updater-btn-later = Позже
 updater-mac-hint = Для macOS загрузите новую версию со страницы релиза:
 updater-downloading = Скачивание: { $percent }% ({ $mb } МБ)
+updater-downloading-total = Скачивание: { $percent }% ({ $mb } / { $total } МБ)
+updater-download-hint = Установка начнётся автоматически после завершения загрузки
 updater-installing = Установка обновления...
 updater-check-btn = Проверить обновления
 updater-up-to-date = У вас последняя версия ({ $version })
 updater-checking = Проверка обновлений...
 updater-error = Ошибка обновления: { $err }
 updater-android-sig-hint = При конфликте подписи удалите старую версию перед установкой
+
+# Знамения Острова Буян
+omen-alatyr_stone = Алатырь-камень
+omen-alatyr_stone-text = Бел-горюч камень лежит на морском берегу, горячий сквозь пену. От него исходит глухой звон, как от набатного колокола на дне моря.
+omen-alatyr_stone-pray = Преклонить колени и исцелиться
+omen-alatyr_stone-sharpen = Заточить клинки о камень
+omen-alatyr_stone-sacrifice = Принести кровавую жертву за древнюю реликвию
+
+omen-waters_of_buyan = Живая и мёртвая вода
+omen-waters_of_buyan-text = Два ключа бьют рядом: один пахнет талым снегом и свежей кровью, другой черен и неподвижен, как застывшее стекло.
+omen-waters_of_buyan-dead_water = Испить мёртвой воды (Срастить плоть и повысить макс. здоровье)
+omen-waters_of_buyan-living_water = Испить живой воды (Исцелиться и набрать зелье)
+
+omen-buyan_oak = Смертный дуб Буяна
+omen-buyan_oak-text = Исполинский дуб уходит кроной в грозовые тучи. В узловатых ветвях на цепях висит кованый сундук, овеваемый ледяным ветром.
+omen-buyan_oak-climb = Взобраться к сундуку (Получить реликвию и морок)
+omen-buyan_oak-hollow = Заглянуть в дупло (Забрать золото ценой раны)
+omen-buyan_oak-leave = Пройти мимо святыни

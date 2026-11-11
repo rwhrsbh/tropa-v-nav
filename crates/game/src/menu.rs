@@ -21,7 +21,7 @@ pub fn plugin(app: &mut App) {
         .add_systems(Update, crate::battle::style_buttons.run_if(not(in_state(AppState::Battle))));
 }
 
-fn screen(state: AppState, stage: Entity) -> impl Bundle {
+pub(crate) fn screen(state: AppState, stage: Entity) -> impl Bundle {
     (
         DespawnOnExit(state),
         Node {
@@ -567,8 +567,22 @@ fn enter_chronicle(
             }
         });
         p.spawn((
-            menu_button(l10n.t("coop-back"), &fonts),
-            observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Village)),
-        ));
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: px(20),
+                ..default()
+            },
+            Pickable::IGNORE,
+        ))
+        .with_children(|btns| {
+            btns.spawn((
+                menu_button(l10n.t("chronicle-analytics"), &fonts),
+                observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Analytics)),
+            ));
+            btns.spawn((
+                menu_button(l10n.t("coop-back"), &fonts),
+                observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Village)),
+            ));
+        });
     });
 }

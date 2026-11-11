@@ -456,6 +456,7 @@ chronicle-met = Unclean things: { $n } of { $all } met
 chronicle-runs = Runs: { $runs }  ·  wins: { $wins }
 chronicle-won = { $hero } walked out of Nav at dawn  ·  Circle { $circle }
 chronicle-fell = { $hero } fell in act { $act } after { $floors } floors  ·  Circle { $circle }
+chronicle-analytics = Balance Analytics
 building-shrine = The Shrine
 building-shrine-desc = In the lobby you may pick another starting relic for your hero: one more per level.
 building-palisade = The Palisade
@@ -546,9 +547,29 @@ updater-btn-browser = Open in Browser
 updater-btn-later = Later
 updater-mac-hint = For macOS, please download the new version from the release page:
 updater-downloading = Downloading: { $percent }% ({ $mb } MB)
+updater-downloading-total = Downloading: { $percent }% ({ $mb } / { $total } MB)
+updater-download-hint = Installation will begin automatically once download is complete
 updater-installing = Installing update...
 updater-check-btn = Check for updates
 updater-up-to-date = You have the latest version ({ $version })
 updater-checking = Checking for updates...
 updater-error = Update error: { $err }
 updater-android-sig-hint = If a signature conflict occurs, uninstall the older version first
+
+# Buyan Island Omens
+omen-alatyr_stone = Alatyr Stone
+omen-alatyr_stone-text = The white-burning Alatyr stone rests on the sea shore, warm through the foam. From within comes a low tolling, like an alarm bell at the bottom of the sea.
+omen-alatyr_stone-pray = Kneel and heal
+omen-alatyr_stone-sharpen = Sharpen blades against the sacred stone
+omen-alatyr_stone-sacrifice = Offer a blood sacrifice for an ancient relic
+
+omen-waters_of_buyan = Living and Dead Waters
+omen-waters_of_buyan-text = Two springs bubble side by side: one smells of thawed snow and fresh blood, the other is black and motionless as frozen glass.
+omen-waters_of_buyan-dead_water = Drink dead water (Knit flesh and increase max HP)
+omen-waters_of_buyan-living_water = Drink living water (Heal and draw a potion)
+
+omen-buyan_oak = Sacred Oak of Buyan
+omen-buyan_oak-text = A colossal dead oak reaches into the storm clouds. In its knotted boughs, chained iron chests swing in the freezing gale.
+omen-buyan_oak-climb = Climb to the chest (Gain a relic and a curse)
+omen-buyan_oak-hollow = Search the hollow (Take gold at the cost of blood)
+omen-buyan_oak-leave = Pass the shrine by

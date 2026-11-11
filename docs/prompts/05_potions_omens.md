@@ -111,6 +111,9 @@ in close-up, no text.
 | two_fires | two campfires either side of a trail, one white flame, one black |
 | gamayun | the bird Gamayun with a woman's face on a tree, people sitting around below |
 | last_candle | a candle stub on a stone at the edge of total darkness |
+| alatyr_stone | the sacred white-burning Alatyr stone on a stormy sea reef, glowing with ancient runes through salt foam |
+| waters_of_buyan | two mystical bubbling springs under a cliff, one clear with white mist, one dark as obsidian |
+| buyan_oak | an enormous ancient dead oak on a high crag with iron-bound chained chests hanging in cold fog |
 
 ## Card `book_spoil` — `assets/cards/book_spoil-gemini.png`
 

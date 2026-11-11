@@ -10,4 +10,6 @@
     (id: "ice_tale", pool: Book, rarity: Rare),
     // Недослушанный сказ: закрыл книгу, не дочитав, — 15 золота и минус одно проклятие
     (id: "unheard_tale", pool: Book, rarity: Rare),
+    // Осколок Алатыря: в начале каждого боя — 6 щита и очищение случайного ослабления
+    (id: "alatyr_heart", pool: Book, rarity: Rare, passives: [(on: CombatStart, effects: [Block(N(6), Me), Cleanse(Me)])]),
 ]

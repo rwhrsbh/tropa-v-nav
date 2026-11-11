@@ -3,4 +3,6 @@
     steam_app_id: 480,
     // "ru" | "en"; без поля — язык клиента Steam.
     // lang: "ru",
+    // URL для отправки телеметрии (Google Apps Script Web App / Webhook):
+    telemetry_url: "https://script.google.com/macros/s/AKfycbxgtLECTC7pTGTBDl9vM5VWaqxCYq1J0TDC3ibGilgG7zooomVp3XZy0CiSAa4MOeFz/exec",
 )
