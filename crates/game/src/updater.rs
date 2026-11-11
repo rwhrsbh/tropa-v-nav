@@ -782,6 +782,50 @@ mod tests {
     }
 
     #[test]
+    fn test_download_progress_calculation() {
+        let downloaded: u64 = 25 * 1024 * 1024;
+        let total: u64 = 50 * 1024 * 1024;
+        let percent = ((downloaded as f64 / total as f64) * 100.0) as f32;
+        assert_eq!(percent as i32, 50);
+
+        let dl_mb = (downloaded as f32) / (1024.0 * 1024.0);
+        let tot_mb = (total as f32) / (1024.0 * 1024.0);
+        assert_eq!(format!("{dl_mb:.1}"), "25.0");
+        assert_eq!(format!("{tot_mb:.1}"), "50.0");
+    }
+
+    #[test]
+    fn test_download_tracker_simulation() {
+        let tracker = DownloadTracker {
+            downloaded: Arc::new(AtomicU64::new(0)),
+            total: Arc::new(AtomicU64::new(1000)),
+            finished: Arc::new(AtomicBool::new(false)),
+            error: Arc::new(Mutex::new(None)),
+            target_path: PathBuf::from("fake_setup.exe"),
+            release: ReleaseInfo {
+                tag_name: "v0.1.8".into(),
+                version: SemVer { major: 0, minor: 1, patch: 8 },
+                html_url: "https://example.com".into(),
+                asset_name: Some("TropaVNav-Setup-0.1.8.exe".into()),
+                download_url: Some("https://example.com/download".into()),
+                body: "".into(),
+            },
+        };
+
+        // Simulate 50% download
+        tracker.downloaded.store(500, Ordering::Relaxed);
+        let cur_dl = tracker.downloaded.load(Ordering::Relaxed);
+        let cur_tot = tracker.total.load(Ordering::Relaxed);
+        let pct = ((cur_dl as f64 / cur_tot as f64) * 100.0) as f32;
+        assert_eq!(pct as i32, 50);
+
+        // Simulate completion
+        tracker.downloaded.store(1000, Ordering::Relaxed);
+        tracker.finished.store(true, Ordering::Relaxed);
+        assert!(tracker.finished.load(Ordering::Relaxed));
+    }
+
+    #[test]
     fn test_match_asset_for_os() {
         let assets = serde_json::json!([
             { "name": "TropaVNav-android.apk", "browser_download_url": "https://example.com/apk" },
