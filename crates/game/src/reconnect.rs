@@ -63,6 +63,7 @@ fn watch(mut commands: Commands, time: Res<Time>, mut net: ResMut<Net>, mut stat
         w.quiet = 0.0;
         if let Some(gone) = status.lost.take() {
             info!("connection to the host back after {gone:.0} s");
+            net.node.rejoin();
         }
         return;
     }
@@ -95,8 +96,12 @@ fn banner(mut commands: Commands, net: Option<Res<Net>>, status: Res<NetStatus>,
     let text = match (&net, status.lost) {
         (Some(_), Some(lost)) => Some(l10n.tf("coop-reconnecting", &[("s", ((GIVE_UP - lost).max(0.0) as i32).into())])),
         (Some(net), None) if net.node.is_host() && net.node.state.is_some() && net.locals.is_empty() => {
-            let away: Vec<String> = net.node.lobby.players.iter().filter(|p| !p.connected).map(|p| p.name.clone()).collect();
-            (!away.is_empty()).then(|| l10n.tf("coop-player-away", &[("who", away.join(", ").into())]))
+            let away: Vec<(String, f32)> = net.node.lobby.players.iter().enumerate().filter(|(_, p)| !p.connected).map(|(i, p)| (p.name.clone(), (nav_net::RECONNECT_GRACE_PERIOD - net.node.disconnect_timer[i]).max(0.0))).collect();
+            (!away.is_empty()).then(|| {
+                let who: Vec<String> = away.iter().map(|(w, _)| w.clone()).collect();
+                let min_s = away.iter().map(|(_, s)| *s as i32).min().unwrap_or(0);
+                l10n.tf("coop-player-away", &[("who", who.join(", ").into()), ("s", min_s.into())])
+            })
         }
         _ => None,
     };

@@ -1520,3 +1520,85 @@ fn the_hoarder_takes_a_share_and_throws_it_away_for_good() {
     assert!(s.enemies[0].stolen.is_empty(), "the gold is scattered");
     assert_eq!(s.heroes[0].gold_lost, 30, "and gone for good");
 }
+
+#[test]
+fn test_vulnerable_comparison_0_vs_3_stacks() {
+    let (_c, mut s0) = solo(&[], &["hitter"]);
+    let (c, mut s3) = solo(&[], &["hitter"]);
+
+    // Hero in s0 has 0 Vulnerable, Hero in s3 has 3 Vulnerable
+    s3.heroes[0].statuses.insert(StatusKind::Vulnerable, 3);
+
+    // Check displayed intent damage:
+    let intent0 = bot::intent_damage(&c, &s0, &s0.enemies[0]);
+    let intent3 = bot::intent_damage(&c, &s3, &s3.enemies[0]);
+    assert_eq!(intent0, Some((10, 1)), "Displayed intent for 0 vulnerable should be 10");
+    assert_eq!(intent3, Some((15, 1)), "Displayed intent for 3 vulnerable should be 15 (+50%)");
+
+    // Check actual damage received:
+    let hp0_before = s0.heroes[0].hp;
+    end_round(&c, &mut s0);
+    let dmg0 = hp0_before - s0.heroes[0].hp;
+
+    let hp3_before = s3.heroes[0].hp;
+    end_round(&c, &mut s3);
+    let dmg3 = hp3_before - s3.heroes[0].hp;
+
+    assert_eq!(dmg0, 10, "Hero with 0 vulnerable takes exactly 10 damage");
+    assert_eq!(dmg3, 15, "Hero with 3 vulnerable takes exactly 15 damage (+50%)");
+
+    // And after 1 enemy attack round, 3 vulnerable decays to 2 (since it was present before EnemyPhase)
+    assert_eq!(s3.status(UnitRef::Hero(0), StatusKind::Vulnerable), 2);
+}
+
+#[test]
+fn test_vulnerable_applied_by_enemy_does_not_burn_in_same_round() {
+    let (c, mut s) = solo(&[], &["poloz"]);
+    // Poloz pattern: move 0 is coil (6 dmg), move 1 is constrict (12 dmg, 1 Vulnerable), move 2 is venom (9 dmg)
+    // Round 1: coil
+    end_round(&c, &mut s);
+    assert_eq!(s.status(UnitRef::Hero(0), StatusKind::Vulnerable), 0);
+
+    // Round 2: constrict (12 dmg, 1 Vulnerable)
+    let hp_before_constrict = s.heroes[0].hp;
+    end_round(&c, &mut s);
+    assert_eq!(hp_before_constrict - s.heroes[0].hp, 12);
+    // Vulnerable must NOT have burned at the end of that same round!
+    assert_eq!(s.status(UnitRef::Hero(0), StatusKind::Vulnerable), 1, "Vulnerable 1 applied in EnemyPhase remains for next round");
+
+    // Next round (Round 3): hero has Vulnerable 1. Intent damage for venom (base 9) must show 9 * 3 / 2 = 13
+    let next_intent = bot::intent_damage(&c, &s, &s.enemies[0]);
+    assert_eq!(next_intent, Some((13, 1)), "Intent shows 13 (9 * 1.5) because hero is vulnerable");
+
+    // Round 3 execution: hero takes 13 damage
+    let hp_before_venom = s.heroes[0].hp;
+    end_round(&c, &mut s);
+    assert_eq!(hp_before_venom - s.heroes[0].hp, 13, "Hero took 13 damage from venom under Vulnerable");
+    // After Round 3, the Vulnerable stack that was active during the attack finally expires
+    assert_eq!(s.status(UnitRef::Hero(0), StatusKind::Vulnerable), 0, "Vulnerable expires after taking the attack");
+}
+
+#[test]
+fn test_switcheroo_with_one_enemy_does_not_skip_attack() {
+    let (c, mut s) = solo(&["sk_switcheroo"], &["hitter"]);
+    let t = foe(&s, 0);
+    play(&c, &mut s, 0, "sk_switcheroo", Some(t));
+    let hp_before = s.heroes[0].hp;
+    end_round(&c, &mut s);
+    // With 1 enemy, the attack is NOT cancelled! Enemy hits hero for 10.
+    assert_eq!(hp_before - s.heroes[0].hp, 10, "Attack is not cancelled when only 1 enemy is present");
+}
+
+#[test]
+fn test_switcheroo_with_two_enemies_redirects_to_other_enemy() {
+    let (c, mut s) = solo(&["sk_switcheroo"], &["hitter", "dummy"]);
+    let t = foe(&s, 0); // hitter
+    play(&c, &mut s, 0, "sk_switcheroo", Some(t));
+    let hero_hp_before = s.heroes[0].hp;
+    let dummy_hp_before = s.enemies[1].hp;
+    end_round(&c, &mut s);
+    // Hero took 0 damage
+    assert_eq!(s.heroes[0].hp, hero_hp_before, "Hero takes 0 damage because attack was redirected");
+    // Dummy took 10 damage from hitter!
+    assert_eq!(dummy_hp_before - s.enemies[1].hp, 10, "Other enemy took 10 damage from hitter");
+}

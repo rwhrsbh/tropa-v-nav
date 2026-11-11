@@ -283,6 +283,8 @@ fn dropped_player_is_steered_by_autopilot_and_can_return() {
     hub.offline.push(3);
     hub.node(1).peer_left(3);
     hub.node(2).peer_left(3);
+    hub.node(1).reconnect_grace = 0.0;
+    hub.node(2).reconnect_grace = 0.0;
     hub.pump(&c);
     assert!(!hub.node(2).lobby.players[2].connected);
     let floors = hub.node(1).state.as_ref().unwrap().floors_cleared;
@@ -313,6 +315,26 @@ fn dropped_player_is_steered_by_autopilot_and_can_return() {
 }
 
 #[test]
+fn dropped_player_waits_for_reconnect_grace_period() {
+    let c = content();
+    let mut hub = party(&c, 3, 6);
+    into_combat(&c, &mut hub);
+    hub.offline.push(3);
+    hub.node(1).peer_left(3);
+    hub.node(2).peer_left(3);
+    hub.pump(&c);
+    assert!(!hub.node(1).lobby.players[2].connected);
+    // Disconnect timer starts at 0.0, so autopilot must NOT play for player 3:
+    assert!(!hub.node(1).autopilot(&c), "Autopilot must not play while reconnect timer < 120s");
+    // Advance timer to 119s:
+    hub.node(1).disconnect_timer[2] = 119.0;
+    assert!(!hub.node(1).autopilot(&c), "Autopilot must still not play at 119s");
+    // Once timer reaches 120s:
+    hub.node(1).disconnect_timer[2] = 120.0;
+    assert!(hub.node(1).autopilot(&c), "Autopilot only plays once 120s reconnect grace expires");
+}
+
+#[test]
 fn the_run_survives_the_host_leaving() {
     let c = content();
     let mut hub = party(&c, 3, 8);
@@ -329,6 +351,7 @@ fn the_run_survives_the_host_leaving() {
     // Steam hands the lobby to peer 2
     for p in [2, 3] {
         hub.node(p).peer_left(1);
+        hub.node(p).reconnect_grace = 0.0;
         hub.node(p).host_changed(&c, 2);
     }
     hub.pump(&c);

@@ -212,7 +212,13 @@ pub struct Node {
     /// How many messages the host has been heard from: a client that stops hearing it has lost
     /// the connection, whatever the transport says.
     pub heard: u64,
+    /// Host: how long each seat has been disconnected, in seconds.
+    pub disconnect_timer: [f32; MAX_PLAYERS],
+    /// Grace period before autopilot acts for a disconnected player.
+    pub reconnect_grace: f32,
 }
+
+pub const RECONNECT_GRACE_PERIOD: f32 = 120.0;
 
 impl Node {
     /// Opens a lobby as its host.
@@ -279,6 +285,21 @@ impl Node {
         }
     }
 
+    /// Advances timers for disconnected players.
+    pub fn tick(&mut self, dt: f32) {
+        if self.is_host() {
+            let players = &self.lobby.players;
+            let timers = &mut self.disconnect_timer;
+            for (i, p) in players.iter().enumerate() {
+                if !p.connected {
+                    timers[i] += dt;
+                } else {
+                    timers[i] = 0.0;
+                }
+            }
+        }
+    }
+
     /// Joins the lobby hosted by `host`.
     pub fn join(me: Peer, name: &str, host: Peer) -> Node {
         let mut node = Node::blank(me, name);
@@ -301,6 +322,8 @@ impl Node {
             out: Vec::new(),
             notes: Vec::new(),
             heard: 0,
+            disconnect_timer: [0.0; MAX_PLAYERS],
+            reconnect_grace: RECONNECT_GRACE_PERIOD,
         }
     }
 
@@ -466,7 +489,13 @@ impl Node {
             return false;
         }
         let Some(state) = &self.state else { return false };
-        let due = self.lobby.players.iter().enumerate().find_map(|(i, p)| if p.connected { None } else { run_bot(c, state, i as u8).map(|a| (i as u8, a)) });
+        let due = self.lobby.players.iter().enumerate().find_map(|(i, p)| {
+            if p.connected || self.disconnect_timer[i] < self.reconnect_grace {
+                None
+            } else {
+                run_bot(c, state, i as u8).map(|a| (i as u8, a))
+            }
+        });
         let Some((slot, action)) = due else { return false };
         self.host_apply(c, slot, action).is_ok()
     }
@@ -540,8 +569,9 @@ impl Node {
     /// The transport saw this peer leave the lobby.
     pub fn peer_left(&mut self, peer: Peer) {
         if self.lobby.started {
-            if let Some(p) = self.lobby.players.iter_mut().find(|p| p.peer == peer) {
+            if let Some((i, p)) = self.lobby.players.iter_mut().enumerate().find(|(_, p)| p.peer == peer) {
                 p.connected = false;
+                self.disconnect_timer[i] = 0.0;
             }
         } else {
             self.lobby.players.retain(|p| p.peer != peer);
@@ -587,21 +617,32 @@ impl Node {
         if from == self.lobby.host {
             self.heard += 1;
         }
+        if host && !matches!(msg, Msg::OtherBuild) {
+            if let Some((i, p)) = self.lobby.players.iter_mut().enumerate().find(|(_, p)| p.peer == from) {
+                if !p.connected {
+                    p.connected = true;
+                    self.disconnect_timer[i] = 0.0;
+                    self.broadcast_lobby();
+                }
+            }
+        }
         match msg {
             Msg::Hello { build: theirs, .. } if host && theirs != build() => {
                 self.out.push((To::One(from), Msg::OtherBuild));
             }
             Msg::OtherBuild if !host => self.notes.push(Note::OtherBuild),
             Msg::Hello { name, .. } if host => {
-                if let Some(p) = self.lobby.players.iter_mut().find(|p| p.peer == from) {
+                if let Some((i, p)) = self.lobby.players.iter_mut().enumerate().find(|(_, p)| p.peer == from) {
                     // a returning player takes the wheel back from the autopilot
                     p.connected = true;
+                    self.disconnect_timer[i] = 0.0;
                     p.name = name;
-                } else if let Some(p) = self.lobby.players.iter_mut().find(|p| self.lobby.started && !p.connected) {
+                } else if let Some((i, p)) = self.lobby.players.iter_mut().enumerate().find(|(_, p)| self.lobby.started && !p.connected) {
                     // a saved party picked up again, or a player back on another address: the
                     // first seat with no one at it is theirs
                     p.peer = from;
                     p.connected = true;
+                    self.disconnect_timer[i] = 0.0;
                     p.name = name;
                 } else if !self.lobby.started && self.lobby.players.len() < MAX_PLAYERS {
                     self.lobby.players.push(LobbyPlayer { peer: from, name, hero: None, level: 1, starter: 0, ready: false, connected: true });

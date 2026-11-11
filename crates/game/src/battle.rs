@@ -1536,8 +1536,21 @@ fn update_labels(session: Res<Session>, net: Option<Res<crate::net::Net>>, db: R
                     Some((d, k)) => format!("{d}×{k}"),
                     None => String::new(),
                 };
-                // in a party the target matters; alone it is always you
-                if let (Some(t), true) = (intent.target, shown.is_coop()) {
+                // in a party the target matters; alone it is always you; misdirect points at another enemy
+                if let Some(&tgt_uid) = e.flags.get("misdirect") {
+                    let others = shown.living_enemies().filter(|other| other.uid != uid).count();
+                    if others > 0 {
+                        if let Some(target_foe) = shown.enemy(tgt_uid as u32).filter(|f| f.alive) {
+                            s.push_str(&format!(" → {}", l10n.t(&format!("enemy-{}", target_foe.def))));
+                        } else if let Some(first_other) = shown.living_enemies().find(|other| other.uid != uid) {
+                            s.push_str(&format!(" → {}", l10n.t(&format!("enemy-{}", first_other.def))));
+                        }
+                    } else if let (Some(t), true) = (intent.target, shown.is_coop()) {
+                        if let Some(h) = shown.hero(t) {
+                            s.push_str(&format!(" → {}", l10n.t(&format!("hero-{}", h.def))));
+                        }
+                    }
+                } else if let (Some(t), true) = (intent.target, shown.is_coop()) {
                     if let Some(h) = shown.hero(t) {
                         s.push_str(&format!(" → {}", l10n.t(&format!("hero-{}", h.def))));
                     }

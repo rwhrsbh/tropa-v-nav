@@ -299,7 +299,7 @@ impl<'a> Exec<'a> {
     pub(crate) fn standing(&self) -> Vec<u8> {
         self.s.standing_heroes().map(|h| h.slot).collect()
     }
-    fn living(&self) -> Vec<u32> {
+    pub(crate) fn living(&self) -> Vec<u32> {
         self.s.living_enemies().map(|e| e.uid).collect()
     }
     fn exists(&self, u: UnitRef) -> bool {
@@ -1932,6 +1932,20 @@ impl<'a> Exec<'a> {
             return;
         }
 
+        let units: Vec<UnitRef> = (0..self.s.heroes.len() as u8)
+            .map(UnitRef::Hero)
+            .chain(self.s.enemies.iter().map(|e| UnitRef::Enemy(e.uid)))
+            .collect();
+        let mut pre_timed: std::collections::BTreeMap<(UnitRef, StatusKind), i32> = std::collections::BTreeMap::new();
+        for &u in &units {
+            for &st in &[StatusKind::Vulnerable, StatusKind::Weak, StatusKind::Chained] {
+                let cur = self.s.status(u, st);
+                if cur > 0 {
+                    pre_timed.insert((u, st), cur);
+                }
+            }
+        }
+
         self.ev.push(Event::EnemyPhase);
         let order: Vec<u32> = self.s.enemies.iter().map(|e| e.uid).collect();
         for uid in order {
@@ -1972,12 +1986,16 @@ impl<'a> Exec<'a> {
                 self.ev.push(Event::EnemyMove { enemy: uid, mv: intent.mv });
                 // Switcheroo: the blow meant for a hero lands on another enemy
                 let mut aim = target.map(UnitRef::Hero);
-                if self.s.enemies[idx].flags.remove("misdirect").is_some() && aim.is_some() {
-                    let others: Vec<u32> = self.living().into_iter().filter(|u| *u != uid).collect();
-                    aim = self.s.rng.pick(&others).copied().map(UnitRef::Enemy);
-                    if aim.is_none() {
-                        self.rot_tick(me);
-                        continue;
+                if let Some(redirect) = self.s.enemies[idx].flags.remove("misdirect") {
+                    if aim.is_some() {
+                        let others: Vec<u32> = self.living().into_iter().filter(|u| *u != uid).collect();
+                        if !others.is_empty() {
+                            if others.contains(&(redirect as u32)) {
+                                aim = Some(UnitRef::Enemy(redirect as u32));
+                            } else {
+                                aim = self.s.rng.pick(&others).copied().map(UnitRef::Enemy);
+                            }
+                        }
                     }
                 }
                 let mut ctx = Ctx {
@@ -1998,10 +2016,6 @@ impl<'a> Exec<'a> {
             }
         }
 
-        let units: Vec<UnitRef> = (0..self.s.heroes.len() as u8)
-            .map(UnitRef::Hero)
-            .chain(self.s.enemies.iter().map(|e| UnitRef::Enemy(e.uid)))
-            .collect();
         for u in units {
             let all: Vec<(StatusKind, i32)> = match u {
                 UnitRef::Hero(i) => self.s.heroes[i as usize].statuses.iter().map(|(k, v)| (*k, *v)).collect(),
@@ -2009,7 +2023,10 @@ impl<'a> Exec<'a> {
             };
             for (st, n) in all {
                 if st.timed() {
-                    self.add_status(u, st, -1);
+                    let eligible = pre_timed.get(&(u, st)).copied().unwrap_or(0);
+                    if eligible > 0 {
+                        self.add_status(u, st, -1);
+                    }
                 } else if st.round_only() {
                     self.add_status(u, st, -n);
                 }

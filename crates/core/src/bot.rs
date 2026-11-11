@@ -21,8 +21,19 @@ pub fn intent_damage(c: &Content, s: &Combat, e: &Enemy) -> Option<(i32, i32)> {
             _ => return None,
         };
         let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);
+        d = d * s.enemy_dmg / 100;
         if s.status(me, StatusKind::Weak) > 0 {
             d = d * 3 / 4;
+        }
+        let target_hero = intent.target.or_else(|| if s.heroes.len() == 1 || mv.intent == IntentKind::AttackAll { Some(0) } else { None });
+        if let Some(slot) = target_hero {
+            let u = UnitRef::Hero(slot);
+            if s.status(u, StatusKind::Vulnerable) > 0 {
+                d = d * 3 / 2;
+            }
+            if s.status(u, StatusKind::Mist) > 0 {
+                d /= 2;
+            }
         }
         Some((d.max(0), hits))
     })
@@ -38,7 +49,32 @@ pub fn incoming(c: &Content, s: &Combat, slot: u8) -> i32 {
             if !hits_me {
                 return None;
             }
-            intent_damage(c, s, e).map(|(d, k)| d * k)
+            let me = UnitRef::Enemy(e.uid);
+            let u = UnitRef::Hero(slot);
+            mv.effects.iter().find_map(|fx| {
+                let (a, hits) = match fx {
+                    Effect::Damage(a, _) => (a, 1),
+                    Effect::Hits(a, k, _) => (a, *k),
+                    _ => return None,
+                };
+                let base = match a {
+                    Amount::N(base) => *base,
+                    Amount::Pack(base, each) => base + (s.living_enemies().count() as i32 - 1) * each,
+                    _ => return None,
+                };
+                let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);
+                d = d * s.enemy_dmg / 100;
+                if s.status(me, StatusKind::Weak) > 0 {
+                    d = d * 3 / 4;
+                }
+                if s.status(u, StatusKind::Vulnerable) > 0 {
+                    d = d * 3 / 2;
+                }
+                if s.status(u, StatusKind::Mist) > 0 {
+                    d /= 2;
+                }
+                Some(d.max(0) * hits)
+            })
         })
         .sum()
 }

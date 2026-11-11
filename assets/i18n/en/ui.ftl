@@ -521,8 +521,8 @@ battle-choose-discard = Pick { $n ->
    *[other] { $n } cards
 } in your hand to discard.
 
-coop-reconnecting = The connection to the party is lost. Getting back in… { $s } s left; the autopilot plays for you meanwhile.
-coop-player-away = Dropped out: { $who }. The autopilot plays for them until they come back to their seats.
+coop-reconnecting = The connection to the party is lost. Getting back in… { $s } s left.
+coop-player-away = Disconnected: { $who }. Waiting for reconnect ({ $s } s left)...
 coop-error-lost = The connection to the party did not come back. The host has the run saved: it can be carried on together.
 menu-continue-party = Carry on with the party: act { $act }
 

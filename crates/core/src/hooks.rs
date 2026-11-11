@@ -77,8 +77,11 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
         // Skomorokh's "Switcheroo": the targeted enemy's next blow hits another enemy
         "misdirect" => {
             if let Some(UnitRef::Enemy(uid)) = ctx.target {
-                if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
-                    e.flags.insert("misdirect".into(), 1);
+                let others: Vec<u32> = ex.living().into_iter().filter(|u| *u != uid).collect();
+                if let Some(&aim_enemy) = ex.s.rng.pick(&others) {
+                    if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                        e.flags.insert("misdirect".into(), aim_enemy as i32);
+                    }
                 }
             }
         }

@@ -596,7 +596,9 @@ fn local_peers(db: Res<Db>, time: Res<Time>, mut net: ResMut<Net>, session: Opti
 }
 
 fn autopilot(db: Res<Db>, time: Res<Time>, mut net: ResMut<Net>, mut wait: Local<f32>) {
-    *wait -= time.delta_secs();
+    let dt = time.delta_secs();
+    net.node.tick(dt);
+    *wait -= dt;
     if *wait <= 0.0 {
         *wait = 0.6;
         net.node.autopilot(&db.0);
