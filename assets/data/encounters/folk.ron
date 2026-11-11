@@ -6,5 +6,5 @@
     (id: "f_vodyanoy", act: 2, kind: Normal, enemies: ["vodyanoy"], extra3: ["drowned_maiden"], extra4: ["swamp_light"]),
     (id: "f_chuchelo", act: 3, kind: Normal, enemies: ["chuchelo", "raven_upyr"], extra4: ["raven_upyr"]),
     (id: "f_verlioka", act: 3, kind: Normal, enemies: ["verlioka"], extra3: ["weeper"], extra4: ["nav_soul"]),
-    (id: "f_viy", act: 3, kind: Normal, enemies: ["viy"], extra4: ["nav_soul"]),
+    (id: "f_viy", act: 3, kind: Elite, enemies: ["viy"], extra4: ["nav_soul"]),
 ]

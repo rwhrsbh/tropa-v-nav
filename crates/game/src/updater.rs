@@ -749,6 +749,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_current_version_matches_crate_version() {
+        let cur = SemVer::current();
+        println!("Detected current game version: {}", cur.to_string());
+        assert_eq!(cur.to_string(), "0.1.8");
+    }
+
+    #[test]
     fn test_semver_parse() {
         assert_eq!(SemVer::parse("0.1.6"), Some(SemVer { major: 0, minor: 1, patch: 6 }));
         assert_eq!(SemVer::parse("v0.1.4"), Some(SemVer { major: 0, minor: 1, patch: 4 }));

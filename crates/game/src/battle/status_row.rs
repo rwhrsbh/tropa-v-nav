@@ -112,10 +112,10 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
                 };
                 out.push(Chip { icon: "status/lost_limb".into(), n: (h.lost_limbs > 1).then_some(h.lost_limbs as i32), shown: None, good: Some(false), name: l10n.t(&key), help: help(l10n, &key) });
             }
-            for flag in ["marked", "blind", "coiled", "confused", "mired", "asleep", "charmed", "frozen", "winter", "draw_less", "energy_less", "no_intents"] {
+            for flag in ["marked", "blind", "coiled", "confused", "mired", "asleep", "charmed", "frozen", "winter", "draw_less", "energy_less", "no_intents", "doom"] {
                 if let Some(n) = real.flags.get(flag) {
                     let key = format!("trait-{flag}");
-                    out.push(Chip { icon: format!("status/{flag}"), n: (*n > 1).then_some(*n), shown: None, good: Some(false), name: l10n.t(&key), help: help(l10n, &key) });
+                    out.push(Chip { icon: format!("status/{flag}"), n: (*n > 1 || flag == "doom").then_some(*n), shown: None, good: Some(false), name: l10n.t(&key), help: help(l10n, &key) });
                 }
             }
             status(&mut out, &h.statuses);
@@ -128,10 +128,19 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
                     out.push(Chip { icon: "status/immortal".into(), n: None, shown: None, good: Some(true), name: l10n.t("trait-immortal"), help: help(l10n, "trait-immortal") });
                 }
                 // what its kind does, while it can: the hare's dodge is gone once spent this round
-                for flag in ["dodge", "flying", "hiding", "enrage", "lifesteal", "piercing", "rises", "hunter", "pack", "spores", "vengeful", "burning", "greedy", "hollow", "growing"] {
+                for flag in [
+                    "dodge", "flying", "hiding", "enrage", "lifesteal", "piercing", "rises", "hunter", "pack", "spores", "vengeful",
+                    "burning", "greedy", "hollow", "growing", "kinetic_moss", "bayun_perch", "spell_mirror", "flicker", "gorynych_head", "yaga_mortar", "overheat",
+                ] {
                     if real.flags.contains_key(flag) && !(flag == "dodge" && real.flags.contains_key("turn_dodged")) {
                         let key = format!("trait-{flag}");
                         out.push(Chip { icon: format!("status/{flag}"), n: None, shown: None, good: Some(true), name: l10n.t(&key), help: help(l10n, &key) });
+                    }
+                }
+                if let Some(n) = real.flags.get("kinetic_charge") {
+                    if *n > 0 {
+                        let key = "trait-kinetic_charge";
+                        out.push(Chip { icon: "status/kinetic_charge".into(), n: Some(*n), shown: None, good: Some(true), name: l10n.t(key), help: help(l10n, key) });
                     }
                 }
                 if let Some(n) = real.flags.get("last_breath") {

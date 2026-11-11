@@ -37,6 +37,7 @@ fn test_new_encounters_and_enemies_load() {
         "a1_bayun", "a1_mokhovik", "a1_nochnitsy",
         "a1_solovey", "a1_korochun",
         "a2_baba_yaga", "a2_vodyanoy_tsar", "a2_polunochnitsa", "a2_zlydni",
+        "a3_morovitsa",
         "a4_sea_guards", "a4_ogneya", "a4_morovitsa",
         "a4_gagana", "a4_gorynych", "a4_koschei",
     ];

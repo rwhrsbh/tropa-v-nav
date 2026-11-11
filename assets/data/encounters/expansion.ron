@@ -45,6 +45,11 @@
         extra3: ["zlyden"], extra4: ["anchutka"],
     ),
     (
+        id: "a3_morovitsa", act: 3, kind: Elite,
+        enemies: ["morovitsa", "weeper", "nav_soul"], solo: ["morovitsa", "nav_soul"],
+        extra4: ["weeper"],
+    ),
+    (
         id: "a4_sea_guards", act: 4, kind: Normal,
         enemies: ["sea_guard", "sea_guard", "raven_upyr"],
         extra3: ["sea_guard"], extra4: ["sea_guard"],
