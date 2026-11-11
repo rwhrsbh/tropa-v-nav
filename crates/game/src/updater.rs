@@ -125,6 +125,7 @@ pub fn match_platform_asset<'a>(assets: &'a [serde_json::Value]) -> Option<(&'a 
 }
 
 /// Matches assets for a specific OS name (for testing across platforms).
+#[allow(dead_code)]
 pub fn match_asset_for_os<'a>(os: &str, assets: &'a [serde_json::Value]) -> Option<(&'a str, &'a str)> {
     for asset in assets {
         let Some(name) = asset.get("name").and_then(|v| v.as_str()) else { continue };
@@ -383,8 +384,12 @@ pub fn apply_update(target_path: &PathBuf, mut exit_writer: MessageWriter<AppExi
         })();
 
         match res {
-            Ok(()) => exit_writer.write(AppExit::Success),
-            Err(e) => bevy::log::error!("Linux update failed: {e}"),
+            Ok(()) => {
+                exit_writer.write(AppExit::Success);
+            }
+            Err(e) => {
+                bevy::log::error!("Linux update failed: {e}");
+            }
         }
     }
 
