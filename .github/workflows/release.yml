@@ -130,18 +130,19 @@ jobs:
         run: |
           which cargo-apk || cargo install cargo-apk --locked
           export ANDROID_NDK_ROOT="$ANDROID_NDK_LATEST_HOME"
-          # Use persistent release keystore so Android allows updates without signature mismatch
-          if [ -f tools/release.keystore ]; then
-            export CARGO_APK_RELEASE_KEYSTORE="$PWD/tools/release.keystore"
-          else
-            keytool -genkeypair -keystore release.keystore -alias tropa -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass tropapass -keypass tropapass -dname "CN=Tropa v Nav"
-            export CARGO_APK_RELEASE_KEYSTORE="$PWD/release.keystore"
-          fi
-          export CARGO_APK_RELEASE_KEYSTORE_PASSWORD=tropapass
           cargo apk build --release -p tropa-android
-      - name: Upload
+      # cargo-apk 0.10 leaves the release APK unsigned, and Android refuses to install an
+      # unsigned APK ("package appears to be invalid"), so it is aligned and signed here with
+      # the persistent keystore (updates install over each other only with the same key)
+      - name: Sign the APK
         run: |
+          test -f tools/release.keystore || { echo "tools/release.keystore is missing"; exit 1; }
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           apk=$(find target/release/apk -name '*.apk' | head -1)
-          cp "$apk" TropaVNav-android.apk
-          gh release upload "$TAG" TropaVNav-android.apk --clobber -R "$GITHUB_REPOSITORY"
+          "$bt/zipalign" -f -p 4 "$apk" aligned.apk
+          "$bt/apksigner" sign --ks tools/release.keystore --ks-key-alias tropa \
+            --ks-pass pass:tropapass --key-pass pass:tropapass \
+            --out TropaVNav-android.apk aligned.apk
+          "$bt/apksigner" verify --verbose TropaVNav-android.apk
+      - name: Upload
+        run: gh release upload "$TAG" TropaVNav-android.apk --clobber -R "$GITHUB_REPOSITORY"
