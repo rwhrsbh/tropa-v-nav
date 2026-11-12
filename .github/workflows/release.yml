@@ -1,5 +1,9 @@
 # Builds the game for every platform and puts the builds straight into a GitHub Release (no
 # workflow artifacts are kept). Runs on a pushed tag `v*`, or by hand with a tag name.
+#
+# Caches: GitHub lets a tag run read the default branch's caches but never share its own, so
+# only runs on a branch save them. Start the build by hand from `main` (Actions > release >
+# Run workflow, branch main, tag name) and the next runs, tags included, start warm.
 name: release
 
 on:
@@ -47,15 +51,28 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: "desktop-${{ matrix.name }}"
+          cache-on-failure: true
+          save-if: ${{ github.ref_type == 'branch' }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Linux libraries
         if: matrix.name == 'linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev pkg-config
+      - name: Cache packed assets
+        id: packcache
+        uses: actions/cache@v4
+        with:
+          path: target/pack/desktop
+          key: pack-desktop-${{ runner.os }}-${{ hashFiles('assets/**', 'tools/pack_assets.py') }}
       - name: Pack the assets
         shell: bash
         run: |
+          # the packer skips files not older than their packed copy; a fresh checkout makes
+          # every source "new", so with a cache hit the sources are dated far back
+          if [ "${{ steps.packcache.outputs.cache-hit }}" = "true" ]; then
+            find assets -type f -exec touch -t 200001010000 {} +
+          fi
           pip install pillow soundfile
           python -X utf8 tools/pack_assets.py desktop
       - name: Build
@@ -110,6 +127,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: "android-aarch64"
+          cache-on-failure: true
+          save-if: ${{ github.ref_type == 'branch' }}
       - name: Cache cargo-apk binary
         uses: actions/cache@v4
         with:
@@ -122,8 +141,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Cache packed assets
+        id: packcache
+        uses: actions/cache@v4
+        with:
+          path: target/pack/mobile
+          key: pack-mobile-${{ hashFiles('assets/**', 'tools/pack_assets.py') }}
       - name: Pack the assets
         run: |
+          # see the desktop job: with a cache hit the sources are dated far back, so the
+          # packer keeps the cached files instead of redoing them
+          if [ "${{ steps.packcache.outputs.cache-hit }}" = "true" ]; then
+            find assets -type f -exec touch -t 200001010000 {} +
+          fi
           pip install pillow soundfile
           python -X utf8 tools/pack_assets.py mobile
       - name: Build the APK
