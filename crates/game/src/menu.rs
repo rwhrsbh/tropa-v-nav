@@ -13,7 +13,8 @@ use bevy::ui_widgets::{observe, Activate, Button};
 pub fn plugin(app: &mut App) {
     app.add_systems(OnEnter(AppState::Menu), enter_menu)
         .add_systems(OnEnter(AppState::Settings), enter_settings)
-        .add_systems(Update, drag_sliders.run_if(in_state(AppState::Settings)))
+        // wherever the settings lie open: on their own screen, or over a run
+        .add_systems(Update, drag_sliders.run_if(any_with_component::<SliderStep>))
         .add_systems(Update, toggle_full_screen)
         .add_systems(OnEnter(AppState::Village), enter_village)
         .add_systems(OnEnter(AppState::Chronicle), enter_chronicle)
@@ -201,6 +202,10 @@ pub fn apply_settings(
     }
 }
 
+/// The settings laid over a run, opened from the pause menu: the same rows as the menu's screen.
+#[derive(Component)]
+pub struct SettingsOverlay;
+
 fn enter_settings(
     mut commands: Commands,
     stage: Single<Entity, With<Stage>>,
@@ -210,6 +215,57 @@ fn enter_settings(
     art: Res<Art>,
     assets: Res<AssetServer>,
 ) {
+    commands.spawn((DespawnOnExit(AppState::Settings), backdrop(&art, &assets, "bg/menu", 0.45), ChildOf(*stage)));
+    let root = commands.spawn(screen(AppState::Settings, *stage)).id();
+    settings_rows(&mut commands, root, false, &fonts, &l10n, &profile);
+}
+
+/// Lays the settings over the pause menu (anew, if they lie there already: a row has changed).
+pub fn open_settings_overlay(
+    mut commands: Commands,
+    old: Query<Entity, With<SettingsOverlay>>,
+    stage: Single<Entity, With<Stage>>,
+    fonts: Res<Fonts>,
+    l10n: Res<L10n>,
+    profile: Res<crate::profile::Profile>,
+) {
+    for e in &old {
+        commands.entity(e).despawn();
+    }
+    let root = commands
+        .spawn((
+            SettingsOverlay,
+            Node {
+                position_type: PositionType::Absolute,
+                width: px(STAGE_W),
+                height: px(STAGE_H),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: px(22),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.02, 0.02, 0.03, 0.97)),
+            // over the pause menu it was opened from
+            GlobalZIndex(1001),
+            ChildOf(*stage),
+        ))
+        .id();
+    settings_rows(&mut commands, root, true, &fonts, &l10n, &profile);
+}
+
+/// Shows a changed setting where the settings are open: on their own screen, or over a run.
+fn redraw_settings(mut commands: Commands, state: Res<State<AppState>>, mut next: ResMut<NextState<AppState>>, overlay: Query<(), With<SettingsOverlay>>) {
+    if *state.get() == AppState::Settings {
+        next.set(AppState::Settings);
+    } else if !overlay.is_empty() {
+        commands.run_system_cached(open_settings_overlay);
+    }
+}
+
+/// The rows of the settings under `root`. `in_run`: laid over a run, where "back" only folds them
+/// away and the updater, which leads out to the menu, is left off.
+fn settings_rows(commands: &mut Commands, root: Entity, in_run: bool, fonts: &Fonts, l10n: &L10n, profile: &crate::profile::Profile) {
     use crate::profile::{Profile, Settings};
     let s = profile.settings;
     let on_off = |v: bool| l10n.t(if v { "settings-on" } else { "settings-off" });
@@ -227,21 +283,20 @@ fn enter_settings(
             format!("{}: {w}x{h}", l10n.t("settings-window-size"))
         }, |s| s.window_size = (s.window_size + 1) % crate::profile::WINDOW_SIZES.len() as u8),
     ];
-    commands.spawn((DespawnOnExit(AppState::Settings), backdrop(&art, &assets, "bg/menu", 0.45), ChildOf(*stage)));
-    commands.spawn(screen(AppState::Settings, *stage)).with_children(|p| {
+    commands.entity(root).with_children(|p| {
         p.spawn(theme::text(l10n.t("menu-settings"), &fonts.title, 72.0, theme::BONE));
         for (label, change) in rows {
             p.spawn((
                 // nine rows and a title have to fit the screen
                 Node { margin: UiRect::vertical(px(-9)), ..default() },
                 children![(
-                menu_button(label, &fonts),
-                observe(move |_: On<Activate>, mut profile: ResMut<Profile>, mut commands: Commands, mut next: ResMut<NextState<AppState>>| {
+                menu_button(label, fonts),
+                observe(move |_: On<Activate>, mut profile: ResMut<Profile>, mut commands: Commands| {
                     change(&mut profile.settings);
                     profile.save();
                     commands.run_system_cached(apply_settings);
                     // redraw with the new value
-                    next.set(AppState::Settings);
+                    commands.run_system_cached(redraw_settings);
                 }),
                 )],
             ));
@@ -265,39 +320,50 @@ fn enter_settings(
                 row.spawn((SliderValue(which), theme::text(pct(v), &fonts.num, 26.0, theme::CANDLE), Node { width: px(80), ..default() }));
             });
         }
-        p.spawn((
-            menu_button(l10n.t("coop-back"), &fonts),
-            observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Menu)),
-        ));
-        // off to the side: game version and check updates button
-        p.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(40),
-                bottom: px(40),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::FlexStart,
-                row_gap: px(8),
-                ..default()
-            },
-            children![
-                (theme::text(format!("v{}", crate::updater::SemVer::current().to_string()), &fonts.num, 20.0, theme::DIM)),
-                (
-                    menu_button(l10n.t("updater-check-btn"), &fonts),
-                    observe(|_: On<Activate>, mut updater: ResMut<crate::updater::UpdaterState>, mut next: ResMut<NextState<AppState>>| {
-                        updater.dismissed = false;
-                        crate::updater::trigger_check(&mut updater);
-                        next.set(AppState::Menu);
-                    }),
-                ),
-            ],
-        ));
+        if in_run {
+            p.spawn((
+                menu_button(l10n.t("coop-back"), fonts),
+                observe(|_: On<Activate>, mut commands: Commands, open: Query<Entity, With<SettingsOverlay>>| {
+                    for e in &open {
+                        commands.entity(e).despawn();
+                    }
+                }),
+            ));
+        } else {
+            p.spawn((
+                menu_button(l10n.t("coop-back"), fonts),
+                observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Menu)),
+            ));
+            // off to the side: game version and check updates button
+            p.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(40),
+                    bottom: px(40),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexStart,
+                    row_gap: px(8),
+                    ..default()
+                },
+                children![
+                    (theme::text(format!("v{}", crate::updater::SemVer::current().to_string()), &fonts.num, 20.0, theme::DIM)),
+                    (
+                        menu_button(l10n.t("updater-check-btn"), fonts),
+                        observe(|_: On<Activate>, mut updater: ResMut<crate::updater::UpdaterState>, mut next: ResMut<NextState<AppState>>| {
+                            updater.dismissed = false;
+                            crate::updater::trigger_check(&mut updater);
+                            next.set(AppState::Menu);
+                        }),
+                    ),
+                ],
+            ));
+        }
 
         // off to the side, or the rows would not fit: where to find what to send with a bug report
         p.spawn((
             Node { position_type: PositionType::Absolute, right: px(40), bottom: px(40), ..default() },
             children![(
-                menu_button(l10n.t("settings-logs"), &fonts),
+                menu_button(l10n.t("settings-logs"), fonts),
                 observe(|_: On<Activate>| crate::logfile::show_folder()),
             )],
         ));
@@ -305,7 +371,7 @@ fn enter_settings(
 }
 
 /// F11, or Alt+Enter, takes the game between a window and the whole screen, and keeps the choice.
-fn toggle_full_screen(keys: Res<ButtonInput<KeyCode>>, mut profile: ResMut<crate::profile::Profile>, mut commands: Commands, state: Res<State<AppState>>, mut next: ResMut<NextState<AppState>>) {
+fn toggle_full_screen(keys: Res<ButtonInput<KeyCode>>, mut profile: ResMut<crate::profile::Profile>, mut commands: Commands) {
     let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
     if !(keys.just_pressed(KeyCode::F11) || (alt && keys.just_pressed(KeyCode::Enter))) {
         return;
@@ -314,10 +380,8 @@ fn toggle_full_screen(keys: Res<ButtonInput<KeyCode>>, mut profile: ResMut<crate
     s.screen = if s.screen == 0 { 1 } else { 0 };
     profile.save();
     commands.run_system_cached(apply_settings);
-    // the settings screen shows the new choice
-    if *state.get() == AppState::Settings {
-        next.set(AppState::Settings);
-    }
+    // the settings, where they are open, show the new choice
+    commands.run_system_cached(redraw_settings);
 }
 
 const SLIDER_STEPS: u8 = 20;

@@ -28,6 +28,18 @@ pub fn hero_color(hero: &str) -> Color {
     }
 }
 
+/// The colour of a player's marker on the map, by their seat: what they draw there is in it, and
+/// their token stands on a disc of it. Dark and full enough to read on parchment, and unlike each
+/// other, which the heroes' own colours are not.
+pub fn marker_color(seat: u8) -> Color {
+    match seat % 4 {
+        0 => Color::srgb(0.72, 0.17, 0.12),
+        1 => Color::srgb(0.17, 0.40, 0.66),
+        2 => Color::srgb(0.20, 0.50, 0.24),
+        _ => Color::srgb(0.52, 0.25, 0.60),
+    }
+}
+
 #[derive(Resource, Clone)]
 pub struct Fonts {
     pub title: Handle<Font>,

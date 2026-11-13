@@ -137,7 +137,7 @@ enum Step {
     Shot(String),
     /// Leave the game.
     Quit,
-    /// A key pressed and let go, by its name: space, enter, left, right, esc, back.
+    /// A key pressed and let go, by its name: space, enter, left, right, esc, m, back.
     Key(String),
     /// Types these characters, one key at a time.
     Type(String),
@@ -263,6 +263,7 @@ fn robot(
                 "left" => (KeyCode::ArrowLeft, Key::ArrowLeft),
                 "right" => (KeyCode::ArrowRight, Key::ArrowRight),
                 "esc" => (KeyCode::Escape, Key::Escape),
+                "m" => (KeyCode::KeyM, Key::Character("m".into())),
                 _ => (KeyCode::Backspace, Key::Backspace),
             };
             for state in [ButtonState::Pressed, ButtonState::Released] {

@@ -1,6 +1,6 @@
 //! Escape in a run opens a small menu over it: back to the run, out to the main menu (the run is
 //! kept: alone it waits under "Continue", in a party the others carry on and the host keeps it
-//! saved), or out of the game.
+//! saved), the settings laid over it, or out of the game.
 
 use crate::l10n::L10n;
 use crate::menu::menu_button;
@@ -21,13 +21,13 @@ pub fn plugin(app: &mut App) {
 }
 
 #[derive(Component)]
-struct PauseMenu;
+pub(crate) struct PauseMenu;
 
 fn in_run(state: AppState) -> bool {
     matches!(state, AppState::Map | AppState::Battle | AppState::Reward | AppState::Rest | AppState::Shop | AppState::Omen)
 }
 
-fn close(mut commands: Commands, open: Query<Entity, With<PauseMenu>>) {
+fn close(mut commands: Commands, open: Query<Entity, Or<(With<PauseMenu>, With<crate::menu::SettingsOverlay>)>>) {
     for e in &open {
         commands.entity(e).despawn();
     }
@@ -39,7 +39,8 @@ fn toggle(
     keys: Res<ButtonInput<KeyCode>>,
     state: Res<State<AppState>>,
     open: Query<Entity, With<PauseMenu>>,
-    piles: Query<(), With<crate::battle::piles::PileView>>,
+    piles: Query<(), Or<(With<crate::battle::piles::PileView>, With<crate::run_ui::MapPeek>)>>,
+    settings: Query<Entity, With<crate::menu::SettingsOverlay>>,
     stage: Single<Entity, With<Stage>>,
     fonts: Res<Fonts>,
     l10n: Res<L10n>,
@@ -48,13 +49,20 @@ fn toggle(
     if !keys.just_pressed(KeyCode::Escape) || !in_run(*state.get()) {
         return;
     }
+    // out of the settings, back to the pause menu under them
+    if !settings.is_empty() {
+        for e in &settings {
+            commands.entity(e).despawn();
+        }
+        return;
+    }
     if !open.is_empty() {
         for e in &open {
             commands.entity(e).despawn();
         }
         return;
     }
-    // Escape closes an open pile first
+    // Escape closes an open pile, or the map looked at in a fight, first
     if !piles.is_empty() {
         return;
     }
@@ -87,6 +95,10 @@ fn toggle(
                         commands.entity(e).despawn();
                     }
                 }),
+            ));
+            p.spawn((
+                menu_button(l10n.t("menu-settings"), &fonts),
+                observe(|_: On<Activate>, mut commands: Commands| commands.run_system_cached(crate::menu::open_settings_overlay)),
             ));
             p.spawn((
                 menu_button(l10n.t("pause-to-menu"), &fonts),

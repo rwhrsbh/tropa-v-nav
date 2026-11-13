@@ -27,6 +27,7 @@ pub fn plugin(app: &mut App) {
     }
     app.init_resource::<UpgradePick>()
         .add_systems(Update, (draw_map, beckon).run_if(in_state(AppState::Map)))
+        .add_systems(Update, peek_map.run_if(in_state(AppState::Battle)))
         .add_systems(Update, draw_reward.run_if(in_state(AppState::Reward)))
         .add_systems(Update, draw_rest.run_if(in_state(AppState::Rest)))
         .add_systems(Update, draw_shop.run_if(in_state(AppState::Shop)))
@@ -227,6 +228,26 @@ const WALKED: Color = Color::srgb(0.55, 0.12, 0.06);
 /// The parchment's own pale colour.
 const PAPER: Color = Color::srgb(0.93, 0.86, 0.71);
 
+/// How large a player's token is under the node the party stands on, and on a node voted for.
+const TOKEN: f32 = 46.0;
+const VOTE_TOKEN: f32 = 42.0;
+
+/// The round frame of a player's token, `size` across.
+pub(crate) fn token_node(size: f32) -> Node {
+    Node { width: px(size), height: px(size), border: UiRect::all(px(3)), border_radius: BorderRadius::MAX, flex_shrink: 0.0, ..default() }
+}
+
+/// Makes a player's token of `token`: a round disc of the colour the player in that `seat` draws
+/// in on the map, with their hero's little figure (`assets/map/hero_<id>`) on it where one has
+/// been painted.
+pub(crate) fn hero_token(token: &mut EntityCommands, hero: &str, seat: u8, art: &Art, assets: &AssetServer) {
+    let color = theme::marker_color(seat);
+    token.insert((BackgroundColor(color.lighter(0.12)), BorderColor::all(color.mix(&INK, 0.45)), Pickable::IGNORE));
+    if let Some(face) = art.image(assets, &format!("map/hero_{hero}")) {
+        token.insert(ImageNode::new(face));
+    }
+}
+
 /// A node the party may step to next: it swells and settles, asking to be picked.
 #[derive(Component)]
 struct Beckon;
@@ -264,6 +285,89 @@ fn draw_map(
     let (Some(run), Some(me)) = (net.node.state.as_ref(), net.node.my_slot()) else { return };
     let Stage::Map { votes } = &run.stage else { return };
     let Some(root) = redraw(&mut commands, &mut status, &old, AppState::Map, *canvas, theme::SOOT) else { return };
+    paint_map(&mut commands, root, run, me, Some(votes), &fonts, &l10n, &art, &assets, Some(&mut spots), &mut scroll);
+}
+
+/// The map looked at in the middle of a fight (M): the road is seen, but not walked.
+#[derive(Component)]
+pub struct MapPeek;
+
+/// Where the map looked at in a fight lies among everything drawn: over the whole fight, under
+/// the pause menu.
+pub const PEEK_Z: i32 = 700;
+
+/// M in a fight unrolls the map over it, and M or Escape rolls it up again.
+#[allow(clippy::too_many_arguments)]
+fn peek_map(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    net: Option<Res<Net>>,
+    open: Query<Entity, With<MapPeek>>,
+    paused: Query<(), Or<(With<crate::pause::PauseMenu>, With<crate::menu::SettingsOverlay>)>>,
+    canvas: Single<Entity, With<Canvas>>,
+    fonts: Res<Fonts>,
+    l10n: Res<L10n>,
+    art: Res<Art>,
+    assets: Res<AssetServer>,
+    mut scroll: ResMut<crate::map_party::MapScroll>,
+) {
+    // the pause menu lies over the map and takes the keys first
+    if !paused.is_empty() {
+        return;
+    }
+    if !open.is_empty() {
+        if keys.any_just_pressed([KeyCode::KeyM, KeyCode::Escape]) {
+            for e in &open {
+                commands.entity(e).despawn();
+            }
+        }
+        return;
+    }
+    if !keys.just_pressed(KeyCode::KeyM) {
+        return;
+    }
+    let Some(net) = net else { return };
+    let (Some(run), Some(me)) = (net.node.state.as_ref(), net.node.my_slot()) else { return };
+    // the last stretch has no map
+    if run.map.floors.is_empty() {
+        return;
+    }
+    let root = commands
+        .spawn((
+            MapPeek,
+            DespawnOnExit(AppState::Battle),
+            // not passed through: nothing of the fight under the map is pressed by mistake
+            Node { position_type: PositionType::Absolute, width: px(STAGE_W), height: px(STAGE_H), ..default() },
+            BackgroundColor(theme::SOOT),
+            GlobalZIndex(PEEK_Z),
+            ChildOf(*canvas),
+        ))
+        .id();
+    // rolled to where the party stands
+    scroll.fresh = true;
+    paint_map(&mut commands, root, run, me, None, &fonts, &l10n, &art, &assets, None, &mut scroll);
+}
+
+/// Draws the map under `root`. With `votes` it is the map screen, where the next node is voted
+/// for; without, the map is only looked at and nothing on it can be pressed.
+#[allow(clippy::too_many_arguments)]
+fn paint_map(
+    commands: &mut Commands,
+    root: Entity,
+    run: &Run,
+    me: u8,
+    votes: Option<&[Option<u8>]>,
+    fonts: &Fonts,
+    l10n: &L10n,
+    art: &Art,
+    assets: &AssetServer,
+    spots: Option<&mut crate::map_party::MapSpots>,
+    scroll: &mut crate::map_party::MapScroll,
+) {
+    let voting = votes.is_some();
+    let votes = votes.unwrap_or(&[]);
+    let voted = |seat: u8| votes.get(seat as usize).copied().flatten();
+    let mut commands = commands.reborrow();
 
     let here = run.at;
     // the act's forest, dimmed, and the map unrolled over it
@@ -318,7 +422,7 @@ fn draw_map(
         ChildOf(root),
     ));
     commands.spawn((
-        theme::text(l10n.t(if votes[me as usize].is_some() { "map-voted" } else { "map-hint" }), &fonts.body, 22.0, theme::DIM),
+        theme::text(l10n.t(if !voting { "map-peek-hint" } else if voted(me).is_some() { "map-voted" } else { "map-hint" }), &fonts.body, 22.0, theme::DIM),
         Node { position_type: PositionType::Absolute, right: px(40), top: px(150), max_width: px(380), ..default() },
         TextLayout::justify(Justify::Right),
         ChildOf(root),
@@ -346,7 +450,10 @@ fn draw_map(
                 ));
             }
         });
-    party_panel(&mut commands, root, run, me, &fonts, &l10n);
+    // in a fight the party is told of by the fight itself
+    if voting {
+        party_panel(&mut commands, root, run, me, fonts, l10n);
+    }
 
     // a path is a row of ink dots, as if pricked out with a pen, leaving room round the nodes
     // a path is walked (the party came along it), open (it leads on from where they stand), or neither
@@ -392,13 +499,16 @@ fn draw_map(
         }
     };
 
-    let choices = run.choices();
+    // only looked at, the map offers nowhere to step
+    let choices = if voting { run.choices() } else { Vec::new() };
     let next_floor = here.map(|(f, _)| f as usize + 1).unwrap_or(0);
     // where each choice sits, for the party's rings and the lot (see `map_party`)
-    spots.0 = match run.map.floors.get(next_floor) {
-        Some(floor) => choices.iter().map(|(n, _)| floor.get(*n as usize).map(|node| map_pos(next_floor, node.col)).unwrap_or(BOSS_POS)).collect(),
-        None => vec![BOSS_POS],
-    };
+    if let Some(spots) = spots {
+        spots.0 = match run.map.floors.get(next_floor) {
+            Some(floor) => choices.iter().map(|(n, _)| floor.get(*n as usize).map(|node| map_pos(next_floor, node.col)).unwrap_or(BOSS_POS)).collect(),
+            None => vec![BOSS_POS],
+        };
+    }
     let party = run.players.len() > 1;
     // paths first, so the nodes sit on top of them
     let walked = |a: (u8, u8), b: (u8, u8)| run.trail.windows(2).any(|w| w[0] == a && w[1] == b);
@@ -449,22 +559,18 @@ fn draw_map(
             ));
             if standing {
                 // the party stands here: a token for each of them under the mark
-                let party_colors: Vec<Color> = run.players.iter().map(|pl| theme::hero_color(&pl.hero)).collect();
                 e.with_children(|t| {
-                    let n = party_colors.len() as f32;
-                    for (k, color) in party_colors.into_iter().enumerate() {
-                        t.spawn((
-                            Node { position_type: PositionType::Absolute, left: px(side / 2.0 - n * 9.0 + k as f32 * 18.0), bottom: px(-14), width: px(18), height: px(18), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
-                            BackgroundColor(color.lighter(0.15)),
-                            BorderColor::all(INK),
-                            Pickable::IGNORE,
-                        ));
+                    let n = run.players.len() as f32;
+                    let step = TOKEN - 4.0;
+                    for (k, pl) in run.players.iter().enumerate() {
+                        let mut token = t.spawn(Node { position_type: PositionType::Absolute, left: px(side / 2.0 - (n * step + 4.0) / 2.0 + k as f32 * step), bottom: px(-TOKEN + 6.0), ..token_node(TOKEN) });
+                        hero_token(&mut token, &pl.hero, k as u8, art, assets);
                     }
                 });
             }
             if let Some(c) = choice {
                 e.insert((Button, Hovered::default(), Btn(theme::CANDLE.with_alpha(0.3)), Beckon));
-                let mine = party && votes[me as usize] == Some(c);
+                let mine = party && voted(me) == Some(c);
                 e.observe(move |_: On<Activate>, mut out: ResMut<RunOutbox>, net: Option<ResMut<Net>>, mut status: ResMut<NetStatus>| {
                     if mine {
                         if let Some(mut net) = net {
@@ -475,16 +581,13 @@ fn draw_map(
                         out.0.push(RunAction::Vote(c));
                     }
                 });
-                // each player's token, in their hero's colour, along the node's foot
-                let tokens: Vec<Color> = votes.iter().enumerate().filter(|(_, v)| **v == Some(c)).map(|(p, _)| theme::hero_color(&run.players[p].hero)).collect();
+                // each player's token, on their marker's colour, along the node's foot
+                let voters: Vec<(u8, &str)> = votes.iter().enumerate().filter(|(_, v)| **v == Some(c)).map(|(p, _)| (p as u8, run.players[p].hero.as_str())).collect();
                 e.with_children(|t| {
-                    for (k, color) in tokens.into_iter().enumerate() {
-                        t.spawn((
-                            Node { position_type: PositionType::Absolute, left: px(-8.0 + k as f32 * 16.0), bottom: px(-8.0), width: px(16), height: px(16), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
-                            BackgroundColor(color.lighter(0.15)),
-                            BorderColor::all(INK),
-                            Pickable::IGNORE,
-                        ));
+                    let step = VOTE_TOKEN - 4.0;
+                    for (k, (seat, hero)) in voters.into_iter().enumerate() {
+                        let mut token = t.spawn(Node { position_type: PositionType::Absolute, left: px(-10.0 + k as f32 * step), bottom: px(-VOTE_TOKEN / 2.0), ..token_node(VOTE_TOKEN) });
+                        hero_token(&mut token, hero, seat, art, assets);
                     }
                 });
             } else {
@@ -516,7 +619,7 @@ fn draw_map(
             // only the nodes the party can step to are buttons
             e.insert((Button, Hovered::default(), Btn(base)));
             // clicked again once chosen, the node hurries the others along
-            let mine = party && votes[me as usize] == Some(c);
+            let mine = party && voted(me) == Some(c);
             e.observe(move |_: On<Activate>, mut out: ResMut<RunOutbox>, net: Option<ResMut<Net>>, mut status: ResMut<NetStatus>| {
                 if mine {
                     if let Some(mut net) = net {
@@ -527,16 +630,12 @@ fn draw_map(
                     out.0.push(RunAction::Vote(c));
                 }
             });
-            // each player's token, in their hero's colour
-            let tokens: Vec<Color> = votes.iter().enumerate().filter(|(_, v)| **v == Some(c)).map(|(p, _)| theme::hero_color(&run.players[p].hero)).collect();
+            // each player's token, on their marker's colour
+            let voters: Vec<(u8, &str)> = votes.iter().enumerate().filter(|(_, v)| **v == Some(c)).map(|(p, _)| (p as u8, run.players[p].hero.as_str())).collect();
             e.with_children(|t| {
-                for color in tokens {
-                    t.spawn((
-                        Node { width: px(14), height: px(14), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
-                        BackgroundColor(color.lighter(0.15)),
-                        BorderColor::all(theme::BONE),
-                        Pickable::IGNORE,
-                    ));
+                for (seat, hero) in voters {
+                    let mut token = t.spawn(token_node(VOTE_TOKEN));
+                    hero_token(&mut token, hero, seat, art, assets);
                 }
             });
         } else {
@@ -550,7 +649,7 @@ fn draw_map(
             spawn_node(&mut commands, map_pos(f, node.col), node.kind, choice, standing, f < next_floor && !standing, !standing && visited((f as u8, i as u8)));
         }
     }
-    let boss_choice = (next_floor >= run.map.floors.len()).then_some(0);
+    let boss_choice = (voting && next_floor >= run.map.floors.len()).then_some(0);
     spawn_node(&mut commands, BOSS_POS, NodeKind::Boss, boss_choice, false, false, false);
 }
 

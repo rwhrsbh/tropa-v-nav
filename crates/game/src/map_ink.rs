@@ -17,7 +17,15 @@ use bevy::ui_widgets::{observe, Activate, Button};
 pub fn plugin(app: &mut App) {
     app.init_resource::<MapInk>()
         .add_systems(Update, sync_ink)
-        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Map)));
+        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Map)))
+        // the map looked at in a fight (see `run_ui::MapPeek`) is drawn on as well
+        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Battle)));
+}
+
+/// How far everything of the pencil is lifted: in a fight the map is laid over the whole fight,
+/// and its marks and tray with it.
+fn lift(state: &Option<Res<State<AppState>>>) -> i32 {
+    if state.as_ref().is_some_and(|s| *s.get() == AppState::Battle) { crate::run_ui::PEEK_Z } else { 0 }
 }
 
 /// What the right button does on the map.
@@ -42,6 +50,15 @@ pub struct MapInk {
     /// Where the eraser was last frame, while it is rubbing: it rubs the whole way between.
     rubbed_from: Option<Vec2>,
     pub tool: Tool,
+    /// This player's seat: their marks are drawn in its colour (see `theme::marker_color`).
+    seat: Option<u8>,
+}
+
+impl MapInk {
+    /// The colour this player's own marks are drawn in: their seat's, as everyone else sees them.
+    fn own_color(&self) -> Color {
+        self.seat.map_or(PENCIL, theme::marker_color)
+    }
 }
 
 /// One piece of a pencil stroke, child of the sheet.
@@ -72,10 +89,15 @@ const STEP: f32 = 6.0;
 /// The eraser's reach from the pointer: it is ten times the pencil's breadth across.
 const RUB: f32 = DOT * 5.0;
 const EDGE: Color = Color::srgb(0.42, 0.33, 0.22);
+/// Where the marks lie among everything drawn: over the map screen, under its tray.
+const INK_Z: i32 = 5;
+/// How far below the top bar the tray begins: under the party's panel, which is as tall as four
+/// players make it.
+const TRAY_DROP: f32 = 210.0;
 
 /// A piece of line from `a` to `b`: a bar with round ends turned along the way, so the pieces of a
 /// stroke overlap into one unbroken line (a lone point is a round dot).
-fn piece(commands: &mut Commands, sheet: Entity, a: Vec2, b: Vec2) -> Entity {
+fn piece(commands: &mut Commands, sheet: Entity, a: Vec2, b: Vec2, z: i32, hue: Color) -> Entity {
     let d = b - a;
     let mid = (a + b) / 2.0;
     let w = d.length() + DOT;
@@ -83,8 +105,8 @@ fn piece(commands: &mut Commands, sheet: Entity, a: Vec2, b: Vec2) -> Entity {
         InkDot,
         Node { position_type: PositionType::Absolute, left: px(mid.x - w / 2.0), top: px(mid.y - DOT / 2.0), width: px(w), height: px(DOT), border_radius: BorderRadius::MAX, ..default() },
         UiTransform { rotation: Rot2::radians(d.y.atan2(d.x)), ..UiTransform::IDENTITY },
-        BackgroundColor(PENCIL),
-        GlobalZIndex(5),
+        BackgroundColor(hue),
+        GlobalZIndex(z),
         Pickable::IGNORE,
         ChildOf(sheet),
     )).id()
@@ -137,13 +159,13 @@ fn rub(strokes: &mut Vec<Vec<Vec2>>, from: Vec2, to: Vec2) -> bool {
     any
 }
 
-fn lay_stroke(commands: &mut Commands, sheet: Entity, stroke: &[Vec2]) {
+fn lay_stroke(commands: &mut Commands, sheet: Entity, stroke: &[Vec2], z: i32, hue: Color) {
     match stroke {
         [] => {}
-        [p] => { piece(commands, sheet, *p, *p); }
+        [p] => { piece(commands, sheet, *p, *p, z, hue); }
         _ => {
             for w in stroke.windows(2) {
-                piece(commands, sheet, w[0], w[1]);
+                piece(commands, sheet, w[0], w[1], z, hue);
             }
         }
     }
@@ -151,22 +173,24 @@ fn lay_stroke(commands: &mut Commands, sheet: Entity, stroke: &[Vec2]) {
 
 /// The map is drawn anew whenever the run changes: the marks are put back on each new sheet, and
 /// forgotten when a new act begins.
-fn redraw_ink(mut commands: Commands, mut ink: ResMut<MapInk>, sheets: Query<(Entity, Ref<MapSheet>)>, dots: Query<Entity, With<RemoteInk>>) {
+fn redraw_ink(mut commands: Commands, mut ink: ResMut<MapInk>, sheets: Query<(Entity, Ref<MapSheet>)>, dots: Query<Entity, With<RemoteInk>>, state: Option<Res<State<AppState>>>) {
+    let z = lift(&state) + INK_Z;
+    let own = ink.own_color();
     for (sheet, marker) in &sheets {
         if marker.is_added() {
             for stroke in &ink.strokes {
-                lay_stroke(&mut commands, sheet, stroke);
+                lay_stroke(&mut commands, sheet, stroke, z, own);
             }
         }
         if marker.is_added() || ink.remote_dirty {
             for e in &dots {
                 commands.entity(e).despawn();
             }
-            for strokes in ink.others.values() {
+            for (seat, strokes) in &ink.others {
                 for stroke in strokes {
                     for (a, b) in stroke.first().map(|p| (*p, *p)).into_iter().chain(stroke.windows(2).map(|w| (w[0], w[1]))) {
-                        let e = piece(&mut commands, sheet, a, b);
-                        commands.entity(e).insert((RemoteInk, BackgroundColor(Color::srgb(0.25, 0.36, 0.48))));
+                        let e = piece(&mut commands, sheet, a, b, z, theme::marker_color(*seat));
+                        commands.entity(e).insert(RemoteInk);
                     }
                 }
             }
@@ -203,9 +227,13 @@ fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMu
     };
     let Some(run) = net.node.state.as_ref() else { return };
     let (seed, act) = (run.seed, run.act);
+    let me = net.node.my_slot();
     let changed = ink.seed != Some(seed) || ink.act != act;
     if changed {
         *ink = MapInk { seed: Some(seed), act, ..default() };
+    }
+    if ink.seat != me {
+        ink.seat = me;
     }
     // Flush earlier edits before answering a snapshot request so reliable ordering cannot
     // append those same points again after the snapshot.
@@ -258,18 +286,37 @@ fn wipe(commands: &mut Commands, ink: &mut MapInk, dots: &Query<Entity, (With<In
     }
 }
 
-/// The tray lies at the left of the map, beside the parchment, once per map screen.
-fn tray(mut commands: Commands, trays: Query<(), With<InkTray>>, stage: Single<Entity, With<Stage>>, fonts: Res<Fonts>, l10n: Res<L10n>, art: Res<crate::art::Art>, assets: Res<AssetServer>) {
+/// The tray lies at the left of the map, beside the parchment, once per map screen; in a fight it
+/// belongs to the map looked at there, and goes when that is rolled up.
+#[allow(clippy::too_many_arguments)]
+fn tray(
+    mut commands: Commands,
+    trays: Query<(), With<InkTray>>,
+    stage: Single<Entity, With<Stage>>,
+    peek: Query<Entity, With<crate::run_ui::MapPeek>>,
+    state: Option<Res<State<AppState>>>,
+    fonts: Res<Fonts>,
+    l10n: Res<L10n>,
+    art: Res<crate::art::Art>,
+    assets: Res<AssetServer>,
+) {
     if !trays.is_empty() {
         return;
     }
+    let up = lift(&state);
+    let parent = if up == 0 {
+        *stage
+    } else {
+        let Ok(peek) = peek.single() else { return };
+        peek
+    };
     commands
         .spawn((
             InkTray,
-            Node { position_type: PositionType::Absolute, left: px(28), top: px(crate::between::BAR_H + 28.0), flex_direction: FlexDirection::Column, row_gap: px(8), ..default() },
-            GlobalZIndex(40),
+            Node { position_type: PositionType::Absolute, left: px(28), top: px(crate::between::BAR_H + TRAY_DROP), flex_direction: FlexDirection::Column, row_gap: px(8), ..default() },
+            GlobalZIndex(up + 40),
             DespawnOnExit(AppState::Map),
-            ChildOf(*stage),
+            ChildOf(parent),
         ))
         .with_children(|p| {
             p.spawn(theme::text(l10n.t("map-ink-title"), &fonts.body, 22.0, theme::BONE));
@@ -306,7 +353,11 @@ fn draw_ink(
     dots: Query<Entity, (With<InkDot>, Without<RemoteInk>)>,
     rings: Query<Entity, With<EraserRing>>,
     mut ink: ResMut<MapInk>,
+    state: Option<Res<State<AppState>>>,
 ) {
+    let up = lift(&state);
+    let ink_z = up + INK_Z;
+    let own = ink.own_color();
     let ring = |commands: &mut Commands, at: Option<(Entity, Vec2)>| {
         for e in &rings {
             commands.entity(e).despawn();
@@ -317,7 +368,7 @@ fn draw_ink(
                 Node { position_type: PositionType::Absolute, left: px(at.x - RUB), top: px(at.y - RUB), width: px(RUB * 2.0), height: px(RUB * 2.0), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
                 BorderColor::all(PENCIL),
                 BackgroundColor(theme::BONE.with_alpha(0.25)),
-                GlobalZIndex(6),
+                GlobalZIndex(ink_z + 1),
                 Pickable::IGNORE,
                 ChildOf(sheet),
             ));
@@ -361,7 +412,7 @@ fn draw_ink(
                 commands.entity(e).despawn();
             }
             for stroke in &ink.strokes {
-                lay_stroke(&mut commands, sheet, stroke);
+                lay_stroke(&mut commands, sheet, stroke, ink_z, own);
             }
         }
         ink.drawing = false;
@@ -374,7 +425,7 @@ fn draw_ink(
         ink.drawing = true;
         ink.strokes.push(vec![at]);
         ink.pending.push(InkChange::Begin(at.to_array()));
-        piece(&mut commands, sheet, at, at);
+        piece(&mut commands, sheet, at, at, ink_z, own);
         return;
     }
     let Some(stroke) = ink.strokes.last_mut() else { return };
@@ -385,7 +436,7 @@ fn draw_ink(
     // the piece from the last point reaches the pointer whole, however quick the stroke
     stroke.push(at);
     ink.pending.push(InkChange::Point(at.to_array()));
-    piece(&mut commands, sheet, last, at);
+    piece(&mut commands, sheet, last, at, ink_z, own);
 }
 
 #[cfg(test)]

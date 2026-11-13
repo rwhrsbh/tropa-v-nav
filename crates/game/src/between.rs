@@ -28,7 +28,7 @@ const CLEARING_DROP: f32 = 135.0;
 const PEDLAR_SIZE: Vec2 = Vec2::new(390.0, 520.0);
 
 pub fn plugin(app: &mut App) {
-    app.init_resource::<ShopOpen>().init_resource::<PedlarShake>();
+    app.init_resource::<ShopOpen>().init_resource::<PedlarShake>().init_resource::<DeckSort>().add_systems(Update, (resort_deck, light_sort, scroll_deck));
     for state in BETWEEN {
         app.add_systems(OnExit(state), |mut commands: Commands, bars: Query<Entity, Or<(With<TopBar>, With<DeckView>)>>| {
             for e in &bars {
@@ -349,13 +349,13 @@ pub fn open_player(
     open: Query<Entity, With<DeckView>>,
     net: Option<Res<Net>>,
     db: Res<Db>,
+    sort: Res<DeckSort>,
     canvas: Single<Entity, With<Canvas>>,
     fonts: Res<Fonts>,
     l10n: Res<L10n>,
     art: Res<Art>,
     assets: Res<AssetServer>,
 ) {
-    use crate::battle::{CARD_H, CARD_W};
     if !open.is_empty() {
         for e in &open {
             commands.entity(e).despawn();
@@ -366,6 +366,7 @@ pub fn open_player(
     let Some(run) = net.node.state.as_ref() else { return };
     let Ok(seat) = rows.get(ev.event_target()) else { return };
     let Some(pl) = run.players.get(seat.0 as usize) else { return };
+    let hue = theme::hero_color(&pl.hero);
     let view = commands
         .spawn((
             DeckView,
@@ -378,42 +379,270 @@ pub fn open_player(
                 height: px(STAGE_H - BAR_H),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                padding: UiRect::top(px(24)),
-                row_gap: px(16),
-                overflow: Overflow::scroll_y(),
+                padding: UiRect::top(px(22)),
+                row_gap: px(14),
                 ..default()
             },
-            BackgroundColor(Color::BLACK.with_alpha(0.86)),
+            BackgroundColor(Color::srgb(0.03, 0.03, 0.035).with_alpha(0.97)),
             // over the hand and whatever flies in a fight, under the card hints
             GlobalZIndex(65),
             ChildOf(*canvas),
         ))
         .id();
     commands.entity(view).observe(|ev: On<Activate>, mut commands: Commands| commands.entity(ev.event_target()).despawn());
-    commands.spawn((theme::text(l10n.t(&format!("hero-{}", pl.hero)), &fonts.title, 40.0, theme::hero_color(&pl.hero).lighter(0.1)), ChildOf(view)));
-    commands.spawn((theme::text(crate::run_ui::party_line(pl, &l10n), &fonts.body, 22.0, theme::BONE), ChildOf(view)));
+    // another player's sheet has a head: whose it is and how they are, and what they carry. One's
+    // own has none: all of that is on the bar along the top already
+    if net.node.my_slot() != Some(seat.0) {
+    let head = commands
+        .spawn((
+            theme::panel_edged(
+                Node { width: px(DECK_W), padding: UiRect::axes(px(24), px(14)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), align_items: AlignItems::Center, column_gap: px(28), ..default() },
+                hue.with_alpha(0.7),
+            ),
+            Pickable::IGNORE,
+            ChildOf(view),
+        ))
+        .id();
+    commands.spawn((
+        Node { flex_direction: FlexDirection::Column, row_gap: px(2), flex_shrink: 0.0, ..default() },
+        Pickable::IGNORE,
+        ChildOf(head),
+        children![
+            theme::text(l10n.t(&format!("hero-{}", pl.hero)), &fonts.title, 38.0, hue.lighter(0.1)),
+            theme::text(crate::run_ui::party_line(pl, &l10n), &fonts.body, 20.0, theme::BONE),
+        ],
+    ));
     // what they carry, each telling what it does on hover
-    let carried = commands.spawn((Node { width: px(1500), flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(6), row_gap: px(6), ..default() }, Pickable::IGNORE, ChildOf(view))).id();
+    let carried = commands.spawn((Node { flex_grow: 1.0, flex_basis: px(0), flex_wrap: FlexWrap::Wrap, align_content: AlignContent::Center, column_gap: px(6), row_gap: px(6), ..default() }, Pickable::IGNORE, ChildOf(head))).id();
     for (kind, id) in pl.relics.iter().map(|id| ("relic", id)).chain(pl.potions.iter().map(|id| ("potion", id))) {
         commands.spawn((
             Button,
             Hovered::default(),
-            CardHints::new(vec![(l10n.t(&format!("{kind}-{id}")), l10n.t(&format!("{kind}-{id}-desc")))]),
-            Node { width: px(52), height: px(52), ..default() },
+            CardHints::below(vec![(l10n.t(&format!("{kind}-{id}")), l10n.t(&format!("{kind}-{id}-desc")))]),
+            Node { width: px(48), height: px(48), ..default() },
             art.node(&assets, &format!("{kind}s/{id}"), theme::CANDLE),
             ChildOf(carried),
         ));
     }
-    commands.spawn((theme::text(l10n.t("bar-deck-close"), &fonts.body, 20.0, theme::DIM), ChildOf(view)));
-    let mut cards: Vec<(usize, &(Id, bool))> = pl.deck.iter().enumerate().collect();
-    cards.sort_by(|a, b| a.1.cmp(b.1));
-    let k = if cards.len() <= 20 { 0.62 } else { 0.5 };
-    let grid = commands
-        .spawn((Node { width: px(1700), flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(12), row_gap: px(12), ..default() }, Pickable::IGNORE, ChildOf(view)))
+    }
+    // how the cards are laid out: one way at a time, and the same way pressed again turns it round
+    let bar = commands
+        .spawn((Node { width: px(DECK_W), align_items: AlignItems::Center, column_gap: px(12), ..default() }, Pickable::IGNORE, ChildOf(view)))
         .id();
-    for (i, (id, up)) in cards {
-        let slot = commands.spawn((Node { width: px(CARD_W * k), height: px(CARD_H * k), ..default() }, Pickable::IGNORE, ChildOf(grid))).id();
-        shown_card(&mut commands, slot, i, id, *up, k, &db.0, &l10n, &fonts, &art, &assets);
+    commands.spawn((theme::text(l10n.tf("bar-deck", &[("n", (pl.deck.len() as i32).into())]), &fonts.title, 26.0, theme::BONE), Node { margin: UiRect::right(px(24)), flex_shrink: 0.0, ..default() }, ChildOf(bar)));
+    commands.spawn((theme::text(l10n.t("deck-sort"), &fonts.body, 20.0, theme::DIM), Node { flex_shrink: 0.0, ..default() }, ChildOf(bar)));
+    for by in [DeckOrder::Name, DeckOrder::Rarity, DeckOrder::Cost, DeckOrder::Upgraded] {
+        commands.spawn((
+            SortButton(by),
+            Button,
+            Hovered::default(),
+            Btn(theme::PEAT),
+            Node { padding: UiRect::axes(px(18), px(7)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(18)), column_gap: px(8), align_items: AlignItems::Center, flex_shrink: 0.0, ..default() },
+            BackgroundColor(theme::PEAT),
+            BorderColor::all(SORT_EDGE),
+            children![
+                theme::text(l10n.t(by.key()), &fonts.title, 20.0, theme::BONE),
+                // a little chevron, drawn: the fonts have no arrows
+                (
+                    SortArrow(by),
+                    Node { width: px(10), height: px(10), border: UiRect { right: px(3), bottom: px(3), ..default() }, margin: UiRect::horizontal(px(4)), ..default() },
+                    BorderColor::all(theme::CANDLE),
+                    UiTransform::IDENTITY,
+                    Visibility::Hidden,
+                    Pickable::IGNORE,
+                ),
+            ],
+            observe(move |_: On<Activate>, mut sort: ResMut<DeckSort>| {
+                if sort.by == by {
+                    sort.flipped = !sort.flipped;
+                } else {
+                    *sort = DeckSort { by, flipped: false };
+                }
+            }),
+            ChildOf(bar),
+        ));
+    }
+    commands.spawn((theme::text(l10n.t("deck-hint"), &fonts.body, 18.0, theme::DIM), Node { margin: UiRect::left(auto()), flex_shrink: 0.0, ..default() }, ChildOf(bar)));
+    // the way out, at the end of the same line
+    commands.spawn((
+        Button,
+        Hovered::default(),
+        Btn(theme::PEAT),
+        Node { padding: UiRect::axes(px(20), px(7)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), margin: UiRect::left(px(8)), flex_shrink: 0.0, ..default() },
+        BackgroundColor(theme::PEAT),
+        BorderColor::all(theme::BONE.with_alpha(0.6)),
+        children![theme::text(l10n.t("deck-close"), &fonts.title, 20.0, theme::BONE)],
+        observe(|_: On<Activate>, mut commands: Commands, open: Query<Entity, With<DeckView>>| {
+            for e in &open {
+                commands.entity(e).despawn();
+            }
+        }),
+        ChildOf(bar),
+    ));
+    // the cards: an even grid, rolled by the wheel when it is taller than the screen. As wide as
+    // the screen, so what a card tells beside itself is not cut off at the grid's edge
+    let scroller = commands
+        .spawn((
+            DeckScroll,
+            Node { width: px(STAGE_W), flex_grow: 1.0, flex_basis: px(0), min_height: px(0), justify_content: JustifyContent::Center, align_items: AlignItems::FlexStart, overflow: Overflow::scroll_y(), ..default() },
+            ScrollPosition::default(),
+            Pickable::IGNORE,
+            ChildOf(view),
+        ))
+        .id();
+    let grid = commands
+        .spawn((
+            DeckGrid(seat.0),
+            Node { width: px(DECK_W), flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::FlexStart, column_gap: px(DECK_GAP), row_gap: px(DECK_GAP), padding: UiRect::new(px(0), px(0), px(6), px(40)), ..default() },
+            Pickable::IGNORE,
+            ChildOf(scroller),
+        ))
+        .id();
+    lay_deck(&mut commands, grid, &pl.deck, &sort, &db.0, &l10n, &fonts, &art, &assets);
+}
+
+/// How wide the sheet's head and its grid of cards are: `DECK_COLS` cards and the gaps between.
+const DECK_COLS: f32 = 7.0;
+const DECK_GAP: f32 = 22.0;
+/// How large a card is shown on the sheet.
+const DECK_K: f32 = 0.82;
+const DECK_W: f32 = DECK_COLS * crate::battle::CARD_W * DECK_K + (DECK_COLS - 1.0) * DECK_GAP;
+const SORT_EDGE: Color = Color::srgb(0.42, 0.33, 0.22);
+
+/// What the cards of a sheet are laid out by.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum DeckOrder {
+    #[default]
+    Name,
+    Rarity,
+    Cost,
+    Upgraded,
+}
+
+impl DeckOrder {
+    fn key(self) -> &'static str {
+        match self {
+            DeckOrder::Name => "deck-sort-name",
+            DeckOrder::Rarity => "deck-sort-rarity",
+            DeckOrder::Cost => "deck-sort-cost",
+            DeckOrder::Upgraded => "deck-sort-upgraded",
+        }
+    }
+}
+
+/// The order chosen on a player's sheet; it is kept from one look to the next.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+pub struct DeckSort {
+    pub by: DeckOrder,
+    /// Turned round: the rarest last, the dearest first, the upgraded last.
+    pub flipped: bool,
+}
+
+/// The grid of a sheet's cards, and whose (the seat).
+#[derive(Component)]
+struct DeckGrid(u8);
+/// What the wheel rolls on a sheet.
+#[derive(Component)]
+struct DeckScroll;
+#[derive(Component)]
+struct SortButton(DeckOrder);
+/// The little arrow on a sort button, showing which way the order runs.
+#[derive(Component)]
+struct SortArrow(DeckOrder);
+
+/// A deck in the order chosen: each card with its place in the deck. Cards that tie stand by
+/// name, the plain one before the upgraded.
+pub fn sorted_deck<'a>(deck: &'a [(Id, bool)], sort: DeckSort, db: &Content, name: &dyn Fn(&str) -> String) -> Vec<(usize, &'a (Id, bool))> {
+    let rank = |(id, up): &(Id, bool)| -> i32 {
+        let def = db.cards.get(id);
+        match sort.by {
+            DeckOrder::Name => 0,
+            // the rarest first; what is no reward at all (curses, tokens) last
+            DeckOrder::Rarity => match def.map(|d| d.rarity) {
+                Some(Rarity::Rare) => 0,
+                Some(Rarity::Uncommon) => 1,
+                Some(Rarity::Common) => 2,
+                Some(Rarity::Starter) => 3,
+                _ => 4,
+            },
+            // the cheapest first, as it plays now; a card that costs X after every number
+            DeckOrder::Cost => def.map(|d| d.view(*up, Form::Human)).map_or(i32::MAX, |v| if v.x_cost { i32::MAX - 1 } else { v.cost }),
+            DeckOrder::Upgraded => i32::from(!*up),
+        }
+    };
+    let mut cards: Vec<(i32, String, usize, &(Id, bool))> = deck.iter().enumerate().map(|(i, c)| (rank(c), name(&c.0), i, c)).collect();
+    cards.sort_by(|a, b| {
+        let first = if sort.flipped { b.0.cmp(&a.0) } else { a.0.cmp(&b.0) };
+        first.then_with(|| a.1.cmp(&b.1)).then_with(|| a.3 .1.cmp(&b.3 .1)).then_with(|| a.2.cmp(&b.2))
+    });
+    cards.into_iter().map(|(_, _, i, c)| (i, c)).collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lay_deck(commands: &mut Commands, grid: Entity, deck: &[(Id, bool)], sort: &DeckSort, db: &Content, l10n: &L10n, fonts: &Fonts, art: &Art, assets: &AssetServer) {
+    use crate::battle::{CARD_H, CARD_W};
+    for (i, (id, up)) in sorted_deck(deck, *sort, db, &|id| l10n.t(&format!("card-{id}"))) {
+        let slot = commands.spawn((Node { width: px(CARD_W * DECK_K), height: px(CARD_H * DECK_K), flex_shrink: 0.0, ..default() }, Pickable::IGNORE, ChildOf(grid))).id();
+        shown_card(commands, slot, i, id, *up, DECK_K, db, l10n, fonts, art, assets);
+    }
+}
+
+/// A new order chosen: the cards of the open sheet are laid out again, from the top.
+#[allow(clippy::too_many_arguments)]
+fn resort_deck(
+    mut commands: Commands,
+    sort: Res<DeckSort>,
+    grids: Query<(Entity, &DeckGrid)>,
+    mut scrolls: Query<&mut ScrollPosition, With<DeckScroll>>,
+    net: Option<Res<Net>>,
+    db: Res<Db>,
+    fonts: Res<Fonts>,
+    l10n: Res<L10n>,
+    art: Res<Art>,
+    assets: Res<AssetServer>,
+) {
+    if !sort.is_changed() || sort.is_added() {
+        return;
+    }
+    let Some(run) = net.as_ref().and_then(|n| n.node.state.as_ref()) else { return };
+    for (grid, seat) in &grids {
+        let Some(pl) = run.players.get(seat.0 as usize) else { continue };
+        commands.entity(grid).despawn_children();
+        lay_deck(&mut commands, grid, &pl.deck, &sort, &db.0, &l10n, &fonts, &art, &assets);
+    }
+    for mut at in &mut scrolls {
+        at.0 = Vec2::ZERO;
+    }
+}
+
+/// The order in use shows lit on its button, with an arrow for the way it runs.
+fn light_sort(sort: Res<DeckSort>, mut buttons: Query<(&SortButton, &mut BorderColor)>, mut arrows: Query<(&SortArrow, &mut Visibility, &mut UiTransform)>) {
+    for (b, mut edge) in &mut buttons {
+        let want = BorderColor::all(if b.0 == sort.by { theme::CANDLE } else { SORT_EDGE });
+        if *edge != want {
+            *edge = want;
+        }
+    }
+    for (a, mut seen, mut tf) in &mut arrows {
+        seen.set_if_neq(if a.0 == sort.by { Visibility::Inherited } else { Visibility::Hidden });
+        // the corner of a square, turned to point down, or up when the order is turned round
+        let (turn, shift) = if sort.flipped { (-135.0, 3.0) } else { (45.0, -3.0) };
+        let want = UiTransform { rotation: Rot2::degrees(turn), translation: Val2::px(0.0, shift), ..UiTransform::IDENTITY };
+        if *tf != want {
+            *tf = want;
+        }
+    }
+}
+
+/// The wheel rolls the cards of an open sheet; the layout itself stops it at the last row.
+fn scroll_deck(mut wheel: MessageReader<bevy::input::mouse::MouseWheel>, mut scrolls: Query<&mut ScrollPosition, With<DeckScroll>>) {
+    use bevy::input::mouse::MouseScrollUnit;
+    let turned: f32 = wheel.read().map(|w| if w.unit == MouseScrollUnit::Line { w.y * 110.0 } else { w.y }).sum();
+    if turned == 0.0 {
+        return;
+    }
+    for mut at in &mut scrolls {
+        at.0.y = (at.0.y - turned).max(0.0);
     }
 }
 

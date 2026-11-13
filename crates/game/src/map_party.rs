@@ -16,6 +16,8 @@ pub fn plugin(app: &mut App) {
         .init_resource::<MapScroll>()
         .add_systems(OnEnter(AppState::Map), |mut scroll: ResMut<MapScroll>| scroll.fresh = true)
         .add_systems(Update, (roll_sheet, send_pointer, show_pointers, show_votes, play_lot, pulse).chain().run_if(in_state(AppState::Map)))
+        // the map looked at in a fight rolls under the wheel as well
+        .add_systems(Update, roll_sheet.run_if(in_state(AppState::Battle)))
         .add_systems(OnExit(AppState::Map), |mut commands: Commands, marks: Query<Entity, With<MapOverlay>>| {
             for e in &marks {
                 commands.entity(e).despawn();
@@ -177,6 +179,8 @@ fn show_pointers(
     l10n: Res<crate::l10n::L10n>,
     time: Res<Time>,
     scroll: Res<MapScroll>,
+    art: Res<crate::art::Art>,
+    assets: Res<AssetServer>,
     mut cursors: Query<(Entity, &mut Cursor, &mut Node, &mut Visibility)>,
 ) {
     let Some(net) = net else { return };
@@ -201,12 +205,10 @@ fn show_pointers(
                         ChildOf(*canvas),
                     ))
                     .with_children(|c| {
-                        c.spawn((
-                            Node { width: px(20), height: px(20), border: UiRect::all(px(3)), border_radius: BorderRadius::MAX, ..default() },
-                            BackgroundColor(color),
-                            BorderColor::all(theme::BONE),
-                            BoxShadow::new(color.with_alpha(0.7), px(0), px(0), px(2), px(10)),
-                        ));
+                        // the same little face as their token on the map
+                        let hero = net.node.state.as_ref().and_then(|r| r.players.get(seat as usize)).map(|p| p.hero.clone()).unwrap_or_default();
+                        let mut dot = c.spawn((crate::run_ui::token_node(30.0), BoxShadow::new(color.with_alpha(0.7), px(0), px(0), px(2), px(10))));
+                        crate::run_ui::hero_token(&mut dot, &hero, seat, &art, &assets);
                         c.spawn((theme::text(name, &fonts.body, 18.0, color.lighter(0.2)), TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK }));
                     });
             }
@@ -216,8 +218,8 @@ fn show_pointers(
         c.quiet += dt;
         c.at = c.at.lerp(c.to, (dt * 14.0).min(1.0));
         let at = scroll.to_stage(c.at);
-        node.left = px(at.x - 10.0);
-        node.top = px(at.y - 10.0);
+        node.left = px(at.x - 15.0);
+        node.top = px(at.y - 15.0);
         // a cursor not heard of for a while has left the map, or its player the game
         vis.set_if_neq(if c.quiet < 3.0 { Visibility::Inherited } else { Visibility::Hidden });
     }
