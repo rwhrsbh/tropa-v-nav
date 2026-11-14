@@ -19,7 +19,7 @@ const SHUFFLE_FLIGHT: usize = 12;
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (cue_flights, fly, show_turned, close_on_escape).chain().after(cue_effects).run_if(in_state(AppState::Battle)).distributive_run_if(resource_exists::<Session>),
+        (cue_flights, fly, pike_flight, close_on_escape).chain().after(cue_effects).run_if(in_state(AppState::Battle)).distributive_run_if(resource_exists::<Session>),
     );
 }
 
@@ -48,56 +48,24 @@ struct Flight {
     show_first: bool,
 }
 
-/// A card the Pike turned up off the deck: it rises from `from` to the middle of the table, is
-/// held there to be read, then goes off to `to` (the discard pile), or fades where it hangs when
-/// `to` is `None` (another player's card, seen played and gone).
+/// A card the pike took off the draw pile: it leaves the pile face down, turns over on its way
+/// up, is held out a moment a little below the middle of the screen, and goes to the discard.
 #[derive(Component)]
-struct Turned {
-    from: Vec2,
-    to: Option<Vec2>,
+struct PikeShow {
     t: f32,
-    size: Vec2,
+    /// Its face is on (it has turned over).
+    face: bool,
+    card: Card,
+    form: Form,
 }
 
-/// Where a turned-up card is held to be read, and how large, and how long each part takes.
-const TURNED_AT: Vec2 = Vec2::new(960.0, 430.0);
-const TURNED_SCALE: f32 = 0.9;
-const TURN_RISE: f32 = 0.35;
-const TURN_HOLD: f32 = 0.9;
-const TURN_GO: f32 = 0.4;
-
-fn show_turned(mut commands: Commands, time: Res<Time>, mut q: Query<(Entity, &mut Turned, &mut Node, &mut UiTransform, &mut Visibility)>) {
-    let dt = time.delta_secs();
-    for (e, mut c, mut node, mut tf, mut vis) in &mut q {
-        if *vis != Visibility::Inherited {
-            *vis = Visibility::Inherited;
-        }
-        c.t += dt;
-        let (at, scale, alpha_done) = if c.t < TURN_RISE {
-            let p = 1.0 - (1.0 - c.t / TURN_RISE).powi(2);
-            (c.from.lerp(TURNED_AT, p), 0.2 + (TURNED_SCALE - 0.2) * p, false)
-        } else if c.t < TURN_RISE + TURN_HOLD {
-            (TURNED_AT, TURNED_SCALE, false)
-        } else if c.t < TURN_RISE + TURN_HOLD + TURN_GO {
-            let p = ((c.t - TURN_RISE - TURN_HOLD) / TURN_GO).powi(2);
-            match c.to {
-                Some(to) => (TURNED_AT.lerp(to, p) - Vec2::Y * 120.0 * (p * std::f32::consts::PI).sin(), TURNED_SCALE + (0.12 - TURNED_SCALE) * p, false),
-                // played by another: it rises and fades where it was shown
-                None => (TURNED_AT - Vec2::Y * 60.0 * p, TURNED_SCALE * (1.0 - 0.2 * p), p > 0.95),
-            }
-        } else {
-            commands.entity(e).despawn();
-            continue;
-        };
-        if alpha_done {
-            commands.entity(e).despawn();
-            continue;
-        }
-        node.left = px(at.x - c.size.x / 2.0);
-        node.top = px(at.y - c.size.y / 2.0);
-        tf.scale = Vec2::splat(scale);
-    }
-}
+/// The stages of a pike's flight, in seconds: up from the pile, held out, down to the discard.
+const PIKE_UP: f32 = 0.38;
+const PIKE_HOLD: f32 = 0.62;
+const PIKE_DOWN: f32 = 0.4;
+/// Where the pike holds the card out (its centre), and how large.
+const PIKE_SHOW_AT: Vec2 = Vec2::new(960.0, 610.0);
+const PIKE_SHOW_K: f32 = 0.9;
 
 /// Sends a card leaving the hand off along an arc from `from` (its centre) to `to`, shrinking
 /// to `end` of its size, after `wait` seconds; it is gone when it lands.
@@ -288,6 +256,10 @@ impl ShowPile<'_, '_> {
                 if let Some(e) = spawn_card(commands, slot, card, h.form, Some(at), false, (), &self.db.0, l10n, &self.fonts, &self.art, &self.assets) {
                     // hoverable to be turned over, and a click still goes through to close the view
                     commands.entity(e).insert((UiTransform { scale: Vec2::splat(k), ..default() }, Pickable { should_block_lower: false, is_hoverable: true }));
+                    // what its keywords mean, told beside it on hover, as in the hand
+                    if let Some(def) = self.db.0.cards.get(&card.def) {
+                        commands.entity(e).insert((Hovered::default(), crate::run_ui::CardHints::new(l10n.card_glossary(&def.view(card.upgraded, h.form)))));
+                    }
                     if self.db.0.cards.get(&card.def).is_some_and(|def| crate::card_flip::upgrades(def, h.form, l10n)) {
                         commands.entity(e).insert(crate::card_flip::CardFlip::new(card.clone(), h.form));
                     }
@@ -342,29 +314,38 @@ fn cue_flights(
                 }
                 sfx.play(&mut commands, "card_shuffle", &mixer, 1.0);
             }
-            // the Pike turns up the deck's top card: its owner sees it rise from the deck, held
-            // up, then go to the discard pile; the others see it only when it is played, rising
-            // from that hero
-            Event::PikeTurned { player, card, upgraded, played } if *player == me || *played => {
-                let size = Vec2::new(CARD_W, CARD_H);
-                let (from, to) = if *player == me {
-                    (DRAW_AT, Some(DISCARD_AT))
-                } else {
-                    let at = unit_place(&session.shown, UnitRef::Hero(*player)).map_or(TURNED_AT, |(foot, sz)| foot - Vec2::Y * sz.y * 0.6);
-                    (at, None)
-                };
-                let form = session.shown.hero(*player).map_or(session.my_hero().form, |h| h.form);
-                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: *upgraded, free: true };
-                if let Some(e) = spawn_card(&mut commands, *layer, &shown, form, Some(from - size / 2.0), false, (), &db.0, &l10n, &fonts, &art, &assets) {
-                    commands.entity(e).insert((
-                        Turned { from, to, t: 0.0, size },
-                        UiTransform { scale: Vec2::splat(0.2), ..default() },
-                        Visibility::Hidden,
-                        GlobalZIndex(440),
+            Event::PikeDrew { player, card, upgraded } if *player == me => {
+                // the back of a card, with the deck's lozenge, comes up off the draw pile
+                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: *upgraded, free: false };
+                commands.spawn((
+                    PikeShow { t: 0.0, face: false, card: shown, form: session.my_hero().form },
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(DRAW_AT.x - CARD_W / 2.0),
+                        top: px(DRAW_AT.y - CARD_H / 2.0),
+                        width: px(CARD_W),
+                        height: px(CARD_H),
+                        border: UiRect::all(px(4)),
+                        border_radius: BorderRadius::all(px(12)),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.24, 0.12, 0.09)),
+                    BorderColor::all(theme::CANDLE.darker(0.12)),
+                    BoxShadow::new(Color::BLACK.with_alpha(0.6), px(0), px(8), px(0), px(18)),
+                    UiTransform { scale: Vec2::splat(0.3), ..default() },
+                    GlobalZIndex(440),
+                    Pickable::IGNORE,
+                    ChildOf(*layer),
+                    children![(
+                        Node { width: px(70), height: px(70), border: UiRect::all(px(6)), ..default() },
+                        BorderColor::all(theme::CANDLE),
+                        UiTransform { rotation: Rot2::degrees(45.0), ..default() },
                         Pickable::IGNORE,
-                    ));
-                }
-                sfx.play(&mut commands, "card_gain", &mixer, 1.0);
+                    )],
+                ));
+                sfx.play(&mut commands, "card_draw", &mixer, 1.0);
             }
             Event::CardAdded { player, card, pile } if *player == me => {
                 // a card come from outside the deck shows itself first, then goes where it belongs
@@ -420,5 +401,62 @@ fn fly(mut commands: Commands, time: Res<Time>, mut q: Query<(Entity, &mut Fligh
         node.top = px(at.y - f.size.y / 2.0);
         tf.scale = Vec2::splat(f.scale.0 + (f.scale.1 - f.scale.0) * p);
         tf.rotation = Rot2::radians((p * std::f32::consts::PI * 2.0).sin() * 0.25);
+    }
+}
+
+/// Plays the pike's flights: up from the draw pile turning over, held out, down to the discard.
+#[allow(clippy::too_many_arguments)]
+fn pike_flight(
+    mut commands: Commands,
+    time: Res<Time>,
+    db: Res<Db>,
+    l10n: Res<L10n>,
+    fonts: Res<Fonts>,
+    art: Res<Art>,
+    assets: Res<AssetServer>,
+    mut q: Query<(Entity, &mut PikeShow, &mut Node, &mut UiTransform, &mut BackgroundColor, &mut BorderColor)>,
+) {
+    let total = PIKE_UP + PIKE_HOLD + PIKE_DOWN;
+    for (e, mut show, mut node, mut tf, mut bg, mut edge) in &mut q {
+        show.t += time.delta_secs();
+        let t = show.t;
+        if t >= total {
+            commands.entity(e).despawn();
+            continue;
+        }
+        let (at, k, turn) = if t < PIKE_UP {
+            // up off the pile along an arc, growing, turning over about its upright
+            let p = t / PIKE_UP;
+            let ease = 1.0 - (1.0 - p).powi(3);
+            let at = DRAW_AT.lerp(PIKE_SHOW_AT, ease) - Vec2::Y * 120.0 * (ease * std::f32::consts::PI).sin();
+            (at, 0.3 + (PIKE_SHOW_K - 0.3) * ease, p)
+        } else if t < PIKE_UP + PIKE_HOLD {
+            // held out, breathing a little
+            let p = (t - PIKE_UP) / PIKE_HOLD;
+            (PIKE_SHOW_AT, PIKE_SHOW_K * (1.0 + 0.03 * (p * std::f32::consts::PI).sin()), 1.0)
+        } else {
+            // slow to leave, fast to land, shrinking into the discard
+            let p = (t - PIKE_UP - PIKE_HOLD) / PIKE_DOWN;
+            let ease = p * p;
+            let at = PIKE_SHOW_AT.lerp(DISCARD_AT, ease) - Vec2::Y * 90.0 * (ease * std::f32::consts::PI).sin();
+            (at, PIKE_SHOW_K + (0.12 - PIKE_SHOW_K) * ease, 1.0)
+        };
+        // the turn: the back narrows to an edge, and the face widens out of it
+        let width = (turn * std::f32::consts::PI).cos().abs().max(0.02);
+        if turn >= 0.5 && !show.face {
+            show.face = true;
+            if let Some(def) = db.0.cards.get(&show.card.def) {
+                let (card, form) = (show.card.clone(), show.form);
+                *bg = BackgroundColor(crate::battle::card_frame(def));
+                *edge = BorderColor::all(if def.hero.is_empty() { theme::DIM } else { theme::hero_color(&def.hero) });
+                node.justify_content = JustifyContent::FlexStart;
+                node.flex_direction = FlexDirection::Column;
+                node.padding = UiRect::all(px(6));
+                commands.entity(e).despawn_children().with_children(|c| crate::battle::card_face(c, &card, def, form, false, &l10n, &fonts, &art, &assets));
+            }
+        }
+        node.left = px(at.x - CARD_W / 2.0);
+        node.top = px(at.y - CARD_H / 2.0);
+        tf.scale = Vec2::new(k * width, k);
     }
 }

@@ -1,0 +1,7 @@
+// Новые боссы первого и второго актов: у каждого акта их теперь три.
+[
+    (id: "a1_idolishche", act: 1, kind: Boss, enemies: ["idolishche"]),
+    (id: "a1_vikhor", act: 1, kind: Boss, enemies: ["vikhor"]),
+    (id: "a2_gore", act: 2, kind: Boss, enemies: ["gore"]),
+    (id: "a2_domovoy", act: 2, kind: Boss, enemies: ["domovoy"]),
+]

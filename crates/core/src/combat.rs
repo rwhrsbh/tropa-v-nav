@@ -118,6 +118,27 @@ pub const SHIELD_ARM: u8 = 2;
 pub const FEAR_CAP: i32 = 750;
 /// What each blow struck in the Mara mask adds: 7.5 percent.
 pub const MARA_FEAR: i32 = 75;
+/// How many blows a round Tugarin's paper wings halve.
+pub const WING_HITS: i32 = 3;
+/// What the Idolishche heals for each card left in a hero's hand as the turn ends.
+pub const GLUTTON_HEAL: i32 = 3;
+/// The most wind Vikhor can gather.
+pub const GALE_MOST: i32 = 10;
+/// What breaking the Domovoy's house rule costs, through any block.
+pub const HOUSE_RULE_COST: i32 = 4;
+
+/// Which kind of card the Domovoy forbids at each value of his `house_rule`.
+pub fn house_rule_kind(rule: i32) -> CardType {
+    match rule {
+        1 => CardType::Skill,
+        2 => CardType::Power,
+        _ => CardType::Attack,
+    }
+}
+/// HP a single blow must take to crack one of the black volhv's runes.
+pub const BLACK_RUNE_BREAK: i32 = 10;
+/// Percent of her life a fallen twin mourner rises with, while her sister stands.
+pub const TWIN_RISE_PCT: i32 = 40;
 
 /// What a body has left to fight with once this arm is gone.
 pub fn stump_cards(arm: u8) -> &'static [&'static str] {
@@ -300,7 +321,7 @@ impl<'a> Exec<'a> {
     fn hero(&mut self, slot: u8) -> &mut Hero {
         &mut self.s.heroes[slot as usize]
     }
-    fn enemy_idx(&self, uid: u32) -> Option<usize> {
+    pub(crate) fn enemy_idx(&self, uid: u32) -> Option<usize> {
         self.s.enemies.iter().position(|e| e.uid == uid)
     }
     pub(crate) fn standing(&self) -> Vec<u8> {
@@ -407,6 +428,7 @@ impl<'a> Exec<'a> {
 
     pub(crate) fn heal(&mut self, u: UnitRef, n: i32) {
         let n = self.gloomed(u, n);
+        let n = if matches!(u, UnitRef::Hero(_)) && self.s.living_enemies().any(|e| e.flags.contains_key("withering")) { n / 2 } else { n };
         if n <= 0 || !self.exists(u) {
             return;
         }
@@ -463,6 +485,24 @@ impl<'a> Exec<'a> {
             }
             if matches!(src, Some(UnitRef::Enemy(_))) {
                 d = d * self.s.enemy_dmg / 100;
+            }
+            if let Some(UnitRef::Enemy(uid)) = src {
+                let flags = self.s.enemy(uid).map(|e| e.flags.clone()).unwrap_or_default();
+                // the biryuk: alone, it fights half again as hard
+                if flags.contains_key("lone") && self.s.living_enemies().count() == 1 {
+                    d = d * 3 / 2;
+                }
+                // the hound of Nav smells blood: a hero at half health or less takes half again
+                if let UnitRef::Hero(i) = dst {
+                    let h = &self.s.heroes[i as usize];
+                    if flags.contains_key("blood_scent") && h.hp * 2 <= h.max_hp {
+                        d = d * 3 / 2;
+                    }
+                }
+                // Vikhor: the wind he has gathered rides every one of his blows
+                if let Some(w) = flags.get("gale") {
+                    d += *w;
+                }
             }
             if src.is_some_and(|s| self.s.status(s, S::Weak) > 0) {
                 d = d * 3 / 4;
@@ -532,9 +572,20 @@ impl<'a> Exec<'a> {
                 if dodged {
                     self.ev.push(Event::Missed { unit: dst });
                 }
+                // Gore: while anyone still holds a Gore card, blows reach him at half
+                let woeful = self.s.heroes.iter().any(|h| h.hand.iter().any(|c| c.def == "gore"));
                 let e = &mut self.s.enemies[idx];
+                let d = if woeful && e.flags.contains_key("woe") { d / 2 } else { d };
                 // a thing of straw: no one blow does it more than so much harm
                 let d = if e.flags.contains_key("hollow") { d.min(HOLLOW_MOST) } else { d };
+                // Tugarin's paper wings: the first blows of a round glance off at half
+                let d = if attack && e.flags.contains_key("paper_wings") {
+                    let hits = e.flags.entry("turn_wing_hits".into()).or_insert(0);
+                    *hits += 1;
+                    if *hits <= WING_HITS { d / 2 } else { d }
+                } else {
+                    d
+                };
                 // Nochnitsa flicker: on even rounds, incoming attack damage reduced to 1
                 let d = if attack && e.flags.contains_key("flicker") && self.s.round % 2 == 0 { d.min(1) } else { d };
                 // Mokhovik kinetic moss: attacks under 6 damage are absorbed into kinetic charge
@@ -564,6 +615,16 @@ impl<'a> Exec<'a> {
                     lost = lost.min(e.hp - 1).max(0);
                 }
                 e.hp -= lost;
+                // a heavy blow cracks one of the black volhv's runes
+                if lost >= BLACK_RUNE_BREAK {
+                    if let Some(runes) = e.flags.get_mut("black_runes") {
+                        *runes = (*runes - 1).max(0);
+                    }
+                }
+                // Chernobog keeps count of the harm done to him between his moves
+                if e.flags.contains_key("eclipse") {
+                    *e.flags.entry("harm_taken".into()).or_insert(0) += lost;
+                }
                 let dead = e.hp <= 0;
                 let (hp, block) = (e.hp, e.block);
                 // the serpent loosens its coils once it has been hurt enough
@@ -600,8 +661,9 @@ impl<'a> Exec<'a> {
                 let bayun_perch = matches!(dst, UnitRef::Enemy(uid) if self.s.enemy(uid).is_some_and(|e| e.flags.contains_key("bayun_perch")));
                 let spell_mirror = matches!(dst, UnitRef::Enemy(uid) if self.s.enemy(uid).is_some_and(|e| e.flags.contains_key("spell_mirror")));
                 let mut reflect = thorns;
+                // high on his pillar, the cat claws back at every blow: a little, but every hit
                 if bayun_perch {
-                    reflect += 2;
+                    reflect += 1;
                 }
                 if spell_mirror {
                     reflect += (d * 30 / 100).max(1);
@@ -790,7 +852,7 @@ impl<'a> Exec<'a> {
         }
     }
 
-    fn kill(&mut self, idx: usize, src: Option<UnitRef>) {
+    pub(crate) fn kill(&mut self, idx: usize, src: Option<UnitRef>) {
         // the kostomakha falls apart once and lies as bones until its next turn, when it gets
         // up at half its strength: the heroes get a turn's grace, and see it coming
         if self.s.enemies[idx].flags.remove("rises").is_some() {
@@ -820,6 +882,13 @@ impl<'a> Exec<'a> {
             self.ev.push(Event::GoldReturned { player: slot, amount: gold });
         }
         self.ev.push(Event::EnemyDied { enemy: uid });
+        // a twin mourner's fall enrages her sister
+        if self.s.enemies[idx].flags.contains_key("twin_soul") {
+            let sisters: Vec<u32> = self.s.enemies.iter().filter(|e| e.alive && e.flags.contains_key("twin_soul")).map(|e| e.uid).collect();
+            for s in sisters {
+                self.add_status(UnitRef::Enemy(s), S::Strength, 3);
+            }
+        }
         if let Some(d) = self.c.enemies.get(&def) {
             if !d.on_death.is_empty() {
                 let fx = d.on_death.clone();
@@ -945,6 +1014,7 @@ impl<'a> Exec<'a> {
         if let Some(UnitRef::Hero(j)) = target {
             if j != p {
                 self.hero(j).flags.remove("mired");
+                self.hero(j).flags.remove("asleep");
             }
         }
         // the mavka's charm: the next attack turns on a friend, or is wasted when alone
@@ -966,10 +1036,23 @@ impl<'a> Exec<'a> {
         let h = self.hero(p);
         h.hand.remove(pos);
         h.energy -= cost;
+        h.flags.remove("turn_furrow");
         if free_rune {
             *h.flags.entry("free_rune".into()).or_insert(1) -= 1;
         }
         self.add_status(UnitRef::Hero(p), S::Drowse, -drowse);
+        // Vikhor's wind: every skill played lulls it a little
+        if view.kind == CardType::Skill {
+            for e in self.s.enemies.iter_mut().filter(|e| e.alive) {
+                if let Some(w) = e.flags.get_mut("gale") {
+                    *w = (*w - 1).max(0);
+                }
+            }
+        }
+        // the Domovoy's house rule: a card of the kind forbidden this round costs blood
+        if self.s.living_enemies().filter_map(|e| e.flags.get("house_rule")).any(|r| house_rule_kind(*r) == view.kind) {
+            self.lose_hp(UnitRef::Hero(p), HOUSE_RULE_COST);
+        }
         self.resolve(p, card, view, target, cost, charmed && target.is_none());
         Ok(())
     }
@@ -991,6 +1074,7 @@ impl<'a> Exec<'a> {
             self.ev.push(Event::Shuffled { player: p });
         }
         let Some(card) = self.hero(p).draw.pop() else { return };
+        self.ev.push(Event::PikeDrew { player: p, card: card.def.clone(), upgraded: card.upgraded });
         let h = &self.s.heroes[p as usize];
         let view = self.c.cards.get(&card.def).map(|d| d.view(card.upgraded, h.form));
         let barred = match &view {
@@ -1012,10 +1096,9 @@ impl<'a> Exec<'a> {
             CardTarget::Downed => self.s.heroes.iter().find(|a| a.downed).map(|a| UnitRef::Hero(a.slot)),
         };
         let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed) && target.is_none();
-        let plays = view.is_some() && !barred && !nobody;
-        self.ev.push(Event::PikeTurned { player: p, card: card.def.clone(), upgraded: card.upgraded, played: plays });
         match view {
-            Some(view) if plays => self.resolve(p, card, view, target, 0, false),
+            Some(view) if !barred && !nobody => self.resolve(p, card, view, target, 0, false),
+            // shown going there by the pike's own flight (`Event::PikeDrew`)
             _ => self.hero(p).discard.push(card),
         }
     }
@@ -1426,8 +1509,8 @@ impl<'a> Exec<'a> {
                     ctx.fatal = false;
                     for _ in 0..times {
                         for u in self.targets(ctx, *t) {
-                            // the duck is on the wing / cat on his perch: only blows that sweep everyone, and runes, reach it
-                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch"))) {
+                            // the duck is on the wing: only blows that sweep everyone, and runes, reach it
+                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying"))) {
                                 continue;
                             }
                             if self.strike(Some(ctx.src), u, n, ctx.attack) {
@@ -1944,6 +2027,19 @@ impl<'a> Exec<'a> {
             self.ev.push(Event::Intent { enemy, mv, target });
         }
 
+        // the Domovoy changes his rule each round; Vikhor's wind rises by one for each hero standing
+        // against him, twice as fast once he is wounded
+        let rising = if self.s.round > 1 { standing.len() as i32 } else { 0 };
+        for e in self.s.enemies.iter_mut().filter(|e| e.alive) {
+            if let Some(r) = e.flags.get_mut("house_rule") {
+                *r = *r % 3 + 1;
+            }
+            let storm = if e.flags.contains_key("phase2") { 2 } else { 1 };
+            if let Some(w) = e.flags.get_mut("gale") {
+                *w = (*w + storm * rising).min(GALE_MOST);
+            }
+        }
+        let furrow = self.s.living_enemies().any(|e| e.flags.contains_key("furrow"));
         for slot in standing {
             let round = self.s.round;
             let h = self.hero(slot);
@@ -1959,6 +2055,9 @@ impl<'a> Exec<'a> {
             h.energy = (BASE_ENERGY - less_energy).max(0);
             h.ready = false;
             h.flags.retain(|k, _| !k.starts_with("turn_"));
+            if furrow {
+                h.flags.insert("turn_furrow".into(), 1);
+            }
             let hungry = h.form == Form::Beast && !h.flags.contains_key("no_hunger");
             if hungry {
                 self.lose_hp(UnitRef::Hero(slot), 2);
@@ -2012,6 +2111,14 @@ impl<'a> Exec<'a> {
             if gloom > 0 {
                 self.lose_hp(UnitRef::Hero(slot), gloom);
             }
+            // the Idolishche: whatever is still held as the turn ends goes into his belly
+            let left = self.s.heroes[slot as usize].hand.len() as i32;
+            if left > 0 {
+                let gluttons: Vec<u32> = self.s.living_enemies().filter(|e| e.flags.contains_key("glutton")).map(|e| e.uid).collect();
+                for uid in gluttons {
+                    self.heal(UnitRef::Enemy(uid), GLUTTON_HEAL * left);
+                }
+            }
             let hand = std::mem::take(&mut self.hero(slot).hand);
             let mut keep = Vec::new();
             for card in hand {
@@ -2034,8 +2141,12 @@ impl<'a> Exec<'a> {
             self.hero(slot).hand = keep;
             self.rot_tick(UnitRef::Hero(slot));
         }
-        // Morovitsa Doom countdown
+        // Morovitsa Doom countdown: it lifts when she is dead
+        let morovitsa = self.s.enemies.iter().any(|e| e.alive && e.def == "morovitsa");
         for slot in self.standing() {
+            if !morovitsa {
+                self.s.heroes[slot as usize].flags.remove("doom");
+            }
             let triggered = if let Some(left) = self.s.heroes[slot as usize].flags.get_mut("doom") {
                 *left -= 1;
                 *left <= 0
@@ -2044,25 +2155,28 @@ impl<'a> Exec<'a> {
             };
             if triggered {
                 self.s.heroes[slot as usize].flags.remove("doom");
-                self.lose_hp(UnitRef::Hero(slot), 45);
+                self.lose_hp(UnitRef::Hero(slot), crate::hooks::DOOM_HP);
             }
         }
-        // Gorynych Head Regrowth: a fallen head grows back while another still lives, and is
-        // seen to rise again
-        let mut regrown: Vec<(u32, Id)> = Vec::new();
-        let any_head_alive = self.s.enemies.iter().any(|e| e.alive && e.flags.contains_key("gorynych_head"));
-        if any_head_alive {
+        // Gorynych's heads grow back while one still lives, and so does one of the twin
+        // mourners while her sister stands: Zhlya and Karna must fall together
+        let mut regrown = Vec::new();
+        for (kin, back) in [("gorynych_head", 0), ("twin_soul", TWIN_RISE_PCT)] {
+            if !self.s.enemies.iter().any(|e| e.alive && e.flags.contains_key(kin)) {
+                continue;
+            }
             for e in &mut self.s.enemies {
-                if !e.alive && e.flags.contains_key("gorynych_head") {
+                if !e.alive && !e.fled && e.flags.contains_key(kin) {
                     let turns = e.flags.entry("gorynych_regrowth".into()).or_insert(2);
                     *turns -= 1;
                     if *turns <= 0 {
                         e.alive = true;
-                        e.hp = 35.min(e.max_hp);
+                        e.hp = if back > 0 { (e.max_hp * back / 100).max(1) } else { 35.min(e.max_hp) };
                         e.block = 0;
-                        e.intent = None;
                         e.statuses.clear();
+                        e.intent = None;
                         e.flags.remove("gorynych_regrowth");
+                        // seen growing back (the screen raises a fallen foe on this)
                         regrown.push((e.uid, e.def.clone()));
                     }
                 }
@@ -2156,10 +2270,6 @@ impl<'a> Exec<'a> {
                     bled: false,
                 };
                 self.run(&mv.effects, &mut ctx);
-                // Ogneya runs hotter with every lash of fire she throws
-                if attacks && self.s.enemy(uid).is_some_and(|e| e.alive && e.flags.contains_key("overheat")) {
-                    self.add_status(me, S::Strength, 1);
-                }
             }
             self.rot_tick(me);
             if self.s.standing_heroes().next().is_none() {
@@ -2242,6 +2352,9 @@ fn carves_free(h: &Hero, view: &CardView) -> bool {
 pub fn energy_cost(h: &Hero, card: &Card, view: &CardView) -> i32 {
     if card.free || carves_free(h, view) {
         0
+    } else if view.cost > 0 && h.flags.contains_key("turn_furrow") {
+        // the polevik's furrow: the first card of the turn costs one more
+        view.cost + 1
     } else {
         view.cost
     }

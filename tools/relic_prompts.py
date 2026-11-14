@@ -104,6 +104,13 @@ WHAT = {
     "spindle": "an old wooden hand spindle wound with coarse grey thread, a stone whorl at its end",
     "wooden_gong": "a bilo: a thick dark oak plank hung on two ropes, a wooden mallet leaning against it",
     "icon_lamp": "a small tarnished copper icon lamp hanging on three thin chains, a tiny amber flame behind red glass",
+    "owl_eye": "a single great amber owl's eye set in a ring of grey-brown feathers, sewn into a small leather charm on a cord",
+    "spindle_whorl": "an ancient pinkish slate spindle whorl, a thick stone ring scratched with crosses, threaded on a short wooden spindle with red wool wound above it",
+    "birchbark_letter": "a curled strip of old birch bark scratched with rows of tiny Old Slavonic letters, its ends rolled up",
+    "raven_quill": "a long glossy black raven feather cut into a writing quill, a drop of rust red ink at its nib",
+    "hearth_ember": "a single glowing coal from a peasant stove lying in a small clay dish, cracks of orange fire inside the black crust",
+    "perun_flint": "a dark knapped flint stone and an iron fire striker, a pale blue spark leaping between them",
+    "kupala_wheel": "a small wheel of plaited straw with eight spokes, its rim burning with small orange flames",
 }
 
 

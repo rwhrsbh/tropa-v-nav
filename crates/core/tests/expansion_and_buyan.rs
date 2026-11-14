@@ -145,31 +145,6 @@ fn test_act3_to_act4_heal() {
 }
 
 #[test]
-fn test_bayun_perch_blocks_targeted_melee_allows_sweeping() {
-    let (c, mut s) = solo(&["t_hit", "t_hit_all"], &["kot_bayun"]);
-    let t = foe(&s, 0);
-    let start_hp = s.enemies[0].hp;
-    assert!(s.enemies[0].flags.contains_key("bayun_perch"));
-
-    // Targeted strike misses because cat is on high perch!
-    play(&c, &mut s, 0, "t_hit", Some(t));
-    assert_eq!(s.enemies[0].hp, start_hp, "Targeted strike cannot reach cat on his perch");
-
-    // AllFoes sweeping strike hits!
-    play(&c, &mut s, 0, "t_hit_all", None);
-    assert_eq!(s.enemies[0].hp, start_hp - 4, "Sweeping strike hits cat on his perch");
-}
-
-#[test]
-fn ogneya_runs_hotter_with_every_attack() {
-    let (c, mut s) = solo(&["t_block"], &["ogneya"]);
-    let lash = c.enemies["ogneya"].moves.iter().position(|m| m.id == "fire_whip").unwrap();
-    s.enemies[0].intent = Some(Intent { mv: lash, target: Some(0) });
-    end_round(&c, &mut s);
-    assert_eq!(s.enemies[0].statuses.get(&StatusKind::Strength).copied().unwrap_or(0), 1);
-}
-
-#[test]
 fn a_fallen_gorynych_head_grows_back_and_is_seen_to() {
     let (c, mut s) = solo(&["t_block"], &["gorynych_fire", "gorynych_poison"]);
     let fire = s.enemies[0].uid;
@@ -189,18 +164,30 @@ fn a_fallen_gorynych_head_grows_back_and_is_seen_to() {
     assert!(seen, "and the others were told");
 }
 
+/// Kot Bayun's claws count the statuses that end up in the discard pile (the hand is thrown away
+/// before he moves), and his intent shows that blow before it lands.
 #[test]
-fn bayun_leaps_down_to_pounce_and_climbs_back_to_purr() {
-    let (c, mut s) = solo(&["t_block"], &["kot_bayun"]);
-    s.heroes[0].max_hp = 999;
-    s.heroes[0].hp = 999;
-    let moves = &c.enemies["kot_bayun"].moves;
-    let pounce = moves.iter().position(|m| m.id == "pounce").unwrap();
-    let purr = moves.iter().position(|m| m.id == "purr").unwrap();
-    s.enemies[0].intent = Some(Intent { mv: pounce, target: Some(0) });
+fn bayun_claws_count_the_eyelids_left_unplayed() {
+    let (c, mut s) = solo(&["t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block"], &["kot_bayun"]);
+    let hp = s.heroes[0].hp;
+    // round 1: the purr slips two Heavy Eyelids into the hand
     end_round(&c, &mut s);
-    assert!(!s.enemies[0].flags.contains_key("bayun_perch"), "down off his post, in reach");
-    s.enemies[0].intent = Some(Intent { mv: purr, target: None });
+    assert_eq!(s.heroes[0].hand.iter().filter(|x| x.def == "heavy_eyelids").count(), 2);
+    assert_eq!(s.heroes[0].hp, hp);
+    // round 2: the claws are coming, for 10 and 4 for each of the two left unplayed
+    let bayun = s.enemies[0].clone();
+    assert_eq!(bot::intent_damage(&c, &s, &bayun), Some((18, 1)));
     end_round(&c, &mut s);
-    assert!(s.enemies[0].flags.contains_key("bayun_perch"), "back up again");
+    assert_eq!(s.heroes[0].hp, hp - 18);
+}
+
+/// The pike's card is announced before it plays, so the screen can show it leaving the pile.
+#[test]
+fn the_pike_says_which_card_it_took() {
+    let c = content();
+    let h = hero("emelya", &["em_pike_fetch", "em_pike_fetch", "em_pike_fetch", "em_pike_fetch", "em_pike_fetch", "t_block", "t_block", "t_block"]);
+    let (mut s, _) = start(&c, &[h], &ids(&["dummy"]), 7);
+    let ev = play(&c, &mut s, 0, "em_pike_fetch", None);
+    let at = ev.iter().position(|e| matches!(e, Event::PikeDrew { player: 0, .. })).expect("pike drew");
+    assert!(ev[at..].iter().any(|e| matches!(e, Event::CardPlayed { .. })), "{ev:?}");
 }

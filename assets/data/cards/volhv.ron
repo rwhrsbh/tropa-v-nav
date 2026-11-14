@@ -31,7 +31,7 @@
         up: (cost: 2),
     ),
     (
-        id: "vol_invoke", hero: "volhv", kind: Skill, rarity: Uncommon, cost: 1,
+        id: "vol_invoke", hero: "volhv", kind: Skill, rarity: Uncommon, cost: 1, keywords: [Retain],
         effects: [Invoke],
         up: (cost: 0),
     ),

@@ -23,7 +23,8 @@ import time
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-DOWNLOADS = os.path.join(os.path.expanduser("~"), "Downloads")
+# where the browser saves: TROPA_DOWNLOADS if set, else the user's Downloads folder
+DOWNLOADS = os.environ.get("TROPA_DOWNLOADS") or os.path.join(os.path.expanduser("~"), "Downloads")
 # Flow ends a name with a time stamp, or (since 2026-11) with eight hex digits
 STAMP = re.compile(r"_(\d{14}|[0-9a-f]{8})( \(\d+\))?\.(jpe?g|png)$", re.I)
 

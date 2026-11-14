@@ -19,13 +19,13 @@ pub fn plugin(app: &mut App) {
         .add_systems(Update, sync_ink)
         .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Map)))
         // the map looked at in a fight (see `run_ui::MapPeek`) is drawn on as well
-        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Battle)));
+        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(|state: Res<State<AppState>>| crate::run_ui::PEEK_STATES.contains(state.get())));
 }
 
 /// How far everything of the pencil is lifted: in a fight the map is laid over the whole fight,
 /// and its marks and tray with it.
 fn lift(state: &Option<Res<State<AppState>>>) -> i32 {
-    if state.as_ref().is_some_and(|s| *s.get() == AppState::Battle) { crate::run_ui::PEEK_Z } else { 0 }
+    if state.as_ref().is_some_and(|s| crate::run_ui::PEEK_STATES.contains(s.get())) { crate::run_ui::PEEK_Z } else { 0 }
 }
 
 /// What the right button does on the map.
@@ -52,19 +52,19 @@ pub struct MapInk {
     pub tool: Tool,
     /// This player's seat: their marks are drawn in their hero's colour.
     seat: Option<u8>,
-    /// Each seat's hero, for the colour that seat's marks are drawn in.
+    /// The hero in each seat: a player's marks are drawn in their hero's colour.
     heroes: Vec<String>,
 }
 
 impl MapInk {
-    /// The colour this player's own marks are drawn in: their hero's, as everyone else sees them.
-    fn own_color(&self) -> Color {
-        self.seat.map_or(PENCIL, |seat| self.seat_color(seat))
+    /// The colour the marks of the player in `seat` are drawn in: their hero's.
+    fn seat_color(&self, seat: u8) -> Color {
+        self.heroes.get(seat as usize).map_or(PENCIL, |h| theme::marker_color(h))
     }
 
-    /// The colour of the marks of the player in `seat`: their hero's, as their token is.
-    fn seat_color(&self, seat: u8) -> Color {
-        self.heroes.get(seat as usize).map_or(PENCIL, |hero| theme::map_color(hero))
+    /// The colour this player's own marks are drawn in: their hero's, as everyone else sees them.
+    fn own_color(&self) -> Color {
+        self.seat.map_or(PENCIL, |s| self.seat_color(s))
     }
 }
 
@@ -242,9 +242,8 @@ fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMu
     if ink.seat != me {
         ink.seat = me;
     }
-    let heroes: Vec<String> = run.players.iter().map(|p| p.hero.clone()).collect();
-    if ink.heroes != heroes {
-        ink.heroes = heroes;
+    if ink.heroes.len() != run.players.len() || ink.heroes.iter().zip(&run.players).any(|(h, p)| *h != p.hero) {
+        ink.heroes = run.players.iter().map(|p| p.hero.clone()).collect();
         ink.remote_dirty = true;
     }
     // Flush earlier edits before answering a snapshot request so reliable ordering cannot

@@ -53,12 +53,12 @@
         up: (passives: [(on: TurnStart, effects: [Block(N(6), Me)])]),
     ),
     (
-        id: "em_three_wishes", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 1,
+        id: "em_three_wishes", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 1, keywords: [Retain],
         effects: [Draw(N(3)), AddCard(card: "em_sloth", pile: Discard, to: Me)],
         up: (effects: [Draw(N(4)), AddCard(card: "em_sloth", pile: Discard, to: Me)]),
     ),
     (
-        id: "em_by_the_pike", hero: "emelya", kind: Attack, rarity: Rare, cost: 3,
+        id: "em_by_the_pike", hero: "emelya", kind: Attack, rarity: Rare, cost: 3, keywords: [Retain],
         effects: [Hits(N(7), 5, RandomFoe), PikeWill],
         up: (effects: [Hits(N(9), 5, RandomFoe), PikeWill]),
     ),
@@ -243,7 +243,7 @@
     (
         id: "em_last_wish", hero: "emelya", kind: Skill, rarity: Rare, cost: 1,
         effects: [Energy(N(2), Me), Draw(N(2))],
-        keywords: [Exhaust],
+        keywords: [Retain, Exhaust],
         up: (effects: [Energy(N(3), Me), Draw(N(2))]),
     ),
     (

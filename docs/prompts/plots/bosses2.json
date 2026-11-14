@@ -1,0 +1,14 @@
+{
+  "_about": "Боссы первого и второго актов (ноябрь 2026): id -> [вид, описание], виды как в wave.json.",
+  "idolishche": ["B", "Idolishche the Foul, a monstrous pagan glutton giant from the Russian byliny: an enormous obese brute with a tiny head sunk into fat shoulders, a greasy beard full of crumbs, a vast bare belly hanging over a rope belt, a huge iron-studded club in one hand and a gnawed leg of meat in the other, rotten teeth in a gaping mouth."],
+  "vikhor": ["B", "Vikhor the Whirlwind, the abductor spirit: a tall gaunt grey old man whose lower body is a twisting funnel of wind full of torn leaves, straw and rags instead of legs, a long grey beard and hair blown sideways, wild pale eyes, long clawed arms spread wide, hovering low."],
+  "gore": ["B", "Grief-and-Misfortune (Gore-Zloschastie) from the Russian tale: a thin barefoot wretch in grey sackcloth girded with a bast rope, a pale sunken grinning face with hollow eyes, long thin arms reaching out to cling, a wooden begging bowl tied at the waist, crows' feathers in its tangled hair."],
+  "domovoy": ["B", "The Angry Domovoy, master of a dead house: a squat, broad, shaggy little old man covered in grey-brown fur from head to foot, a huge tangled beard, small fierce eyes under heavy brows, holding an iron oven fork (ukhvat) like a spear, a clay pot hanging from his belt, soot on his fur."],
+  "glutton": ["S", "a gaping toothy mouth biting into a whole loaf of bread"],
+  "gale": ["S", "a spiralling whirlwind funnel full of torn leaves and straw"],
+  "woe": ["S", "a thin grey hand clutching a wooden begging bowl, a crow feather beside it"],
+  "house_rule_1": ["S", "a raised round wooden shield crossed out by an iron oven fork"],
+  "house_rule_2": ["S", "a carved wooden amulet idol crossed out by an iron oven fork"],
+  "house_rule_3": ["S", "a battle axe crossed out by an iron oven fork"],
+  "gore_card": ["C", "@Grief clinging to a man: a thin pale grinning wretch in grey sackcloth hanging on the back of a weary peasant on a dark empty road, its arms around his neck."]
+}

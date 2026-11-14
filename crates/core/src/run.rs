@@ -14,7 +14,22 @@ pub const POTION_SLOTS: usize = 3;
 pub const POTION_SASH: &str = "potion_sash";
 pub const SASH_POTION_SLOTS: usize = 5;
 /// Of a hundred fights an omen turns out to be, this many are against an elite.
-pub const OMEN_ELITE_CHANCE: i32 = 20;
+/// A run's lot for an omen: a fixed shuffle of all omens by the run's seed, from which the
+/// open ones are taken in order.
+fn omen_lot(seed: u64, id: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in id.bytes() {
+        h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
+    }
+    let mut z = h ^ seed.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
+pub const OMEN_ELITE_CHANCE: i32 = 33;
+/// Of a hundred "?" on the map: the pedlar, a fight, the greedy hollow. The rest are omens.
+pub const OMEN_ROAD_ODDS: [i32; 3] = [15, 15, 15];
 
 /// How many potions one who carries these relics has room for.
 pub fn potion_slots(relics: &[Id]) -> usize {
@@ -1471,7 +1486,10 @@ impl Run {
                 self.floors_cleared += 1;
                 let act = self.act;
                 let open = 20 + 15 * self.unlocks.omen_tier as usize;
-                let fits: Vec<&EventDef> = c.events.values().filter(|e| !e.for_the_maimed && e.id != HOLLOW_OMEN).take(open).filter(|e| e.act == 0 || e.act == act).collect();
+                // which omens are open is drawn anew each run, so every one of them turns up in time
+                let mut all: Vec<&EventDef> = c.events.values().filter(|e| !e.for_the_maimed && e.id != HOLLOW_OMEN).collect();
+                all.sort_by_key(|e| omen_lot(self.seed, &e.id));
+                let fits: Vec<&EventDef> = all.into_iter().take(open).filter(|e| e.act == 0 || e.act == act).collect();
                 let fresh: Vec<&EventDef> = fits.iter().copied().filter(|e| !self.omens_seen.contains(&e.id)).collect();
                 // a long road may run out of new omens; only then does an old one return
                 let pool = if fresh.is_empty() { fits } else { fresh };
@@ -1479,28 +1497,29 @@ impl Run {
                 let someone_to_ask = self.players.iter().any(|pl| !pl.beheaded);
                 let missing = self.players.iter().any(|pl| pl.beheaded || pl.walks_headless || pl.lost_limbs > 0);
                 let waiting = if someone_to_ask && missing && self.rng.chance(SEAMSTRESS_CHANCE) { c.events.values().find(|e| e.for_the_maimed) } else { None };
-                // not every sign on the road is a tale: the pedlar may be standing there, or foes
-                // lying in wait, each as likely as any one of the omens
-                // and so may the hollow that plays for stakes, which is never the same twice
+                // not every sign on the road is a tale: the pedlar may be standing there, foes may
+                // lie in wait, or the hollow that plays for stakes; the rest are the omens
                 let hollow = c.events.get(HOLLOW_OMEN);
-                let roll = self.rng.below(pool.len() as u32 + 2 + hollow.is_some() as u32) as usize;
-                if let (None, Some(e), true) = (waiting, hollow, roll == pool.len() + 2) {
-                    self.stage = Stage::Omen { id: e.id.clone(), picks: vec![None; self.players.len()] };
-                    return;
-                }
-                if waiting.is_none() && roll == pool.len() {
+                let [shop, fight, gamble] = OMEN_ROAD_ODDS;
+                let roll = self.rng.below(100) as i32;
+                if waiting.is_none() && roll < shop {
                     let stock = (0..self.players.len()).map(|p| self.roll_stock(c, p)).collect();
                     self.stage = Stage::Shop { stock, done: vec![false; self.players.len()] };
                     return;
                 }
-                if waiting.is_none() && roll > pool.len() {
+                if waiting.is_none() && roll < shop + fight {
                     // the fight counts the floor itself, when it is won
                     self.floors_cleared -= 1;
                     let kind = if self.rng.chance(OMEN_ELITE_CHANCE) { NodeKind::Elite } else { NodeKind::Fight };
                     self.start_fight(c, kind, ev);
                     return;
                 }
-                match waiting.or_else(|| pool.get(roll).copied()) {
+                if let (None, Some(e), true) = (waiting, hollow, roll < shop + fight + gamble) {
+                    self.stage = Stage::Omen { id: e.id.clone(), picks: vec![None; self.players.len()] };
+                    return;
+                }
+                let pick = if pool.is_empty() { None } else { pool.get(self.rng.below(pool.len() as u32) as usize).copied() };
+                match waiting.or(pick) {
                     Some(e) => {
                         self.omens_seen.push(e.id.clone());
                         self.stage = Stage::Omen { id: e.id.clone(), picks: vec![None; self.players.len()] };
@@ -2224,5 +2243,25 @@ pub fn run_bot(c: &Content, run: &Run, player: u8) -> Option<RunAction> {
         // the autopilot does not gamble
         Stage::Hollow { done, .. } => (!*done.get(p)?).then_some(RunAction::LeaveHollow),
         Stage::Victory | Stage::Defeat => None,
+    }
+}
+
+#[cfg(test)]
+mod omen_lot_tests {
+    use super::omen_lot;
+
+    #[test]
+    fn over_a_few_runs_every_omen_is_open_once() {
+        let ids: Vec<String> = (0..50).map(|i| format!("omen_{i}")).collect();
+        let mut seen = std::collections::BTreeSet::new();
+        let mut firsts = std::collections::BTreeSet::new();
+        for seed in 0..40u64 {
+            let mut order = ids.clone();
+            order.sort_by_key(|id| omen_lot(seed, id));
+            firsts.insert(order[0].clone());
+            seen.extend(order.into_iter().take(20));
+        }
+        assert_eq!(seen.len(), ids.len(), "some omen never opened");
+        assert!(firsts.len() > 10, "the shuffle hardly changes from run to run");
     }
 }

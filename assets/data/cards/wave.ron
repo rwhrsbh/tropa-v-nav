@@ -1,0 +1,9 @@
+// Статусы новой волны врагов.
+[
+    // Подкидыш (Подменыш): пустышка, которую подменыш кладёт в колоду вместо унесённой карты
+    (id: "podkidysh", kind: Status, rarity: Special, keywords: [Unplayable, Ethereal]),
+    // Нить Паучихи: её можно порвать за 1 энергию; Паучиха кормится каждой нитью в колодах отряда
+    (id: "silk", kind: Status, rarity: Special, cost: 1, keywords: [Exhaust]),
+    // Горе (Горе-Злосчастье): пока оно у кого-то в руке, Горе получает вдвое меньше урона; изжить — 1 энергия
+    (id: "gore", kind: Status, rarity: Special, cost: 1, keywords: [Exhaust]),
+]

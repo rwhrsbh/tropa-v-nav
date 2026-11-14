@@ -268,9 +268,6 @@ pub enum Event {
     Drawn { player: u8, count: u32 },
     Shuffled { player: u8 },
     CardPlayed { player: u8, card: Id, upgraded: bool, target: Option<UnitRef> },
-    /// The Pike's will: the top card of the deck turned up. `played` when it then plays itself
-    /// for free (a `CardPlayed` follows); else it goes, unplayed, to the discard pile.
-    PikeTurned { player: u8, card: Id, upgraded: bool, played: bool },
     /// `hp` and `block` are the target's values after the hit.
     Damage { src: Option<UnitRef>, dst: UnitRef, blocked: i32, lost: i32, attack: bool, hp: i32, block: i32 },
     Redirected { from: u8, to: u8, amount: i32 },
@@ -289,6 +286,9 @@ pub enum Event {
     /// A blow found only air: the unit dodged it, or it was wasted on nobody.
     Missed { unit: UnitRef },
     CardAdded { player: u8, card: Id, pile: Pile },
+    /// The pike took the top card of this player's draw pile to play it by itself; what it does
+    /// (or its going to the discard, if it cannot be played) follows.
+    PikeDrew { player: u8, card: Id, upgraded: bool },
     Exhausted { player: u8, card: Id },
     /// Thrown out of the hand by a card or a power.
     Discarded { player: u8, card: Id },

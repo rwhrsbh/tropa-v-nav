@@ -497,39 +497,42 @@ pub fn open_player(
             ChildOf(bar),
         ));
     }
-    // the hint gives way first when the line is short of room: it wraps, the buttons never do
-    commands.spawn((theme::text(l10n.t("deck-hint"), &fonts.body, 18.0, theme::DIM), TextLayout::justify(Justify::Right), Node { margin: UiRect::left(auto()), flex_shrink: 1.0, min_width: px(0), ..default() }, ChildOf(bar)));
-    // the way out: on another's sheet in the window's top right corner, beside their head panel;
-    // on one's own, at the end of the sorting line, which has the window's head to itself
-    let close_at = if others {
-        Node {
-            position_type: PositionType::Absolute,
-            right: px((STAGE_W - DECK_WINDOW_W) / 2.0 + 14.0),
-            top: px(DECK_EDGE + 14.0),
-            padding: UiRect::axes(px(20), px(7)),
-            border: UiRect::all(px(2)),
-            border_radius: BorderRadius::all(px(8)),
-            ..default()
-        }
-    } else {
-        Node { padding: UiRect::axes(px(20), px(7)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), margin: UiRect::left(px(8)), flex_shrink: 0.0, ..default() }
+    commands.spawn((theme::text(l10n.t("deck-hint"), &fonts.body, 18.0, theme::DIM), Node { margin: UiRect::left(auto()), flex_shrink: 1.0, min_width: px(0), ..default() }, TextLayout::justify(Justify::Right), ChildOf(bar)));
+    // the way out: a cross in the window's top right corner, in the margin beside the cards, so
+    // however long the line of sorts runs it never pushes it off the window
+    const CLOSE: f32 = 40.0;
+    let cross_bar = |deg: f32| {
+        (
+            Node { position_type: PositionType::Absolute, left: px(CLOSE / 2.0 - 13.0 - 2.0), top: px(CLOSE / 2.0 - 1.5 - 2.0), width: px(26), height: px(3), border_radius: BorderRadius::all(px(2)), ..default() },
+            BackgroundColor(theme::BONE),
+            UiTransform { rotation: Rot2::degrees(deg), ..default() },
+            Pickable::IGNORE,
+        )
     };
-    let close = commands.spawn((
+    commands.spawn((
         Button,
         Hovered::default(),
         Btn(theme::PEAT),
-        close_at,
-        GlobalZIndex(66),
+        Node {
+            position_type: PositionType::Absolute,
+            right: px((STAGE_W - DECK_WINDOW_W) / 2.0 + 8.0),
+            top: px(DECK_EDGE + (DECK_HEAD_H - CLOSE) / 2.0),
+            width: px(CLOSE),
+            height: px(CLOSE),
+            border: UiRect::all(px(2)),
+            border_radius: BorderRadius::all(px(8)),
+            ..default()
+        },
         BackgroundColor(theme::PEAT),
         BorderColor::all(theme::BONE.with_alpha(0.6)),
-        children![theme::text(l10n.t("deck-close"), &fonts.title, 20.0, theme::BONE)],
+        children![cross_bar(45.0), cross_bar(-45.0)],
         observe(|_: On<Activate>, mut commands: Commands, open: Query<Entity, With<DeckView>>| {
             for e in &open {
                 commands.entity(e).despawn();
             }
         }),
-    )).id();
-    commands.entity(close).insert(ChildOf(if others { view } else { bar }));
+        ChildOf(view),
+    ));
     // the cards: an even grid, rolled by the wheel when it is taller than the screen. As wide as
     // the screen, so what a card tells beside itself is not cut off at the grid's edge
     let scroller = commands
@@ -592,7 +595,7 @@ const DECK_EDGE: f32 = 14.0;
 const DECK_WINDOW_W: f32 = DECK_W + 112.0;
 const DECK_HEAD_H: f32 = 76.0;
 /// Room left at the right of another player's head panel for the close button.
-const DECK_CLOSE_ROOM: f32 = 150.0;
+const DECK_CLOSE_ROOM: f32 = 56.0;
 /// Room above the first row of cards: a card under the cursor grows, and its top is not to be cut.
 const DECK_GRID_TOP: f32 = 30.0;
 

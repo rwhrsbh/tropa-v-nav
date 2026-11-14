@@ -10,22 +10,27 @@ pub fn intent_damage(c: &Content, s: &Combat, e: &Enemy) -> Option<(i32, i32)> {
     let mv = c.enemies.get(&e.def)?.moves.get(intent.mv)?;
     let me = UnitRef::Enemy(e.uid);
     mv.effects.iter().find_map(|fx| {
-        let (a, hits) = match fx {
-            Effect::Damage(a, _) => (a, 1),
-            Effect::Hits(a, k, _) => (a, *k),
-            _ => return None,
-        };
-        let base = match a {
-            Amount::N(base) => *base,
-            Amount::Pack(base, each) => base + (s.living_enemies().count() as i32 - 1) * each,
+        let (base, hits) = match fx {
+            Effect::Damage(a, _) | Effect::Hits(a, _, _) => {
+                let hits = if let Effect::Hits(_, k, _) = fx { *k } else { 1 };
+                let base = match a {
+                    Amount::N(base) => *base,
+                    Amount::Pack(base, each) => base + (s.living_enemies().count() as i32 - 1) * each,
+                    _ => return None,
+                };
+                (base, hits)
+            }
+            // a blow worked out by a hook of the enemy's own
+            Effect::Hook(name) => (crate::hooks::hook_damage(c, s, me, name, intent.target.or(if s.heroes.len() == 1 { Some(0) } else { None }))?, 1),
             _ => return None,
         };
         let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);
         d = d * s.enemy_dmg / 100;
+        let target_hero = intent.target.or_else(|| if s.heroes.len() == 1 || mv.intent == IntentKind::AttackAll { Some(0) } else { None });
+        d = traits_bonus(s, e, target_hero, d);
         if s.status(me, StatusKind::Weak) > 0 {
             d = d * 3 / 4;
         }
-        let target_hero = intent.target.or_else(|| if s.heroes.len() == 1 || mv.intent == IntentKind::AttackAll { Some(0) } else { None });
         if let Some(slot) = target_hero {
             let u = UnitRef::Hero(slot);
             if s.status(u, StatusKind::Vulnerable) > 0 {
@@ -37,6 +42,20 @@ pub fn intent_damage(c: &Content, s: &Combat, e: &Enemy) -> Option<(i32, i32)> {
         }
         Some((d.max(0), hits))
     })
+}
+
+/// What a foe's own nature adds to each blow, the way `strike` adds it: a lone biryuk, the
+/// hound's nose for blood, Vikhor's wind.
+fn traits_bonus(s: &Combat, e: &Enemy, target: Option<u8>, mut d: i32) -> i32 {
+    if e.flags.contains_key("lone") && s.living_enemies().count() == 1 {
+        d = d * 3 / 2;
+    }
+    if let Some(h) = target.and_then(|t| s.hero(t)) {
+        if e.flags.contains_key("blood_scent") && h.hp * 2 <= h.max_hp {
+            d = d * 3 / 2;
+        }
+    }
+    d + e.flags.get("gale").copied().unwrap_or(0)
 }
 
 /// Total damage aimed at a hero this round.
@@ -64,6 +83,7 @@ pub fn incoming(c: &Content, s: &Combat, slot: u8) -> i32 {
                 };
                 let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);
                 d = d * s.enemy_dmg / 100;
+                d = traits_bonus(s, e, Some(slot), d);
                 if s.status(me, StatusKind::Weak) > 0 {
                     d = d * 3 / 4;
                 }
@@ -137,7 +157,7 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
 
     // no point striking what cannot die, or what a single blow cannot reach
     let others_out = s.living_enemies().any(|e| !e.flags.contains_key("hiding"));
-    let reachable = |e: &&Enemy| !e.flags.contains_key("immortal") && !e.flags.contains_key("flying") && !e.flags.contains_key("bayun_perch") && !(others_out && e.flags.contains_key("hiding"));
+    let reachable = |e: &&Enemy| !e.flags.contains_key("immortal") && !e.flags.contains_key("flying") && !(others_out && e.flags.contains_key("hiding"));
     let weakest = s
         .living_enemies()
         .filter(reachable)
@@ -165,8 +185,8 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
     if let Some((card, _)) = playable.iter().find(|(c, _)| c.def == "koschei_needle") {
         return CombatAction::Play { card: card.uid, target: None };
     }
-    // something on the wing or high on a perch: sweeping blows first
-    if s.living_enemies().any(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch")) {
+    // something on the wing: sweeping blows first
+    if s.living_enemies().any(|e| e.flags.contains_key("flying")) {
         let sweep = playable.iter().find(|(_, v)| v.target == CardTarget::None && v.effects.iter().any(|e| matches!(e, Effect::Damage(_, Tgt::AllFoes) | Effect::Hits(_, _, Tgt::AllFoes))));
         if let Some((card, _)) = sweep {
             return CombatAction::Play { card: card.uid, target: None };

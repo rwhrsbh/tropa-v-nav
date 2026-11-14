@@ -42,7 +42,7 @@
     ),
     (
         id: "zn_living_water", hero: "znaharka", kind: Skill, rarity: Rare, cost: 1, target: Downed,
-        keywords: [Exhaust, Coop],
+        keywords: [Retain, Exhaust, Coop],
         effects: [Revive(50, Target)],
         up: (cost: 0),
     ),

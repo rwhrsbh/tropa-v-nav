@@ -16,6 +16,8 @@ use nav_core::*;
 use nav_core::Event;
 
 pub const CARD_W: f32 = 220.0;
+/// The light blue of Yemelya's sleep: his orb of it beside the energy.
+const DROWSE_BLUE: Color = Color::srgb(0.27, 0.56, 0.82);
 pub const CARD_H: f32 = 310.0;
 /// Original resting height; the optional raised layout lifts it by 90 stage pixels.
 const HAND_TOP: f32 = 905.0;
@@ -211,6 +213,8 @@ enum Label {
     Intent(u32),
     Team(u8),
     Energy,
+    /// Yemelya's sleep, on the little blue orb beside the energy.
+    Drowse,
     Draw,
     Discard,
     Round,
@@ -700,7 +704,8 @@ fn enter(
             ));
 
             // energy: burning splinters left of the hand
-            p.spawn((
+            let sloth = session.my_hero().mechanic == nav_core::Mechanic::Sloth;
+            let mut orb = p.spawn((
                 theme::panel_edged(Node {
                     position_type: PositionType::Absolute,
                     left: px(300),
@@ -720,6 +725,32 @@ fn enter(
                     theme::text(l10n.t("battle-energy"), &fonts.body, 16.0, theme::DIM),
                 ],
             ));
+            // Yemelya's sleep: a second, smaller orb on the blue his sleep-paid cards wear
+            if sloth {
+                orb.with_child((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        right: px(-46),
+                        top: px(-22),
+                        width: px(72),
+                        height: px(72),
+                        border: UiRect::all(px(3)),
+                        border_radius: BorderRadius::MAX,
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    BackgroundColor(DROWSE_BLUE),
+                    BorderColor::all(theme::FROST),
+                    BoxShadow::new(DROWSE_BLUE.with_alpha(0.6), px(0), px(0), px(2), px(12)),
+                    Pickable::IGNORE,
+                    children![
+                        (Label::Drowse, theme::text("", &fonts.num, 30.0, Color::WHITE), TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK.with_alpha(0.6) }),
+                        theme::text(l10n.t("mech-Sloth-name"), &fonts.body, 12.0, theme::FROST),
+                    ],
+                ));
+            }
 
             // the piles: pressed, each spreads its cards out (see `piles`)
             p.spawn(piles::pile_plate(140.0, piles::PileKind::Draw, Label::Draw, &l10n, &fonts));
@@ -1661,6 +1692,7 @@ fn update_labels(session: Res<Session>, net: Option<Res<crate::net::Net>>, db: R
                 s
             }),
             Label::Energy => Some(format!("{}", session.my_hero().energy)),
+            Label::Drowse => Some(session.my_hero().statuses.get(&nav_core::StatusKind::Drowse).copied().unwrap_or(0).to_string()),
             // the piles' counts, on the discs of their stacks
             Label::Draw => Some(session.my_hero().draw.len().to_string()),
             Label::Discard => Some(session.my_hero().discard.len().to_string()),
@@ -1820,14 +1852,8 @@ pub fn card_face(c: &mut ChildSpawnerCommands, card: &Card, def: &CardDef, form:
             c.spawn((theme::text(line, &fonts.body, 14.0, gem.unwrap_or(theme::DIM)), Node { margin: UiRect::vertical(px(2)), ..default() }));
             // a long text shrinks to stay on the card: about 110 letters fit at full size, and
             // what this guess misses is measured and brought in by `fit_text`
-            let mut text = l10n.card_text(&card.def, def, &view);
-            // a werewolf card tells its other side too, so the turn holds no surprise
-            if def.hero == "volkolak" && def.two_sided(card.upgraded) {
-                let other = if form == Form::Beast { Form::Human } else { Form::Beast };
-                let side = l10n.card_text(&card.def, def, &def.view(card.upgraded, other));
-                text = format!("{text}
-{}: {side}", l10n.t(&format!("side-{other:?}")));
-            }
+            // a werewolf card tells its other side too, on a line of its own
+            let text = l10n.full_card_text(&card.def, def, card.upgraded, form);
             let size = (18.0 * (110.0 / text.chars().count().max(1) as f32).sqrt()).clamp(12.0, 18.0);
             c.spawn((
                 theme::text(text, &fonts.body, size, theme::BONE),
@@ -1983,10 +2009,28 @@ fn light_bonuses(mut commands: Commands, session: Res<Session>, db: Res<Db>, car
     }
     *last = Some(key);
     let blind = sees_nothing(&session);
+    // a card that does something when thrown away is lit while it can be: a pick of cards to
+    // throw is open, or another card in the hand throws cards away
+    fn throws(list: &[nav_core::Effect]) -> bool {
+        use nav_core::Effect as E;
+        list.iter().any(|e| match e {
+            E::Discard(_) | E::DiscardHand => true,
+            E::If(_, a, b) => throws(a) || throws(b),
+            E::Repeat(_, a) | E::Once(_, a) | E::OncePerTurn(_, a) | E::Every(_, _, a) | E::EveryThisTurn(_, _, a) => throws(a),
+            _ => false,
+        })
+    }
+    let can_throw = |uid: u32| {
+        h.choosing.is_some()
+            || h.hand.iter().any(|c| c.uid != uid && db.0.cards.get(&c.def).is_some_and(|d| throws(&d.view(c.upgraded, h.form).effects)))
+    };
     for (e, w, lit) in &cards {
         let Some(card) = h.hand.iter().find(|c| c.uid == w.uid) else { continue };
         let ready = !blind
-            && db.0.cards.get(&card.def).is_some_and(|def| nav_core::combat::bonus_ready(&db.0, &session.truth, session.me, &def.view(card.upgraded, h.form).effects));
+            && db.0.cards.get(&card.def).is_some_and(|def| {
+                let view = def.view(card.upgraded, h.form);
+                nav_core::combat::bonus_ready(&db.0, &session.truth, session.me, &view.effects) || (!view.on_discard.is_empty() && can_throw(card.uid))
+            });
         if ready && !lit {
             commands.entity(e).insert((BonusLit, Outline::new(px(4), px(1), theme::CANDLE)));
         } else if !ready && lit {

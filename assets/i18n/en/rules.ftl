@@ -5,25 +5,25 @@ fx-damage-AllFoes = Deal { $n } damage to all enemies.
 fx-damage-RandomFoe = Deal { $n } damage to a random enemy.
 fx-hits = Deal { $n } damage { $k } times.
 fx-hits-AllFoes = Deal { $n } damage to all enemies { $k } times.
-fx-hits-RandomFoe = { $k } times, deal { $n } damage to a random enemy.
+fx-hits-RandomFoe = Deal { $n } damage to a random enemy { $k } times.
 fx-block = Gain { $n } Block.
 fx-block-Target = Give an ally { $n } Block.
 fx-block-AllFriends = All allies gain { $n } Block.
 fx-block-OtherFriends = Other allies gain { $n } Block.
 fx-guard = Guard { $n }.
-fx-apply = Apply { $s } { $n }.
-fx-apply-Me = Gain { $s } { $n }.
-fx-apply-AllFoes = Apply { $s } { $n } to all enemies.
-fx-apply-RandomFoe = Apply { $s } { $n } to a random enemy.
-fx-apply-AllFriends = All allies gain { $s } { $n }.
-fx-apply-OtherFriends = Other allies gain { $s } { $n }.
+fx-apply = Apply { $n } { $s }.
+fx-apply-Me = Gain { $n } { $s }.
+fx-apply-AllFoes = Apply { $n } { $s } to all enemies.
+fx-apply-RandomFoe = Apply { $n } { $s } to a random enemy.
+fx-apply-AllFriends = All allies gain { $n } { $s }.
+fx-apply-OtherFriends = Other allies gain { $n } { $s }.
 fx-remove = Remove { $s } from the target.
 fx-remove-Me = Lose all { $s }.
-fx-consume = Echo: consume { $s } on the target.
-fx-consume-AllFoes = Echo: consume { $s } on all enemies.
-fx-cleanse = Remove all debuffs from the target.
-fx-cleanse-Me = Remove all your debuffs.
-fx-cleanse-AllFriends = Remove all debuffs from all allies.
+fx-consume = Respond: consume the target's { $s }.
+fx-consume-AllFoes = Respond: consume every enemy's { $s }.
+fx-cleanse = Remove every harmful status from an ally.
+fx-cleanse-Me = Remove every harmful status from yourself.
+fx-cleanse-AllFriends = Remove every harmful status from all allies.
 fx-draw = Draw { $n ->
     [one] { $n } card
    *[other] { $n } cards
@@ -34,45 +34,61 @@ fx-energy-AllFriends = All allies gain { $n } Energy.
 fx-energy-OtherFriends = Other allies gain { $n } Energy.
 fx-heal = Heal { $n } HP.
 fx-heal-Target = Heal an ally for { $n } HP.
-fx-heal-AllFriends = All allies heal { $n } HP.
+fx-heal-AllFriends = Heal all allies for { $n } HP.
 fx-losehp = Lose { $n } HP.
 fx-losehp-Target = The target loses { $n } HP.
 fx-revive = Raise a fallen ally with { $n }% HP.
-fx-addcard-Hand = Add { $n } × "{ $c }" to your hand.
-fx-addcard-Draw = Shuffle { $n } × "{ $c }" into your deck.
-fx-addcard-Discard = Add { $n } × "{ $c }" to your discard pile.
-fx-addcard-Discard-Target = The target gets { $n } × "{ $c }" in their discard pile.
-fx-taunt = Challenge: this round every enemy attacks only you.
+fx-addcard-Hand = { $n ->
+    [one] Add "{ $c }" to your hand.
+   *[other] Add { $n } × "{ $c }" to your hand.
+}
+fx-addcard-Draw = { $n ->
+    [one] Shuffle "{ $c }" into your deck.
+   *[other] Shuffle { $n } × "{ $c }" into your deck.
+}
+fx-addcard-Discard = { $n ->
+    [one] Put "{ $c }" into your discard pile.
+   *[other] Put { $n } × "{ $c }" into your discard pile.
+}
+fx-addcard-Discard-Target = { $n ->
+    [one] The target gets "{ $c }" in their discard pile.
+   *[other] The target gets { $n } × "{ $c }" in their discard pile.
+}
+fx-taunt = Challenge: this round every enemy strikes only you.
 fx-if = { $c }: { $then }
 fx-else = Otherwise: { $else }
 fx-repeat = { $n } times: { $body }
 rune-pushed-out = Discharges when pushed out.
-fx-rune = Rune “{ $r }” on an ally: { $what }. Discharges when pushed out.
-fx-rune-Me = Rune “{ $r }”: { $what }. Discharges when pushed out.
+fx-rune = Carve a { $r } rune on an ally.
+fx-rune-Me = Carve a { $r } rune.
 fx-invoke = Invoke: all runes fire.
-fx-shift = Shift: change form.
+fx-shift = Shift.
 fx-mask = Put on the { $m } mask.
 
-amount-consumed = consumed Curse
-amount-played = card played this round
-amount-rune-Thunder = Thunder rune
-amount-rune-Frost = Frost rune
-amount-rune-Mist = Mist rune
-amount-rune-Flame = Flame rune
-amount-rune-Zhiva = Zhiva rune
+amount-consumed = amount consumed
+amount-played = cards played this round
 
-cond-has-Me = If you have { $s } { $n }+
-cond-has-Target = If the target has { $s } { $n }+
-cond-has-AllFoes = If all enemies have { $s } { $n }+
-cond-link = Link: { $t }
+cond-has-Me = If you have { $n ->
+    [1] { $s }
+   *[other] { $s } { $n }+
+}
+cond-has-Target = If the target has { $n ->
+    [1] { $s }
+   *[other] { $s } { $n }+
+}
+cond-has-AllFoes = If all enemies have { $n ->
+    [1] { $s }
+   *[other] { $s } { $n }+
+}
+cond-link = Link ({ $t })
 cond-fatal = If fatal
-cond-form-Human = In Human form
-cond-form-Beast = In Beast form
-cond-mask-Bear = Bear mask
-cond-mask-Goat = Goat mask
-cond-mask-Mara = Mara mask
+cond-form-Human = As a man
+cond-form-Beast = As the beast
+cond-mask-Bear = In the Bear mask
+cond-mask-Goat = In the Goat mask
+cond-mask-Mara = In the Mara mask
 cond-coop = In a party
-cond-not = Not ({ $c })
+cond-not = If not ({ $c })
 
 trigger-CombatStart = At the start of combat: { $fx }
 trigger-TurnStart = At the start of your turn: { $fx }
@@ -84,7 +100,7 @@ trigger-Kill = Whenever you kill an enemy: { $fx }
 trigger-Shifted = Whenever you shift: { $fx }
 trigger-MaskChanged = Whenever you change masks: { $fx }
 trigger-AllyRaised = Whenever an ally is raised: { $fx }
-trigger-InHand = At the end of your turn, if this is in your hand: { $fx }
+trigger-InHand = At the end of your turn in hand: { $fx }
 
 type-Attack = Attack
 type-Skill = Skill
@@ -129,7 +145,7 @@ status-Hex-help = The next X hits on the target deal +3 damage, from any hero.
 status-Bleed = Bleed
 status-Bleed-help = Takes X damage every time it attacks.
 status-Fear = Fear
-status-Fear-help = Chance to skip its next attack. 75% at most.
+status-Fear-help = Chance to skip its next attack: as many percent as it has Fear. 75 at most.
 status-Thorns = Thorns
 status-Thorns-help = Deals X damage back to attackers.
 status-HuntMark = Hunter's Trail
@@ -157,19 +173,19 @@ mask-Bear-help = Attacks deal +3 damage.
 mask-Goat = Goat
 mask-Goat-help = Every card you play gives a random ally 2 Block.
 mask-Mara = Mara
-mask-Mara-help = Every blow applies 7.5% Fear.
+mask-Mara-help = Every blow applies 7.5 Fear.
 
-fx-consumecurses = Echo: consume every Curse on the target.
+fx-consumecurses = Respond: consume every Curse on the target.
 fx-once = Once per combat: { $body }
 fx-onceturn = Once per turn: { $body }
 fx-every = Every { $k }th time: { $body }
 fx-everyturn = Every { $k }th time in a turn: { $body }
 fx-maxhp = +{ $n } max HP.
-fx-echo = Echo: gain a free copy of the last card an ally played this round. The copy Exhausts.
-fx-echo-AllFriends = Echo: every hero gains a free copy of the last card an ally played this round.
-fx-herb = Into the Cauldron: { $h }. Spilled: { $spill }.
+fx-echo = Echo: replay the last card an ally played this round, for free.
+fx-echo-AllFriends = Echo for all: every hero replays the last card an ally played this round, for free.
+fx-herb = Into the Cauldron: { $h }.
 fx-brew = Brew everything in the Cauldron.
-fx-provoke = This enemy now aims at you.
+fx-provoke = This enemy now strikes you.
 amount-curses = Curse on the target
 status-Chained = Chained
 status-Chained-help = The Volkolak cannot change form.
@@ -183,16 +199,16 @@ flag-brew_all = Your next brew affects all allies or all enemies.
 flag-first_rune_twice = Your first rune fires twice.
 flag-big_cauldron = The Cauldron holds 4 herbs.
 
-hook-transfer = Remove all debuffs from the heroes and put them on this enemy.
+hook-transfer = Strip every harmful status from the heroes and lay it on this enemy.
 hook-kolyada = X times: a random rune fires on every hero.
 hook-balagan = Enemies swap targets among themselves.
 hook-misdirect = This enemy's next attack on a hero hits another enemy instead.
 hook-random_herb = Add a random herb to your hand.
 
 kw-Curse = Curse
-kw-Curse-help = Rot, Evil Eye and Muted. Echo cards consume it for a bonus.
+kw-Curse-help = Rot, Evil Eye and Muted together. Respond cards consume it for a bonus.
 kw-Echo = Echo
-kw-Echo-help = The copy costs 0 and is gone once played. Alone, it copies your own last card.
+kw-Echo-help = A free copy of the last card an ally played this round; it is gone once played. Alone, it copies your own last card.
 kw-Brew = Brew
 kw-Brew-help = Herbs stay in the Cauldron between turns. Brewing turns them into an effect by recipe. When the cauldron is full, a new herb spills the oldest, which takes weak effect.
 
@@ -210,11 +226,11 @@ herb-burst = Burst-grass
 herb-fern = Fern Flower
 kw-Passable = Passable
 kw-Passable-help = Drag the card onto an ally to hand it over for 1 Energy.
-trigger-SkillPlayed = When you play a Skill: { $fx }
-trigger-Hurt = When an enemy's blow costs you HP: { $fx }
+trigger-SkillPlayed = Whenever you play a Skill: { $fx }
+trigger-Hurt = Whenever an enemy wounds you: { $fx }
 
 kw-Rune = Rune
-kw-Rune-help = Fires at the end of every turn until it is gone. Five fit on the carver, three on an ally: a new rune pushes out the oldest, which discharges, firing one last time.
+kw-Rune-help = A rune fires at the end of every turn. Five fit on you, three on an ally: a new one pushes out the oldest, which fires one last time.
 rune-Thunder-short = 6 damage to a random foe each turn
 rune-Frost-short = 4 Block each turn
 rune-Mist-short = halves the next attack each turn
@@ -238,7 +254,7 @@ trait-frozen-help = The first cards in hand cannot be played this turn.
 trait-winter-help = One card fewer each turn, up to three, while the ice crown stands.
 trait-immortal-help = Cannot die while the needle is whole.
 trait-draw_less = The earth shakes
-trait-draw_less-help = Two cards fewer next turn.
+trait-draw_less-help = Next turn, as many cards fewer as the badge shows.
 trait-energy_less = Dragged under
 trait-energy_less-help = One less energy next turn.
 trait-no_intents = Sirin's song
@@ -274,8 +290,8 @@ trait-hunter-help = Strikes whoever holds the needle, or has hurt the chain of i
 status-Drowse = Drowse
 status-Drowse-help = Gathered by doing nothing: each energy unspent at the end of a turn gives 1 Drowse. Yemelya's cards spend it, and some are paid for with it.
 amount-missing = { $pct }% of health lost
-fx-damage-WeakestFoe = Deal { $n } damage to the weakest foe.
-fx-apply-WeakestFoe = The weakest foe gets { $status } { $n }.
+fx-damage-WeakestFoe = Deal { $n } damage to the weakest enemy.
+fx-apply-WeakestFoe = Apply { $n } { $s } to the weakest enemy.
 hook-spread_curse = This foe's Rot, Hex and Weak land on all the others too.
 hook-fire_all_runes = All your runes go off now and stay carved.
 hook-spill_cauldron = Empty the cauldron: each herb gives the whole party 3 block.
@@ -295,17 +311,17 @@ trait-hollow-help = One blow takes at most 6 from it: strike many times.
 trait-growing = Growing Angry
 trait-growing-help = Stronger with every blow.
 trait-doom = Doom
-trait-doom-help = When the countdown reaches zero, the hero perishes instantly.
+trait-doom-help = When the count reaches zero, the hero loses 30 HP. Doom lifts if Morovitsa is killed.
 trait-kinetic_moss = Kinetic Moss
-trait-kinetic_moss-help = Absorbs attacks weaker than 6 damage and stores kinetic energy.
+trait-kinetic_moss-help = Attacks under 6 damage deal it only 1 and store a kinetic charge.
 trait-kinetic_charge = Kinetic Charge
-trait-kinetic_charge-help = Stored kinetic energy released in a devastating burst.
+trait-kinetic_charge-help = Each charge adds 3 damage to its Kinetic Burst.
 trait-bayun_perch = Bayun's Perch
-trait-bayun_perch-help = Perched on a pillar out of reach from melee strikes.
+trait-bayun_perch-help = Perched on a pillar, he lashes back: every attack hit on him deals 1 to the attacker. Multi-hit cards hurt you too.
 trait-spell_mirror = Spell Mirror
-trait-spell_mirror-help = Reflects directed spells and curses back at the caster.
+trait-spell_mirror-help = Every attack hit on her returns 30% of its damage to the attacker (at least 1).
 trait-flicker = Shadow Flicker
-trait-flicker-help = Slips between shadows, evading targeted strikes.
+trait-flicker-help = On even rounds no attack deals her more than 1 damage.
 trait-gorynych_head = Dragon Head
 trait-gorynych_head-help = As long as one head lives, severed heads regrow after 2 turns.
 trait-yaga_mortar = Yaga's Mortar
@@ -390,26 +406,26 @@ fx-recall = Return { $n ->
 } from your discard pile to your hand.
 trigger-Discarded = Whenever you discard a card: { $fx }
 trigger-Exhausted = Whenever a card of yours is exhausted: { $fx }
-trigger-OnDiscard = If this card is discarded: { $fx }
-amount-discarded = card discarded
-amount-discarded-turn = card discarded this turn
-amount-hand = card in hand
-amount-exhausted = card exhausted this fight
+trigger-OnDiscard = Discard: { $fx }
+amount-discarded = cards discarded
+amount-discarded-turn = cards discarded this turn
+amount-hand = cards in hand
+amount-exhausted = cards exhausted this fight
 kw-Discard = Discard
-kw-Discard-help = You choose which cards go from your hand to the discard pile; the rest of the card waits for your choice. A thrown card's "If this card is discarded" fires, and so do powers waiting for a discard. The end of a turn does not count.
+kw-Discard-help = A card's "Discard:" line fires when a card or a power throws it from your hand; the end of a turn does not count. You choose what to discard, and the card waits for your choice. Powers that wait for a discard fire too.
 
 herb-nettle = Nettle
 herb-henbane = Henbane
 herb-valerian = Valerian
 herb-st_john = St John's Wort
 herb-nettle-help = In a brew: Bleed on enemies and Thorns. Spilt: 1 Bleed to all enemies.
-herb-henbane-help = In a brew: Fear and Rot on enemies. Spilt: 5% Fear to all enemies.
+herb-henbane-help = In a brew: Fear and Rot on enemies. Spilt: 5 Fear to all enemies.
 herb-valerian-help = In a brew: Weak on enemies and Block for allies. Spilt: 1 Weak to a random enemy.
 herb-st_john-help = In a brew: Strength and healing. Spilt: 1 temporary Strength.
 herb-nettle-spill = 1 Bleed to all enemies
-herb-henbane-spill = 5% Fear to all enemies
+herb-henbane-spill = 5 Fear to all enemies
 herb-valerian-spill = 1 Weak to a random enemy
-herb-st_john-spill = 1 temporary Strength
+herb-st_john-spill = +1 Strength this turn
 
 status-Gloom = Gathering Dark
 status-Gloom-help = The fight drags on: from round 9 (13 against an elite, 17 against a boss) the dark thickens every round. Each stack: 10% less Block and healing (up to 60%) and 1 HP lost at the end of the turn, through Block.
@@ -425,7 +441,7 @@ mech-Moon = As a man the Volkolak gains 1 Moon for every attack he plays; at the
 mech-Brew-name = Cauldron
 mech-Brew = A herb does a little at once and goes into the Cauldron, up to four. Brew turns the herbs into a potion by recipe. Fern flower stands in for any herb and doubles the brew. One herb too many spills the oldest, which works weakly.
 mech-Masks-name = Masks
-mech-Masks = The Skomoroh wears one mask at a time. Bear: attacks deal +3 damage. Goat: every card played gives a random ally 2 Block. Mara: every blow gives the foe 7.5% Fear, up to 75%; a frightened foe may miss its attack.
+mech-Masks = The Skomoroh wears one mask at a time. Bear: attacks deal +3 damage. Goat: every card played gives a random ally 2 Block. Mara: every blow gives the foe 7.5 Fear, up to 75; a frightened foe may miss its attack.
 mech-Sloth-name = Drowse
 mech-Sloth = Every Energy left unspent in a turn gives Yemelya 1 Drowse. His cards spend Drowse on blows and Block, and those with a blue cost are paid for with it. None of his cards strike a chosen target: only a random foe, or all of them.
 
@@ -435,7 +451,6 @@ fx-pikewill = The Pike.
 kw-PikeWill = The Pike
 kw-PikeWill-help = The pike plays the top card of your draw pile by itself: for nothing, and at whoever it falls on. What cannot be played goes to the discard pile as it is.
 kw-DrowseCost = Paid in Drowse
-kw-DrowseCost-help = The number on blue: the card costs no Energy, but that much Drowse.
 # the marks a hero's own cards leave on them, shown under the hero
 trait-free_rune = Free Rune
 trait-free_rune-help = Your next rune is free.
@@ -507,8 +522,73 @@ foe-hook-tsar_whirlpool = Every hero has 1 less energy next turn.
 foe-hook-storm_screech = Every hero discards their whole hand.
 foe-hook-doom_clock = Lays Doom on the hero: in 4 rounds they lose 45 HP.
 foe-hook-nightmare_afflict = Shuffles a Dread into the hero's draw pile and takes 6 HP.
-foe-hook-bayun_leap = Leaps down off his post: any blow reaches him until he purrs again.
-foe-hook-bayun_climb = Climbs back up his post, out of reach of an aimed blow.
 foe-hook-bayun_eyelids = Puts two Heavy Eyelids into every hero's hand.
 foe-hook-bayun_claws = 14 damage, plus 6 for every status and curse card in the hero's hand.
 foe-hook-kinetic_burst = 10 damage, plus 3 for every moss charge stored.
+kw-DrowseCost-help = A cost on blue is paid not in Energy but in Drowse.
+fx-damage-x = Deal damage: { $n }.
+fx-damage-x-AllFoes = Deal damage to all enemies: { $n }.
+fx-damage-x-RandomFoe = Deal damage to a random enemy: { $n }.
+fx-damage-x-WeakestFoe = Deal damage to the weakest enemy: { $n }.
+fx-block-x = Gain Block: { $n }.
+fx-block-x-Target = Give an ally Block: { $n }.
+fx-block-x-AllFriends = All allies gain Block: { $n }.
+fx-block-x-OtherFriends = Other allies gain Block: { $n }.
+fx-apply-ally = An ally gains { $n } { $s }.
+fx-apply-ally-Me = Gain { $n } { $s }.
+fx-apply-ally-AllFriends = All allies gain { $n } { $s }.
+fx-apply-ally-OtherFriends = Other allies gain { $n } { $s }.
+fx-apply-x = Apply { $s }: { $n }.
+fx-apply-x-Me = Gain { $s }: { $n }.
+fx-apply-x-AllFoes = Apply { $s } to all enemies: { $n }.
+fx-apply-x-RandomFoe = Apply { $s } to a random enemy: { $n }.
+fx-apply-ally-x = An ally gains { $s }: { $n }.
+fx-apply-double = Double the target's { $s }.
+fx-apply-double-AllFoes = Double every enemy's { $s }.
+fx-consume-Me = Spend all your { $s }.
+fx-draw-x = Draw cards: { $n }.
+fx-draw-discarded = Draw as many cards as you discarded.
+fx-energy-x = Gain Energy: { $n }.
+fx-heal-OtherFriends = Heal other allies for { $n } HP.
+fx-heal-x = Heal HP: { $n }.
+fx-heal-x-Target = Heal an ally HP: { $n }.
+fx-heal-x-AllFriends = Heal all allies HP: { $n }.
+fx-losehp-x = Lose HP: { $n }.
+fx-repeat-discarded = For each card discarded: { $body }
+amount-stat-Target = the target's { $s }
+amount-stat-AllFoes = enemies' { $s }
+amount-runes = { $r } runes
+cond-solo = Alone
+kw-Respond = Respond
+kw-Respond-help = Draws the named status off the target: it is gone, and the card's next effect grows with how much was consumed ("amount consumed").
+trait-lone = Lone
+trait-lone-help = Left without its kind, it strikes half again as hard.
+trait-changeling = Changeling
+trait-changeling-help = Carries cards off your deck. Kill it and all it took comes back to your hand.
+trait-furrow = Boundary
+trait-furrow-help = While the Polevik lives, the first card each turn costs 1 more Energy.
+trait-paper_wings = Paper Wings
+trait-paper_wings-help = The first 3 attacks each round deal him half damage.
+trait-black_runes = Black Runes
+trait-black_runes-help = Each rune adds 3 damage to his Invocation. A blow that takes 10+ health off him cracks one.
+trait-withering = Withering
+trait-withering-help = While the Shade is here, heroes heal at half.
+trait-blood_scent = Smells Blood
+trait-blood_scent-help = Strikes half again as hard at a hero at half health or less.
+trait-twin_soul = Sisters
+trait-twin_soul-help = When one sister falls, the other gains 3 Strength and raises her at 40% health 2 turns later. Kill both.
+trait-eclipse = Black Sun
+trait-eclipse-help = With each of Chernobog's moves the sun climbs unless he took 30 damage. At step 4, eclipse: intents are hidden and he gains 4 Strength.
+trait-stolen = Cards Taken
+trait-stolen-help = How many cards he has carried off your decks.
+
+trait-glutton = Insatiable
+trait-glutton-help = At the end of each turn heals 3 for every card still in the heroes' hands.
+trait-gale = Wind
+trait-gale-help = Each of his blows deals as much more as he has Wind. Wind rises by one per hero each round; every Skill played lulls it by 1.
+trait-woe = Clinging Grief
+trait-woe-help = While anyone holds a Grief card, he takes half damage. Grief can be lived through for 1 energy.
+trait-house_rule-1 = Forbidden: Skills
+trait-house_rule-2 = Forbidden: Powers
+trait-house_rule-3 = Forbidden: Attacks
+trait-house_rule-help = In his house one kind of card is forbidden each round. Whoever plays one loses 4 health through Block. The rule turns each round: Powers, Attacks, Skills.

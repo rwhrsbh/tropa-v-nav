@@ -28,15 +28,13 @@ pub fn hero_color(hero: &str) -> Color {
     }
 }
 
-/// A player's colour on the map's parchment: their hero's own, a little deeper so it reads on the
-/// pale paper. What they draw there is in it, and their token is framed in it.
-pub fn map_color(hero: &str) -> Color {
-    match hero {
-        // Yemelya's pale linen would vanish on parchment: the same hue, much darker
-        "emelya" => Color::srgb(0.50, 0.45, 0.30),
-        _ => hero_color(hero).darker(0.08),
-    }
+/// The colour of a player's marker on the map: what they draw there is in it, and their token
+/// stands on a disc of it. Fixed by hero, the same colour each hero's claims wear at a contested
+/// chest.
+pub fn marker_color(hero: &str) -> Color {
+    hero_color(hero)
 }
+
 
 #[derive(Resource, Clone)]
 pub struct Fonts {

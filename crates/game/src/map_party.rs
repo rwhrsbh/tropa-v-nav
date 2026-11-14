@@ -17,7 +17,7 @@ pub fn plugin(app: &mut App) {
         .add_systems(OnEnter(AppState::Map), |mut scroll: ResMut<MapScroll>| scroll.fresh = true)
         .add_systems(Update, (roll_sheet, send_pointer, show_pointers, show_votes, play_lot, pulse).chain().run_if(in_state(AppState::Map)))
         // the map looked at in a fight rolls under the wheel as well
-        .add_systems(Update, roll_sheet.run_if(in_state(AppState::Battle)))
+        .add_systems(Update, roll_sheet.run_if(|state: Res<State<AppState>>| crate::run_ui::PEEK_STATES.contains(state.get())))
         .add_systems(OnExit(AppState::Map), |mut commands: Commands, marks: Query<Entity, With<MapOverlay>>| {
             for e in &marks {
                 commands.entity(e).despawn();

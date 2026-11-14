@@ -199,3 +199,13 @@ Single full-body creature, three-quarter view facing left, feet on the ground ne
 | `polunochnitsa` | 512×768 | A polunochnitsa, midnight hag of sleep and terror: a tall gaunt phantom in a moth-eaten dark indigo shroud, faceless shadow beneath a hood with two pinprick cold violet lights, spindly claws reaching out to weave nightmares. |
 | `zlyden` | 512×768 | A zlyden, misery imp: a tiny naked scrawny grey goblin-like creature with an oversized hungry mouth full of crooked needles, clutched stolen copper coins in webbed paws, ragged ears, shifting nervously. |
 | `morovitsa` | 1024×1024 | Morovitsa, maiden of pestilence and death: a spectral tall woman in a decaying black lace shroud, pale flesh with black veins, holding an hourglass dripping dark blood and a notched rusted scythe, bringing inescapable doom. |
+
+## Новая волна (ноябрь 2026)
+
+Промпты 23 врагов, 10 значков особенностей и двух карт-статусов — в `docs/prompts/plots/wave.json`;
+сообщения для агента Flow собирает `python tools/wave_prompts.py`. Каждый спрайт — одна картинка на зелёном;
+`python tools/foe_rig.py <картинка> <id> <512x768|1024> <шея>` вырезает фон и делает `_head`, `_body`, `_dead`, `_dead_headless`
+(шея — доля высоты фигуры, либо `x,y` для зверя на четырёх лапах, либо рамка `л,п,в,н` для головы между крыльями или посохом).
+
+Боссы первого и второго актов (Идолище Поганое, Вихорь, Горе-Злосчастье, Злой Домовой), их значки и карта Горе —
+`docs/prompts/plots/bosses2.json`. Соловей, Корочун, Баба-Яга и Водяной царь с тех пор — элиты.

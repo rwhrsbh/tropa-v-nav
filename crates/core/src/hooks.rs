@@ -260,7 +260,11 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 e.hp = (e.max_hp / 2).max(1);
                 e.block = 0;
                 e.statuses.clear();
-                let (unit, hp) = (UnitRef::Enemy(e.uid), e.hp);
+                let (unit, hp, def) = (UnitRef::Enemy(e.uid), e.hp, e.def.clone());
+                // seen getting up (the screen raises a fallen foe on this), then its health
+                if let UnitRef::Enemy(enemy) = unit {
+                    ex.ev.push(Event::Summoned { enemy, def });
+                }
                 ex.ev.push(Event::Heal { unit, amount: hp, hp });
             } else if ex.s.enemies.iter().filter(|e| e.alive).count() < 3 {
                 // no one has fallen yet: he digs a fresh one out of the graveyard
@@ -362,18 +366,6 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 h.flags.remove("winter");
             }
         }
-        // Kot Bayun leaps down off his post to pounce, and is in reach of a plain blow until he
-        // climbs back up to purr
-        "bayun_leap" | "bayun_climb" => {
-            let UnitRef::Enemy(uid) = ctx.src else { return };
-            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
-                if name == "bayun_leap" {
-                    e.flags.remove("bayun_perch");
-                } else {
-                    e.flags.insert("bayun_perch".into(), 1);
-                }
-            }
-        }
         // Kot Bayun: Heavy Eyelids into hand of standing heroes
         "bayun_eyelids" => {
             let heroes: Vec<u8> = ex.s.standing_heroes().map(|h| h.slot).collect();
@@ -382,26 +374,21 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 ex.add_card(slot, "heavy_eyelids", Pile::Hand);
             }
         }
-        // Kot Bayun: Claws scaling with status / curse cards in hand
+        // Kot Bayun: claws that bite harder for every status or curse lying in the discard pile.
+        // The hand is always thrown away before the enemies move, so it is the discard (where his
+        // Heavy Eyelids go when they are not paid off) that he counts. A blow like any other:
+        // strength, weakness and vulnerability count, and the intent shows how much
         "bayun_claws" => {
             let Some(UnitRef::Hero(slot)) = ctx.target else { return };
-            let statuses_in_hand = ex.s.heroes[slot as usize]
-                .hand
-                .iter()
-                .filter(|c| {
-                    ex.c.cards.get(&c.def).is_some_and(|d| matches!(d.kind, CardType::Status | CardType::Curse))
-                })
-                .count() as i32;
-            let dmg = 14 + statuses_in_hand * 6;
-            ex.hurt(Some(ctx.src), UnitRef::Hero(slot), dmg, true);
+            let Some(base) = hook_damage(&ex.c, &ex.s, ctx.src, "bayun_claws", Some(slot)) else { return };
+            ex.strike(Some(ctx.src), UnitRef::Hero(slot), base, true);
         }
         // Mokhovik: Kinetic Burst unleashing stored kinetic charge
         "kinetic_burst" => {
             let UnitRef::Enemy(uid) = ctx.src else { return };
             let Some(UnitRef::Hero(slot)) = ctx.target else { return };
-            let charge = ex.s.enemies.iter().find(|e| e.uid == uid).and_then(|e| e.flags.get("kinetic_charge")).copied().unwrap_or(0);
-            let dmg = 10 + charge * 3;
-            ex.hurt(Some(ctx.src), UnitRef::Hero(slot), dmg, true);
+            let Some(base) = hook_damage(&ex.c, &ex.s, ctx.src, "kinetic_burst", Some(slot)) else { return };
+            ex.strike(Some(ctx.src), UnitRef::Hero(slot), base, true);
             if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
                 e.flags.remove("kinetic_charge");
             }
@@ -419,44 +406,37 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
         "nightmare_afflict" => {
             let Some(UnitRef::Hero(slot)) = ctx.target else { return };
             ex.add_card(slot, "dread", Pile::Draw);
-            ex.hurt(Some(ctx.src), UnitRef::Hero(slot), 6, false);
+            ex.strike(Some(ctx.src), UnitRef::Hero(slot), 6, false);
         }
         // Zlyden: Poverty curse (energy less next turn)
         "poverty_curse" => {
             let Some(UnitRef::Hero(slot)) = ctx.target else { return };
             ex.s.heroes[slot as usize].flags.insert("energy_less".into(), 1);
         }
-        // Morovitsa: Doom Clock (4 stacks countdown)
+        // Morovitsa: Doom Clock, counting down from 4. Gazed at again, a doomed hero's count is
+        // not wound back up: the gaze comes round every third turn, and would otherwise never let
+        // the count run out
         "doom_clock" => {
             let Some(UnitRef::Hero(slot)) = ctx.target else { return };
-            ex.s.heroes[slot as usize].flags.insert("doom".into(), 4);
+            ex.s.heroes[slot as usize].flags.entry("doom".into()).or_insert(DOOM_TURNS);
         }
-        // Gagana: Storm screech (discards target hand)
+        // The enemies move after the heroes' hands are thrown away, so a move that "blows cards out
+        // of the hand" takes them from the next one instead: so many cards fewer drawn next turn
+        // Gagana: Storm screech
         "storm_screech" => {
-            let heroes: Vec<u8> = ex.s.standing_heroes().map(|h| h.slot).collect();
-            for slot in heroes {
-                let h = &mut ex.s.heroes[slot as usize];
-                let mut cards = std::mem::take(&mut h.hand);
-                h.discard.append(&mut cards);
+            for slot in ex.standing() {
+                *ex.s.heroes[slot as usize].flags.entry("draw_less".into()).or_insert(0) += 2;
             }
         }
-        // Gorynych: Roar discard (discards 1 card)
+        // Gorynych: Roar
         "roar_discard" => {
             let Some(UnitRef::Hero(slot)) = ctx.target else { return };
-            let h = &mut ex.s.heroes[slot as usize];
-            if !h.hand.is_empty() {
-                let c = h.hand.remove(0);
-                h.discard.push(c);
-            }
+            *ex.s.heroes[slot as usize].flags.entry("draw_less".into()).or_insert(0) += 1;
         }
         // Solovey: Deafening whistle
         "solovey_whistle" => {
             for slot in ex.standing() {
-                let h = &mut ex.s.heroes[slot as usize];
-                if !h.hand.is_empty() {
-                    let c = h.hand.remove(0);
-                    h.discard.push(c);
-                }
+                *ex.s.heroes[slot as usize].flags.entry("draw_less".into()).or_insert(0) += 1;
             }
         }
         // Korochun: Bitter freeze
@@ -485,6 +465,223 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 }
             }
         }
+        // ---- the new bosses of the first two acts ----
+        // the Idolishche snatches the dearest card from the aimed hero's draw pile (from the
+        // discard pile when that is empty), swallows it for the fight and grows by its cost
+        "devour_hand" => {
+            let (src, Some(UnitRef::Hero(slot))) = (ctx.src, ctx.target) else { return };
+            let h = &ex.s.heroes[slot as usize];
+            let from_draw = !h.draw.is_empty();
+            let pile = if from_draw { &h.draw } else { &h.discard };
+            let cost = |i: usize| ex.c.cards.get(&pile[i].def).map_or(0, |d| d.view(pile[i].upgraded, h.form).cost);
+            let Some(i) = (0..pile.len()).max_by_key(|i| (cost(*i), std::cmp::Reverse(*i))) else { return };
+            let gain = cost(i).max(1);
+            let h = &mut ex.s.heroes[slot as usize];
+            let card = if from_draw { h.draw.remove(i) } else { h.discard.remove(i) };
+            ex.ev.push(Event::Exhausted { player: slot, card: card.def.clone() });
+            ex.s.heroes[slot as usize].exhaust.push(card);
+            ex.add_status(src, StatusKind::Strength, gain);
+        }
+        // Vikhor lifts a hero off the ground: whatever shield they held is blown away
+        "lift" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            ex.s.heroes[slot as usize].block = 0;
+        }
+        // ...and gathers more wind
+        "gust" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                let w = e.flags.entry("gale".into()).or_insert(0);
+                *w = (*w + 2).min(crate::combat::GALE_MOST);
+            }
+        }
+        // ---- the new wave ----
+        // the changeling: the top card of the aimed hero's draw pile is carried off (laid aside,
+        // as if burnt) and a foundling put in its place; the stolen cards come back on its death
+        "swap_top" => {
+            let (UnitRef::Enemy(uid), Some(UnitRef::Hero(slot))) = (ctx.src, ctx.target) else { return };
+            let Some(card) = ex.s.heroes[slot as usize].draw.pop() else { return };
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                e.flags.insert(format!("stolen_{}", card.uid), slot as i32);
+                *e.flags.entry("stolen".into()).or_insert(0) += 1;
+            }
+            ex.ev.push(Event::Exhausted { player: slot, card: card.def.clone() });
+            ex.s.heroes[slot as usize].exhaust.push(card);
+            ex.add_card(slot, "podkidysh", Pile::Draw);
+        }
+        "give_back" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            let Some(e) = ex.s.enemies.iter().find(|e| e.uid == uid) else { return };
+            let stolen: Vec<(u32, u8)> = e.flags.iter().filter_map(|(k, v)| Some((k.strip_prefix("stolen_")?.parse().ok()?, *v as u8))).collect();
+            for (card_uid, slot) in stolen {
+                let h = &mut ex.s.heroes[slot as usize];
+                if let Some(pos) = h.exhaust.iter().position(|c| c.uid == card_uid) {
+                    let card = h.exhaust.remove(pos);
+                    let pile = if h.hand.len() < HAND_LIMIT { Pile::Hand } else { Pile::Discard };
+                    ex.ev.push(Event::CardAdded { player: slot, card: card.def.clone(), pile });
+                    let h = &mut ex.s.heroes[slot as usize];
+                    if pile == Pile::Hand {
+                        h.hand.push(card);
+                    } else {
+                        h.discard.push(card);
+                    }
+                }
+            }
+        }
+        // Tugarin swallows up to two attacks from the aimed hero's discard pile: gone for the
+        // fight, and each makes him stronger
+        "devour_attacks" => {
+            let (src, Some(UnitRef::Hero(slot))) = (ctx.src, ctx.target) else { return };
+            for _ in 0..2 {
+                let h = &ex.s.heroes[slot as usize];
+                let attacks: Vec<usize> = (0..h.discard.len()).filter(|i| ex.c.cards.get(&h.discard[*i].def).is_some_and(|d| d.kind == CardType::Attack)).collect();
+                let Some(&i) = ex.s.rng.pick(&attacks) else { break };
+                let card = ex.s.heroes[slot as usize].discard.remove(i);
+                ex.ev.push(Event::Exhausted { player: slot, card: card.def.clone() });
+                ex.s.heroes[slot as usize].exhaust.push(card);
+                ex.add_status(src, StatusKind::Strength, 2);
+            }
+        }
+        // the black volhv carves another rune on himself, five at most
+        "carve_black" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                let runes = e.flags.entry("black_runes".into()).or_insert(0);
+                *runes = (*runes + 1).min(5);
+            }
+        }
+        // ...and calls on them all: three for each rune still whole, to every hero
+        "invoke_black" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            let runes = ex.s.enemy(uid).and_then(|e| e.flags.get("black_runes")).copied().unwrap_or(0);
+            if runes > 0 {
+                for slot in ex.standing() {
+                    ex.strike(Some(ctx.src), UnitRef::Hero(slot), 3 * runes, true);
+                }
+            }
+        }
+        // the zhivoglot swallows the aimed hero's shield whole
+        "eat_block" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            let h = &mut ex.s.heroes[slot as usize];
+            let eaten = h.block;
+            if eaten > 0 {
+                h.block = 0;
+                let hp = h.hp;
+                ex.ev.push(Event::Damage { src: Some(ctx.src), dst: UnitRef::Hero(slot), blocked: eaten, lost: 0, attack: false, hp, block: 0 });
+                ex.gain_block(ctx.src, eaten);
+            }
+        }
+        // ...and belches half of all it holds at the party
+        "belch" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            let half = ex.s.enemy(uid).map_or(0, |e| e.block / 2);
+            for slot in ex.standing() {
+                ex.strike(Some(ctx.src), UnitRef::Hero(slot), 4 + half, true);
+            }
+        }
+        // the obderikha flays every hero's shield off
+        "strip_block" => {
+            for slot in ex.standing() {
+                let h = &mut ex.s.heroes[slot as usize];
+                if h.block > 0 {
+                    let (blocked, hp) = (h.block, h.hp);
+                    h.block = 0;
+                    ex.ev.push(Event::Damage { src: Some(ctx.src), dst: UnitRef::Hero(slot), blocked, lost: 0, attack: false, hp, block: 0 });
+                }
+            }
+        }
+        // the spinner feeds on every thread of hers still in the heroes' decks
+        "feed_webs" => {
+            let webs = ex.s.heroes.iter().map(|h| h.hand.iter().chain(&h.draw).chain(&h.discard).filter(|c| c.def == "silk").count() as i32).sum::<i32>();
+            if webs > 0 {
+                ex.heal(ctx.src, 3 * webs);
+                ex.add_status(ctx.src, StatusKind::Strength, (webs + 1) / 2);
+            }
+        }
+        // the priest of Chernobog gives the weakest of his flock to his god: its life becomes
+        // his shield, and he grows stronger. With no one left to give, he shields himself
+        "sacrifice" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            let victim = ex.s.enemies.iter().filter(|e| e.alive && e.uid != uid).min_by_key(|e| e.hp).map(|e| (e.uid, e.hp));
+            match victim.and_then(|(v, hp)| Some((ex.enemy_idx(v)?, hp))) {
+                Some((idx, hp)) => {
+                    ex.s.enemies[idx].hp = 0;
+                    ex.kill(idx, None);
+                    ex.gain_block(ctx.src, hp);
+                    ex.add_status(ctx.src, StatusKind::Strength, 3);
+                }
+                None => ex.gain_block(ctx.src, 15),
+            }
+        }
+        // the alkonost's lullaby: all but one of the party fall asleep, until a friend's card
+        // wakes them; one alone only grows drowsy
+        "lullaby" => {
+            let mut standing = ex.standing();
+            if standing.len() <= 1 {
+                for slot in standing {
+                    *ex.s.heroes[slot as usize].flags.entry("draw_less".into()).or_insert(0) += 2;
+                }
+                return;
+            }
+            ex.s.rng.shuffle(&mut standing);
+            for slot in standing.into_iter().skip(1) {
+                ex.s.heroes[slot as usize].flags.insert("asleep".into(), 1);
+            }
+        }
+        // Chernobog's black sun: it climbs unless the party hurt him hard since his last move;
+        // risen full, it blinds everyone and he strikes with all its weight
+        "eclipse_rise" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            let Some(idx) = ex.enemy_idx(uid) else { return };
+            let e = &mut ex.s.enemies[idx];
+            let harm = e.flags.insert("harm_taken".into(), 0).unwrap_or(0);
+            let sun = e.flags.entry("eclipse".into()).or_insert(1);
+            *sun = if harm >= ECLIPSE_BREAK { (*sun - 1).max(1) } else { *sun + 1 };
+            if *sun >= ECLIPSE_FULL {
+                *sun = 1;
+                for h in ex.s.heroes.iter_mut().filter(|h| !h.downed) {
+                    h.flags.insert("no_intents".into(), 1);
+                }
+                ex.add_status(ctx.src, StatusKind::Strength, 4);
+            }
+        }
         _ => debug_assert!(false, "unknown hook `{name}`"),
+    }
+}
+
+/// Harm the party must do to Chernobog between his moves to push his black sun back a step.
+pub const ECLIPSE_BREAK: i32 = 30;
+/// The step at which the black sun is full.
+pub const ECLIPSE_FULL: i32 = 4;
+
+/// How many turns Morovitsa's Doom counts down before it strikes.
+pub const DOOM_TURNS: i32 = 4;
+/// How much health Doom takes when its count runs out.
+pub const DOOM_HP: i32 = 30;
+
+/// The base of a blow an enemy's hooked move deals (before strength, weakness and the like), for
+/// the move itself and for the number its intent shows. `None` for a hook that deals no blow.
+pub fn hook_damage(c: &Content, s: &Combat, src: UnitRef, name: &str, target: Option<u8>) -> Option<i32> {
+    match name {
+        "bayun_claws" => {
+            // what lies in the discard, and what in the hand will go there when the turn ends (so
+            // the intent tells the truth before the hand is thrown away)
+            let curses = target.and_then(|t| s.heroes.get(t as usize)).map_or(0, |h| {
+                let bad = |card: &&Card| c.cards.get(&card.def).is_some_and(|d| matches!(d.kind, CardType::Status | CardType::Curse));
+                let lands = |card: &&Card| c.cards.get(&card.def).is_some_and(|d| {
+                    let v = d.view(card.upgraded, h.form);
+                    !v.has(Keyword::Ethereal) && !v.has(Keyword::Retain)
+                });
+                (h.discard.iter().filter(bad).count() + h.hand.iter().filter(bad).filter(lands).count()) as i32
+            });
+            Some(10 + curses * 4)
+        }
+        "kinetic_burst" => {
+            let UnitRef::Enemy(uid) = src else { return None };
+            let charge = s.enemy(uid).and_then(|e| e.flags.get("kinetic_charge")).copied().unwrap_or(0);
+            Some(10 + charge * 3)
+        }
+        _ => None,
     }
 }
