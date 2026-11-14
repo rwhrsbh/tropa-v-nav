@@ -1108,9 +1108,9 @@ move-deafening_screech = Deafening Tempest Screech
 move-hurricane_volley = Hurricane Volley
 
 move-rime_curse = Rime Curse
-move-ice_scythe = Scythe of Frost
+move-rime_scythe = Scythe of Frost
 move-permafrost = Permafrost
-move-blizzard = Bitter Blizzard
+move-bitter_blizzard = Bitter Blizzard
 move-winter_solstice = Solstice into Darkness
 move-permafrost_cleave = Frost Cleave
 
@@ -1127,7 +1127,7 @@ move-hut_trample = Hut Trample
 move-bone_crusher = Bone Crusher
 
 move-purr = Lulling Purr
-move-purr-desc = Slips Heavy Eyelids into hand.
+move-purr-desc = Climbs his post and slips two Heavy Eyelids into every hero's hand.
 move-claws = Iron Claws
 move-claws-desc = Deals extra damage for each status card in hand.
 move-pounce = Perch Pounce
@@ -1207,3 +1207,5 @@ card-sk_belly_flop = Belly Flop
 card-sk_scatter_props = Scatter the Props
 card-sk_dud = The Dud
 card-sk_show_drill = Showbooth Drill
+move-flicker-desc = Flickers and does nothing: it waits for someone to follow.
+move-wind_up-desc = Winds up: next turn it strikes with all its might.

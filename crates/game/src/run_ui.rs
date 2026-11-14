@@ -238,12 +238,12 @@ pub(crate) fn token_node(size: f32) -> Node {
     Node { width: px(size), height: px(size), border: UiRect::all(px(3)), border_radius: BorderRadius::MAX, flex_shrink: 0.0, ..default() }
 }
 
-/// Makes a player's token of `token`: a round disc of the colour the player in that `seat` draws
-/// in on the map, with their hero's little figure (`assets/map/hero_<id>`) on it where one has
-/// been painted.
-pub(crate) fn hero_token(token: &mut EntityCommands, hero: &str, seat: u8, art: &Art, assets: &AssetServer) {
-    let color = theme::marker_color(seat);
-    token.insert((BackgroundColor(color.lighter(0.12)), BorderColor::all(color.mix(&INK, 0.45)), Pickable::IGNORE));
+/// Makes a player's token of `token`: a round disc of their hero's colour, framed in the colour
+/// they draw in on the map, with their hero's little figure (`assets/map/hero_<id>`) on it where
+/// one has been painted.
+pub(crate) fn hero_token(token: &mut EntityCommands, hero: &str, _seat: u8, art: &Art, assets: &AssetServer) {
+    let color = theme::hero_color(hero);
+    token.insert((BackgroundColor(color.lighter(0.15)), BorderColor::all(theme::map_color(hero)), Pickable::IGNORE));
     if let Some(face) = art.image(assets, &format!("map/hero_{hero}")) {
         token.insert(ImageNode::new(face));
     }

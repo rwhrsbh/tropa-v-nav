@@ -137,7 +137,7 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
 
     // no point striking what cannot die, or what a single blow cannot reach
     let others_out = s.living_enemies().any(|e| !e.flags.contains_key("hiding"));
-    let reachable = |e: &&Enemy| !e.flags.contains_key("immortal") && !e.flags.contains_key("flying") && !(others_out && e.flags.contains_key("hiding"));
+    let reachable = |e: &&Enemy| !e.flags.contains_key("immortal") && !e.flags.contains_key("flying") && !e.flags.contains_key("bayun_perch") && !(others_out && e.flags.contains_key("hiding"));
     let weakest = s
         .living_enemies()
         .filter(reachable)
@@ -165,8 +165,8 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
     if let Some((card, _)) = playable.iter().find(|(c, _)| c.def == "koschei_needle") {
         return CombatAction::Play { card: card.uid, target: None };
     }
-    // something on the wing: sweeping blows first
-    if s.living_enemies().any(|e| e.flags.contains_key("flying")) {
+    // something on the wing or high on a perch: sweeping blows first
+    if s.living_enemies().any(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch")) {
         let sweep = playable.iter().find(|(_, v)| v.target == CardTarget::None && v.effects.iter().any(|e| matches!(e, Effect::Damage(_, Tgt::AllFoes) | Effect::Hits(_, _, Tgt::AllFoes))));
         if let Some((card, _)) = sweep {
             return CombatAction::Play { card: card.uid, target: None };

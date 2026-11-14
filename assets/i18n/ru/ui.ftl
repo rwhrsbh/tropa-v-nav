@@ -644,5 +644,4 @@ hollow-seam-lost = Не сойдётся: { $n }% здоровья уйдёт н
 menu-library = Книга карт
 library-title = Книга карт
 library-count = Открыто { $open } из { $all } · уровень героя { $level }
-library-locked = Откроется{ "
-" }на { $n }-м уровне
+library-locked = Откроется{ "\u000A" }на { $n }-м уровне

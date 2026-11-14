@@ -25,7 +25,7 @@
         id: "kladovik", hp: (58, 62), flags: ["greedy"],
         moves: [
             (id: "count_coins", intent: Debuff, targeted: true, effects: [StealGoldPct(30), Block(N(8), Me)]),
-            (id: "coin_hail", intent: Attack, targeted: true, effects: [Hits(Hoard(3, 10), 3, Target), ScatterHoard]),
+            (id: "coin_hail", intent: AttackAll, effects: [Hits(Hoard(3, 10), 3, AllFoes), ScatterHoard]),
             (id: "hoard", intent: Defend, effects: [Block(N(16), Me)]),
         ],
         pattern: [0, 1, 2],

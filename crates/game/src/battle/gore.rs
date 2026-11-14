@@ -11,7 +11,7 @@ use std::f32::consts::FRAC_PI_2;
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<Blows>()
         .init_resource::<Severed>()
-        .add_systems(Update, (play_frames, trickle_down.run_if(resource_exists::<Session>), (fly_severed, hide_lost_limbs).chain().run_if(resource_exists::<Session>)).run_if(in_state(AppState::Battle)))
+        .add_systems(Update, (play_frames, trickle_down.run_if(resource_exists::<Session>), (fly_severed, hide_lost_limbs).chain().distributive_run_if(resource_exists::<Session>)).run_if(in_state(AppState::Battle)))
         .add_systems(Startup, |mut commands: Commands, assets: Res<AssetServer>| commands.insert_resource(BloodArt::load(&assets))).add_systems(OnEnter(AppState::Battle), |mut b: ResMut<Blows>| b.0.clear()).add_systems(Update, (fall, fly_gibs, bleed).chain().after(dying).run_if(in_state(AppState::Battle)));
 }
 

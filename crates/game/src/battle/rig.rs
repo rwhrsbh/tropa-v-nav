@@ -131,23 +131,20 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/kostomakha", &[(Part::Head, Vec2::new(0.473, 0.143), 1.0), (Part::Shield, Vec2::new(0.888, 0.338), 0.8), (Part::Arm, Vec2::new(0.460, 0.381), 1.0)]),
     ("enemies/mara", &[(Part::Head, Vec2::new(0.54, 0.22), 1.0), (Part::Shield, Vec2::new(0.58, 0.45), 0.8), (Part::Arm, Vec2::new(0.32, 0.42), -0.5)]),
     ("enemies/poludnitsa", &[(Part::Head, Vec2::new(0.464, 0.219), 1.0), (Part::Shield, Vec2::new(0.387, 0.406), 0.8), (Part::Arm, Vec2::new(0.545, 0.406), 1.0)]),
-    ("enemies/kot_bayun", &[(Part::Head, Vec2::new(0.5, 0.396), 1.0)]),
-    ("enemies/mokhovik", &[(Part::Head, Vec2::new(0.5, 0.394), 1.0)]),
-    ("enemies/nochnitsa", &[(Part::Head, Vec2::new(0.5, 0.3), 1.0)]),
-    ("enemies/baba_yaga", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
-    ("enemies/polunochnitsa", &[(Part::Head, Vec2::new(0.499, 0.281), 1.0)]),
-    ("enemies/zlyden", &[(Part::Head, Vec2::new(0.5, 0.347), 1.0)]),
-    ("enemies/morovitsa", &[(Part::Head, Vec2::new(0.499, 0.281), 1.0)]),
-    ("enemies/ogneya", &[(Part::Head, Vec2::new(0.5, 0.3), 1.0)]),
-    ("enemies/sea_guard", &[(Part::Head, Vec2::new(0.499, 0.301), 1.0)]),
-    ("enemies/gagana", &[(Part::Head, Vec2::new(0.5, 0.375), 1.0)]),
-    ("enemies/gorynych", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/gorynych_fire", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/gorynych_poison", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/gorynych_thunder", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/solovey", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
-    ("enemies/korochun", &[(Part::Head, Vec2::new(0.499, 0.3), 1.0)]),
-    ("enemies/vodyanoy_tsar", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
+    ("enemies/kot_bayun", &[(Part::Head, Vec2::new(0.263, 0.352), 1.0), (Part::Arm, Vec2::new(0.252, 0.369), 1.0)]),
+    ("enemies/mokhovik", &[(Part::Head, Vec2::new(0.419, 0.301), 1.0), (Part::Shield, Vec2::new(0.131, 0.514), 0.8), (Part::Arm, Vec2::new(0.747, 0.408), 1.0)]),
+    ("enemies/nochnitsa", &[(Part::Head, Vec2::new(0.617, 0.238), 1.0), (Part::Arm, Vec2::new(0.390, 0.281), 1.0)]),
+    ("enemies/baba_yaga", &[(Part::Head, Vec2::new(0.543, 0.275), 1.0), (Part::Arm, Vec2::new(0.186, 0.080), 1.0)]),
+    ("enemies/polunochnitsa", &[(Part::Head, Vec2::new(0.495, 0.223), 1.0), (Part::Arm, Vec2::new(0.157, 0.278), 1.0)]),
+    ("enemies/zlyden", &[(Part::Head, Vec2::new(0.431, 0.329), 1.0)]),
+    ("enemies/morovitsa", &[(Part::Head, Vec2::new(0.540, 0.223), 1.0), (Part::Shield, Vec2::new(0.630, 0.393), 0.8), (Part::Arm, Vec2::new(0.314, 0.033), 1.0)]),
+    ("enemies/ogneya", &[(Part::Head, Vec2::new(0.626, 0.315), 1.0), (Part::Arm, Vec2::new(0.407, 0.427), 1.0)]),
+    ("enemies/sea_guard", &[(Part::Head, Vec2::new(0.562, 0.199), 1.0), (Part::Arm, Vec2::new(0.212, 0.040), 1.0)]),
+    ("enemies/gagana", &[(Part::Head, Vec2::new(0.292, 0.259), 1.0), (Part::Shield, Vec2::new(0.789, 0.573), 0.8), (Part::Arm, Vec2::new(0.571, 0.182), 1.0)]),
+    ("enemies/gorynych", &[(Part::Head, Vec2::new(0.361, 0.511), 1.0)]),
+    ("enemies/solovey", &[(Part::Head, Vec2::new(0.379, 0.303), 1.0), (Part::Shield, Vec2::new(0.378, 0.258), 0.8), (Part::Arm, Vec2::new(0.279, 0.269), 1.0)]),
+    ("enemies/korochun", &[(Part::Head, Vec2::new(0.496, 0.219), 1.0), (Part::Shield, Vec2::new(0.661, 0.436), 0.8), (Part::Arm, Vec2::new(0.172, 0.202), 1.0)]),
+    ("enemies/vodyanoy_tsar", &[(Part::Head, Vec2::new(0.473, 0.405), 1.0), (Part::Shield, Vec2::new(0.657, 0.472), 0.8), (Part::Arm, Vec2::new(0.148, 0.037), 1.0)]),
 ];
 
 /// The parts `stem` is cut into, with their joints.
@@ -235,6 +232,16 @@ pub(super) fn skin(materials: &mut Assets<RigMaterial>, picture: Option<Handle<I
         Node { position_type: PositionType::Absolute, left: px(-(w - draw.x) / 2.0), top: px(-(h - draw.y)), width: px(w), height: px(h), ..default() },
         Pickable::IGNORE,
     )
+}
+
+/// Widens or narrows a whole-picture skin to a picture of another shape, keeping its height,
+/// its feet and its middle: a pose painted wider than the figure at rest (a blow swung out to the
+/// side) is drawn at the same scale, not squeezed into the resting picture's frame.
+pub(super) fn fit(node: &mut Node, draw: Vec2, aspect: f32) {
+    let wide = draw.y * aspect;
+    let w = wide / (1.0 - 2.0 * PAD_X);
+    node.width = px(w);
+    node.left = px(-(w - draw.x) / 2.0);
 }
 
 /// Writes a pose into a skin's material.

@@ -19,7 +19,7 @@ const SHUFFLE_FLIGHT: usize = 12;
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (cue_flights, fly, close_on_escape).chain().after(cue_effects).run_if(in_state(AppState::Battle)).run_if(resource_exists::<Session>),
+        (cue_flights, fly, show_turned, close_on_escape).chain().after(cue_effects).run_if(in_state(AppState::Battle)).distributive_run_if(resource_exists::<Session>),
     );
 }
 
@@ -46,6 +46,57 @@ struct Flight {
     size: Vec2,
     scale: (f32, f32),
     show_first: bool,
+}
+
+/// A card the Pike turned up off the deck: it rises from `from` to the middle of the table, is
+/// held there to be read, then goes off to `to` (the discard pile), or fades where it hangs when
+/// `to` is `None` (another player's card, seen played and gone).
+#[derive(Component)]
+struct Turned {
+    from: Vec2,
+    to: Option<Vec2>,
+    t: f32,
+    size: Vec2,
+}
+
+/// Where a turned-up card is held to be read, and how large, and how long each part takes.
+const TURNED_AT: Vec2 = Vec2::new(960.0, 430.0);
+const TURNED_SCALE: f32 = 0.9;
+const TURN_RISE: f32 = 0.35;
+const TURN_HOLD: f32 = 0.9;
+const TURN_GO: f32 = 0.4;
+
+fn show_turned(mut commands: Commands, time: Res<Time>, mut q: Query<(Entity, &mut Turned, &mut Node, &mut UiTransform, &mut Visibility)>) {
+    let dt = time.delta_secs();
+    for (e, mut c, mut node, mut tf, mut vis) in &mut q {
+        if *vis != Visibility::Inherited {
+            *vis = Visibility::Inherited;
+        }
+        c.t += dt;
+        let (at, scale, alpha_done) = if c.t < TURN_RISE {
+            let p = 1.0 - (1.0 - c.t / TURN_RISE).powi(2);
+            (c.from.lerp(TURNED_AT, p), 0.2 + (TURNED_SCALE - 0.2) * p, false)
+        } else if c.t < TURN_RISE + TURN_HOLD {
+            (TURNED_AT, TURNED_SCALE, false)
+        } else if c.t < TURN_RISE + TURN_HOLD + TURN_GO {
+            let p = ((c.t - TURN_RISE - TURN_HOLD) / TURN_GO).powi(2);
+            match c.to {
+                Some(to) => (TURNED_AT.lerp(to, p) - Vec2::Y * 120.0 * (p * std::f32::consts::PI).sin(), TURNED_SCALE + (0.12 - TURNED_SCALE) * p, false),
+                // played by another: it rises and fades where it was shown
+                None => (TURNED_AT - Vec2::Y * 60.0 * p, TURNED_SCALE * (1.0 - 0.2 * p), p > 0.95),
+            }
+        } else {
+            commands.entity(e).despawn();
+            continue;
+        };
+        if alpha_done {
+            commands.entity(e).despawn();
+            continue;
+        }
+        node.left = px(at.x - c.size.x / 2.0);
+        node.top = px(at.y - c.size.y / 2.0);
+        tf.scale = Vec2::splat(scale);
+    }
 }
 
 /// Sends a card leaving the hand off along an arc from `from` (its centre) to `to`, shrinking
@@ -290,6 +341,30 @@ fn cue_flights(
                     ));
                 }
                 sfx.play(&mut commands, "card_shuffle", &mixer, 1.0);
+            }
+            // the Pike turns up the deck's top card: its owner sees it rise from the deck, held
+            // up, then go to the discard pile; the others see it only when it is played, rising
+            // from that hero
+            Event::PikeTurned { player, card, upgraded, played } if *player == me || *played => {
+                let size = Vec2::new(CARD_W, CARD_H);
+                let (from, to) = if *player == me {
+                    (DRAW_AT, Some(DISCARD_AT))
+                } else {
+                    let at = unit_place(&session.shown, UnitRef::Hero(*player)).map_or(TURNED_AT, |(foot, sz)| foot - Vec2::Y * sz.y * 0.6);
+                    (at, None)
+                };
+                let form = session.shown.hero(*player).map_or(session.my_hero().form, |h| h.form);
+                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: *upgraded, free: true };
+                if let Some(e) = spawn_card(&mut commands, *layer, &shown, form, Some(from - size / 2.0), false, (), &db.0, &l10n, &fonts, &art, &assets) {
+                    commands.entity(e).insert((
+                        Turned { from, to, t: 0.0, size },
+                        UiTransform { scale: Vec2::splat(0.2), ..default() },
+                        Visibility::Hidden,
+                        GlobalZIndex(440),
+                        Pickable::IGNORE,
+                    ));
+                }
+                sfx.play(&mut commands, "card_gain", &mixer, 1.0);
             }
             Event::CardAdded { player, card, pile } if *player == me => {
                 // a card come from outside the deck shows itself first, then goes where it belongs

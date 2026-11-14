@@ -43,7 +43,7 @@ pub fn plugin(app: &mut App) {
         .add_systems(Update, (beacon, searching.run_if(resource_exists::<Search>)))
         .add_systems(PostUpdate, transmit.run_if(resource_exists::<Lan>).before(crate::net::send));
     #[cfg(feature = "dev")]
-    app.add_systems(OnEnter(AppState::Menu), open).add_systems(Update, (auto_lobby, open_on_fight, drop_line).chain().run_if(resource_exists::<Lan>));
+    app.add_systems(OnEnter(AppState::Menu), open).add_systems(Update, (auto_lobby, open_on_fight, drop_line).chain().distributive_run_if(resource_exists::<Lan>));
 }
 
 /// A knock at a host's door, waited for off to the side so the game does not freeze on it.

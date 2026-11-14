@@ -1107,10 +1107,10 @@ move-whistling_arrow = Калёная свистящая стрела
 move-deafening_screech = Оглушающий рёв бури
 move-hurricane_volley = Ураганный залп
 
-move-rime_curse = Леденящий проклят
-move-ice_scythe = Коса мерзлоты
+move-rime_curse = Леденящее проклятье
+move-rime_scythe = Коса мерзлоты
 move-permafrost = Вечная мерзлота
-move-blizzard = Лютая пурга
+move-bitter_blizzard = Лютая пурга
 move-winter_solstice = Солнцеворот во тьму
 move-permafrost_cleave = Рассечение хлада
 
@@ -1127,7 +1127,7 @@ move-hut_trample = Топот избушки
 move-bone_crusher = Костеломный удар
 
 move-purr = Усыпляющее мурлыканье
-move-purr-desc = Подбрасывает «Тяжёлые веки» в руку.
+move-purr-desc = Забирается на столб и подбрасывает каждому герою по две «Тяжёлые веки» в руку.
 move-claws = Железные когти
 move-claws-desc = Наносит дополнительный урон за каждую карту статуса в руке.
 move-pounce = Прыжок со столба
@@ -1207,3 +1207,5 @@ card-sk_belly_flop = Плюх в лужу
 card-sk_scatter_props = Раскидать реквизит
 card-sk_dud = Пустышка
 card-sk_show_drill = Балаганная выучка
+move-flicker-desc = Мерцает и ничего не делает: ждёт, кто пойдёт за ним.
+move-wind_up-desc = Замахивается: в следующий ход ударит со всей силы.

@@ -322,9 +322,9 @@ trait-flicker-help = Скользит меж теней, избегая приц
 trait-gorynych_head = Голова Горыныча
 trait-gorynych_head-help = Пока жива хотя бы одна голова, павшие головы возрождаются через 2 хода.
 trait-yaga_mortar = Ступа Яги
-trait-yaga_mortar-help = Железная ступа отражает часть урона и даёт защиту.
+trait-yaga_mortar-help = Железная ступа срезает треть каждого удара, пока за раунд по Яге не придётся 28 урона: тогда ступа сбита до следующего раунда.
 trait-overheat = Перегрев
-trait-overheat-help = Накапливает пылающий жар от пламенных атак.
+trait-overheat-help = Каждая её атака раскаляет её сильнее: +1 Сила.
 battle-maimed = Отрублено!
 battle-beheaded = без головы
 trait-lost-one = Отрублена рука
@@ -456,3 +456,83 @@ kw-PikeWill = Щука
 kw-PikeWill-help = Щука сама разыгрывает верхнюю карту колоды: даром и в кого придётся. Что сыграть нельзя, уходит в сброс как есть.
 kw-DrowseCost = Плата Дрёмой
 kw-DrowseCost-help = Число в голубом кружке: карта стоит не сил, а столько Дрёмы.
+# the marks a hero's own cards leave on them, shown under the hero
+trait-free_rune = Даровая реза
+trait-free_rune-help = Следующая реза бесплатна.
+trait-foresight = Провидение
+trait-foresight-help = Вы видите намерения врагов на несколько раундов вперёд.
+trait-storm = Гроза
+trait-storm-help = Громовые резы бьют всех врагов.
+trait-no_hunger = Сытость
+trait-no_hunger-help = В форме Зверя Голод не действует.
+trait-mor = Мор
+trait-mor-help = Гниль на врагах срабатывает дважды и не уменьшается.
+trait-brew_all = Большое варево
+trait-brew_all-help = Следующее варево действует на всех союзников или всех врагов.
+# what an enemy's move does, told of the enemy (the intent's hover text, where no move has its own)
+foe-damage = Наносит { $n } урона.
+foe-damage-AllFoes = Наносит { $n } урона всем героям.
+foe-damage-RandomFoe = Наносит { $n } урона случайному герою.
+foe-hits = Бьёт { $k } { $k ->
+    [one] раз
+    [few] раза
+   *[many] раз
+} по { $n } урона.
+foe-hits-AllFoes = Бьёт всех героев { $k } { $k ->
+    [one] раз
+    [few] раза
+   *[many] раз
+} по { $n } урона.
+foe-hoard = Швыряет украденное золото { $k } { $k ->
+    [one] раз
+    [few] раза
+   *[many] раз
+}: { $n } урона и ещё { $pct }% от украденного за удар.
+foe-hoard-AllFoes = Швыряет украденное золото во всех героев { $k } { $k ->
+    [one] раз
+    [few] раза
+   *[many] раз
+}: { $n } урона и ещё { $pct }% от украденного за удар.
+foe-block = Получает { $n } щита.
+foe-block-AllFriends = Все враги получают { $n } щита.
+foe-block-OtherFriends = Остальные враги получают { $n } щита.
+foe-apply = Накладывает { $s } { $n }.
+foe-apply-Me = Получает { $s } { $n }.
+foe-apply-AllFoes = Накладывает { $s } { $n } на всех героев.
+foe-apply-RandomFoe = Накладывает { $s } { $n } на случайного героя.
+foe-apply-AllFriends = Все враги получают { $s } { $n }.
+foe-apply-OtherFriends = Остальные враги получают { $s } { $n }.
+foe-heal = Лечится на { $n } HP.
+foe-heal-AllFriends = Все враги лечатся на { $n } HP.
+foe-heal-OtherFriends = Остальные враги лечатся на { $n } HP.
+foe-losehp-Me = Сам теряет { $n } HP.
+foe-losehp = Отнимает { $n } HP мимо щита.
+foe-addcard-Hand = Подкладывает в руку { $n } × «{ $c }».
+foe-addcard-Draw = Замешивает в колоду { $n } × «{ $c }».
+foe-addcard-Discard = Подкладывает в сброс { $n } × «{ $c }».
+foe-addcard-Hand-AllFoes = Подкладывает каждому герою в руку { $n } × «{ $c }».
+foe-addcard-Draw-AllFoes = Замешивает каждому герою в колоду { $n } × «{ $c }».
+foe-addcard-Discard-AllFoes = Подкладывает каждому герою в сброс { $n } × «{ $c }».
+foe-summon = Призывает: { $c } × { $n }.
+foe-stealgold = Крадёт { $n } золота. Убейте вора — золото вернётся.
+foe-stealgoldpct = Крадёт { $n }% золота. Убейте вора — золото вернётся.
+foe-scatterhoard = Украденное золото разлетается и пропадает.
+foe-flee = Сбегает с поля боя вместе с награбленным.
+foe-taunt = Заставляет бить себя.
+foe-hook-winter = Нагоняет стужу: пока цела Ледяная корона, герои мёрзнут сильнее и сильнее.
+foe-hook-koschei_turn = Пока игла цела, Кощей лечится на десятую часть жизни, а каждый второй ход крепнет.
+foe-hook-yaga_cauldron = Всем героям Гниль 2; сама Яга лечится на 15 HP.
+foe-hook-yaga_steal_potion = Крадёт у героя зелье; если зелий нет — Гниль 3.
+foe-hook-poverty_curse = В следующий ход у героя на 1 энергию меньше.
+foe-hook-roar_discard = Герой сбрасывает карту из руки.
+foe-hook-solovey_whistle = Каждый герой сбрасывает карту из руки.
+foe-hook-korochun_chill = Сковывает всех героев морозом.
+foe-hook-tsar_whirlpool = В следующий ход у каждого героя на 1 энергию меньше.
+foe-hook-storm_screech = Все герои сбрасывают всю руку.
+foe-hook-doom_clock = Вешает на героя Рок: через 4 раунда он потеряет 45 HP.
+foe-hook-nightmare_afflict = Замешивает герою «Жуть» в колоду и отнимает 6 HP.
+foe-hook-bayun_leap = Спрыгивает со столба: до следующего мурлыканья его достаёт любой удар.
+foe-hook-bayun_climb = Забирается обратно на столб, куда не достаёт прицельный удар.
+foe-hook-bayun_eyelids = Каждому герою в руку по две «Тяжёлые веки».
+foe-hook-bayun_claws = 14 урона и ещё 6 за каждую карту порчи и проклятия в руке героя.
+foe-hook-kinetic_burst = 10 урона и ещё 3 за каждый накопленный заряд мха.

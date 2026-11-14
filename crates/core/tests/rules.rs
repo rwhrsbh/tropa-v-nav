@@ -1676,3 +1676,30 @@ fn a_move_stunned_out_of_is_tried_again_next_round() {
     end_round(&c, &mut s);
     assert_ne!(s.enemies[0].intent.clone().unwrap().mv, first, "and once it has, it goes on");
 }
+
+#[test]
+fn a_move_scared_out_of_is_tried_again_next_round() {
+    let c = content();
+    let party = [hero("t_plain", &["t_block"])];
+    let (mut s, _) = start(&c, &party, &ids(&["kladovik"]), 3);
+    // the purse is filled, the throw comes next; fear makes it drop the throw this round
+    end_round(&c, &mut s);
+    let throw = s.enemies[0].intent.clone().unwrap().mv;
+    s.enemies[0].statuses.insert(StatusKind::Fear, 1000);
+    end_round(&c, &mut s);
+    assert_eq!(s.enemies[0].intent.clone().unwrap().mv, throw, "it throws its coins next round instead");
+}
+
+#[test]
+fn the_hail_of_coins_strikes_every_hero_alike() {
+    let c = content();
+    let party = [hero("t_plain", &["t_block"]), hero("t_plain", &["t_block"])];
+    let (mut s, _) = start(&c, &party, &ids(&["kladovik"]), 3);
+    let hail = c.enemies["kladovik"].moves.iter().position(|m| m.id == "coin_hail").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: hail, target: None });
+    let before: Vec<i32> = s.heroes.iter().map(|h| h.hp + h.block).collect();
+    end_round(&c, &mut s);
+    let lost: Vec<i32> = s.heroes.iter().zip(&before).map(|(h, b)| b - h.hp - h.block).collect();
+    assert!(lost[0] > 0, "the first hero is struck");
+    assert_eq!(lost[0], lost[1], "and the second just as hard");
+}

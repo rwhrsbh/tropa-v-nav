@@ -544,12 +544,13 @@ impl<'a> Exec<'a> {
                 } else {
                     d
                 };
-                // Baba Yaga mortar: reduces damage by 35% until 28+ damage taken in one turn
-                let d = if e.flags.contains_key("yaga_mortar") {
-                    let taken = e.flags.entry("mortar_damage".into()).or_insert(0);
+                // Baba Yaga's mortar takes a third off every blow, until 28 or more have been
+                // struck at her in one round: then it is knocked aside till the next round
+                let d = if e.flags.contains_key("yaga_mortar") && !e.flags.contains_key("turn_mortar_broken") {
+                    let taken = e.flags.entry("turn_mortar_damage".into()).or_insert(0);
                     *taken += d;
                     if *taken >= 28 {
-                        e.flags.remove("yaga_mortar");
+                        e.flags.insert("turn_mortar_broken".into(), 1);
                     }
                     d * 65 / 100
                 } else {
@@ -1011,12 +1012,11 @@ impl<'a> Exec<'a> {
             CardTarget::Downed => self.s.heroes.iter().find(|a| a.downed).map(|a| UnitRef::Hero(a.slot)),
         };
         let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed) && target.is_none();
+        let plays = view.is_some() && !barred && !nobody;
+        self.ev.push(Event::PikeTurned { player: p, card: card.def.clone(), upgraded: card.upgraded, played: plays });
         match view {
-            Some(view) if !barred && !nobody => self.resolve(p, card, view, target, 0, false),
-            _ => {
-                self.ev.push(Event::CardAdded { player: p, card: card.def.clone(), pile: Pile::Discard });
-                self.hero(p).discard.push(card);
-            }
+            Some(view) if plays => self.resolve(p, card, view, target, 0, false),
+            _ => self.hero(p).discard.push(card),
         }
     }
 
@@ -1042,7 +1042,10 @@ impl<'a> Exec<'a> {
 
         let h = self.hero(p);
         if view.kind == CardType::Power {
-            h.powers.extend(view.passives.iter().cloned());
+            h.powers.extend(view.passives.iter().cloned().map(|mut p| {
+                p.card = card.def.clone();
+                p
+            }));
         } else if view.has(Keyword::Exhaust) || card.free {
             self.exhaust_card(p, card.clone());
         } else {
@@ -1423,8 +1426,8 @@ impl<'a> Exec<'a> {
                     ctx.fatal = false;
                     for _ in 0..times {
                         for u in self.targets(ctx, *t) {
-                            // the duck is on the wing: only blows that sweep everyone, and runes, reach it
-                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying"))) {
+                            // the duck is on the wing / cat on his perch: only blows that sweep everyone, and runes, reach it
+                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch"))) {
                                 continue;
                             }
                             if self.strike(Some(ctx.src), u, n, ctx.attack) {
@@ -2044,7 +2047,9 @@ impl<'a> Exec<'a> {
                 self.lose_hp(UnitRef::Hero(slot), 45);
             }
         }
-        // Gorynych Head Regrowth
+        // Gorynych Head Regrowth: a fallen head grows back while another still lives, and is
+        // seen to rise again
+        let mut regrown: Vec<(u32, Id)> = Vec::new();
         let any_head_alive = self.s.enemies.iter().any(|e| e.alive && e.flags.contains_key("gorynych_head"));
         if any_head_alive {
             for e in &mut self.s.enemies {
@@ -2053,11 +2058,18 @@ impl<'a> Exec<'a> {
                     *turns -= 1;
                     if *turns <= 0 {
                         e.alive = true;
-                        e.hp = 35;
+                        e.hp = 35.min(e.max_hp);
+                        e.block = 0;
+                        e.intent = None;
+                        e.statuses.clear();
                         e.flags.remove("gorynych_regrowth");
+                        regrown.push((e.uid, e.def.clone()));
                     }
                 }
             }
+        }
+        for (enemy, def) in regrown {
+            self.ev.push(Event::Summoned { enemy, def });
         }
         self.check_end();
         if self.s.phase != Phase::Heroes {
@@ -2144,6 +2156,10 @@ impl<'a> Exec<'a> {
                     bled: false,
                 };
                 self.run(&mv.effects, &mut ctx);
+                // Ogneya runs hotter with every lash of fire she throws
+                if attacks && self.s.enemy(uid).is_some_and(|e| e.alive && e.flags.contains_key("overheat")) {
+                    self.add_status(me, S::Strength, 1);
+                }
             }
             self.rot_tick(me);
             if self.s.standing_heroes().next().is_none() {

@@ -3,9 +3,9 @@
     (
         id: "kot_bayun", hp: (85, 95), flags: ["bayun_perch"],
         moves: [
-            (id: "purr", intent: Debuff, effects: [Hook("bayun_eyelids")]),
+            (id: "purr", intent: Debuff, effects: [Hook("bayun_climb"), Hook("bayun_eyelids")]),
             (id: "claws", intent: Attack, targeted: true, effects: [Hook("bayun_claws")]),
-            (id: "pounce", intent: Attack, targeted: true, effects: [Damage(N(12), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "pounce", intent: Attack, targeted: true, effects: [Hook("bayun_leap"), Damage(N(12), Target), Apply(Vulnerable, N(1), Target)]),
         ],
         pattern: [0, 1, 2],
     ),
@@ -137,10 +137,10 @@
     (
         id: "korochun", hp: (270, 290),
         moves: [
-            (id: "rime_curse", intent: Special, effects: [Hook("korochun_chill"), Apply(Hex, N(2), Target)]),
-            (id: "ice_scythe", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "rime_curse", intent: Special, targeted: true, effects: [Hook("korochun_chill"), Apply(Hex, N(2), Target)]),
+            (id: "rime_scythe", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
             (id: "permafrost", intent: Defend, effects: [Block(N(20), Me), Apply(Fortitude, N(2), Me)]),
-            (id: "blizzard", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "bitter_blizzard", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Weak, N(1), AllFoes)]),
             (id: "winter_solstice", intent: AttackAll, effects: [Damage(N(14), AllFoes), Apply(Hex, N(2), AllFoes)]),
             (id: "permafrost_cleave", intent: Attack, targeted: true, effects: [Damage(N(22), Target)]),
         ],

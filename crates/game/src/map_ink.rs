@@ -50,14 +50,21 @@ pub struct MapInk {
     /// Where the eraser was last frame, while it is rubbing: it rubs the whole way between.
     rubbed_from: Option<Vec2>,
     pub tool: Tool,
-    /// This player's seat: their marks are drawn in its colour (see `theme::marker_color`).
+    /// This player's seat: their marks are drawn in their hero's colour.
     seat: Option<u8>,
+    /// Each seat's hero, for the colour that seat's marks are drawn in.
+    heroes: Vec<String>,
 }
 
 impl MapInk {
-    /// The colour this player's own marks are drawn in: their seat's, as everyone else sees them.
+    /// The colour this player's own marks are drawn in: their hero's, as everyone else sees them.
     fn own_color(&self) -> Color {
-        self.seat.map_or(PENCIL, theme::marker_color)
+        self.seat.map_or(PENCIL, |seat| self.seat_color(seat))
+    }
+
+    /// The colour of the marks of the player in `seat`: their hero's, as their token is.
+    fn seat_color(&self, seat: u8) -> Color {
+        self.heroes.get(seat as usize).map_or(PENCIL, |hero| theme::map_color(hero))
     }
 }
 
@@ -189,7 +196,7 @@ fn redraw_ink(mut commands: Commands, mut ink: ResMut<MapInk>, sheets: Query<(En
             for (seat, strokes) in &ink.others {
                 for stroke in strokes {
                     for (a, b) in stroke.first().map(|p| (*p, *p)).into_iter().chain(stroke.windows(2).map(|w| (w[0], w[1]))) {
-                        let e = piece(&mut commands, sheet, a, b, z, theme::marker_color(*seat));
+                        let e = piece(&mut commands, sheet, a, b, z, ink.seat_color(*seat));
                         commands.entity(e).insert(RemoteInk);
                     }
                 }
@@ -234,6 +241,11 @@ fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMu
     }
     if ink.seat != me {
         ink.seat = me;
+    }
+    let heroes: Vec<String> = run.players.iter().map(|p| p.hero.clone()).collect();
+    if ink.heroes != heroes {
+        ink.heroes = heroes;
+        ink.remote_dirty = true;
     }
     // Flush earlier edits before answering a snapshot request so reliable ordering cannot
     // append those same points again after the snapshot.

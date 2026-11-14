@@ -642,5 +642,4 @@ hollow-seam-lost = No match: { $n }% of max HP is gone for good, and no arm
 menu-library = Book of Cards
 library-title = Book of Cards
 library-count = { $open } of { $all } opened · hero level { $level }
-library-locked = Opens at{ "
-" }level { $n }
+library-locked = Opens at{ "\u000A" }level { $n }

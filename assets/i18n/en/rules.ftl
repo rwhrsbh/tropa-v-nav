@@ -309,9 +309,9 @@ trait-flicker-help = Slips between shadows, evading targeted strikes.
 trait-gorynych_head = Dragon Head
 trait-gorynych_head-help = As long as one head lives, severed heads regrow after 2 turns.
 trait-yaga_mortar = Yaga's Mortar
-trait-yaga_mortar-help = The enchanted iron mortar deflects blows and grants defense.
+trait-yaga_mortar-help = The iron mortar takes a third off every blow, until 28 damage lands on Yaga in one round: then it is knocked aside till the next.
 trait-overheat = Overheat
-trait-overheat-help = Accumulates searing heat from fiery attacks.
+trait-overheat-help = Every attack she makes runs her hotter: +1 Strength.
 battle-maimed = Severed!
 battle-beheaded = headless
 trait-lost-one = A limb lost
@@ -436,3 +436,79 @@ kw-PikeWill = The Pike
 kw-PikeWill-help = The pike plays the top card of your draw pile by itself: for nothing, and at whoever it falls on. What cannot be played goes to the discard pile as it is.
 kw-DrowseCost = Paid in Drowse
 kw-DrowseCost-help = The number on blue: the card costs no Energy, but that much Drowse.
+# the marks a hero's own cards leave on them, shown under the hero
+trait-free_rune = Free Rune
+trait-free_rune-help = Your next rune is free.
+trait-foresight = Foresight
+trait-foresight-help = You see enemy intents several rounds ahead.
+trait-storm = Storm
+trait-storm-help = Thunder runes strike all enemies.
+trait-no_hunger = Sated
+trait-no_hunger-help = Hunger has no effect in Beast form.
+trait-mor = Pestilence
+trait-mor-help = Rot on enemies triggers twice and does not fade.
+trait-brew_all = Great Brew
+trait-brew_all-help = Your next brew affects all allies or all enemies.
+# what an enemy's move does, told of the enemy (the intent's hover text, where no move has its own)
+foe-damage = Deals { $n } damage.
+foe-damage-AllFoes = Deals { $n } damage to every hero.
+foe-damage-RandomFoe = Deals { $n } damage to a random hero.
+foe-hits = Strikes { $k } { $k ->
+    [one] time
+   *[other] times
+} for { $n } damage.
+foe-hits-AllFoes = Strikes every hero { $k } { $k ->
+    [one] time
+   *[other] times
+} for { $n } damage.
+foe-hoard = Hurls the stolen gold { $k } { $k ->
+    [one] time
+   *[other] times
+}: { $n } damage plus { $pct }% of what it stole per blow.
+foe-hoard-AllFoes = Hurls the stolen gold at every hero { $k } { $k ->
+    [one] time
+   *[other] times
+}: { $n } damage plus { $pct }% of what it stole per blow.
+foe-block = Gains { $n } block.
+foe-block-AllFriends = All enemies gain { $n } block.
+foe-block-OtherFriends = The other enemies gain { $n } block.
+foe-apply = Inflicts { $s } { $n }.
+foe-apply-Me = Gains { $s } { $n }.
+foe-apply-AllFoes = Inflicts { $s } { $n } on every hero.
+foe-apply-RandomFoe = Inflicts { $s } { $n } on a random hero.
+foe-apply-AllFriends = All enemies gain { $s } { $n }.
+foe-apply-OtherFriends = The other enemies gain { $s } { $n }.
+foe-heal = Heals { $n } HP.
+foe-heal-AllFriends = All enemies heal { $n } HP.
+foe-heal-OtherFriends = The other enemies heal { $n } HP.
+foe-losehp-Me = Loses { $n } HP itself.
+foe-losehp = Takes { $n } HP, past any block.
+foe-addcard-Hand = Puts { $n } × «{ $c }» into the hand.
+foe-addcard-Draw = Shuffles { $n } × «{ $c }» into the draw pile.
+foe-addcard-Discard = Puts { $n } × «{ $c }» into the discard pile.
+foe-addcard-Hand-AllFoes = Puts { $n } × «{ $c }» into every hero's hand.
+foe-addcard-Draw-AllFoes = Shuffles { $n } × «{ $c }» into every hero's draw pile.
+foe-addcard-Discard-AllFoes = Puts { $n } × «{ $c }» into every hero's discard pile.
+foe-summon = Summons: { $c } × { $n }.
+foe-stealgold = Steals { $n } gold. Kill the thief to get it back.
+foe-stealgoldpct = Steals { $n }% of your gold. Kill the thief to get it back.
+foe-scatterhoard = The stolen gold scatters and is lost.
+foe-flee = Flees the fight with its loot.
+foe-taunt = Draws every blow to itself.
+foe-hook-winter = Brings the frost: while the Ice Crown stands, the heroes freeze ever worse.
+foe-hook-koschei_turn = While the needle is whole, Koschei heals a tenth of his life and grows stronger every second turn.
+foe-hook-yaga_cauldron = Every hero gets Rot 2; Yaga heals 15 HP.
+foe-hook-yaga_steal_potion = Steals a hero's potion; with none, Rot 3 instead.
+foe-hook-poverty_curse = The hero has 1 less energy next turn.
+foe-hook-roar_discard = The hero discards a card from hand.
+foe-hook-solovey_whistle = Every hero discards a card from hand.
+foe-hook-korochun_chill = Freezes every hero.
+foe-hook-tsar_whirlpool = Every hero has 1 less energy next turn.
+foe-hook-storm_screech = Every hero discards their whole hand.
+foe-hook-doom_clock = Lays Doom on the hero: in 4 rounds they lose 45 HP.
+foe-hook-nightmare_afflict = Shuffles a Dread into the hero's draw pile and takes 6 HP.
+foe-hook-bayun_leap = Leaps down off his post: any blow reaches him until he purrs again.
+foe-hook-bayun_climb = Climbs back up his post, out of reach of an aimed blow.
+foe-hook-bayun_eyelids = Puts two Heavy Eyelids into every hero's hand.
+foe-hook-bayun_claws = 14 damage, plus 6 for every status and curse card in the hero's hand.
+foe-hook-kinetic_burst = 10 damage, plus 3 for every moss charge stored.

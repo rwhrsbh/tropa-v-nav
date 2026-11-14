@@ -143,3 +143,64 @@ fn test_act3_to_act4_heal() {
     let expected_delta = ((max_hp - 20) * 80 + 99) / 100;
     assert_eq!(run.players[0].hp, 20 + expected_delta);
 }
+
+#[test]
+fn test_bayun_perch_blocks_targeted_melee_allows_sweeping() {
+    let (c, mut s) = solo(&["t_hit", "t_hit_all"], &["kot_bayun"]);
+    let t = foe(&s, 0);
+    let start_hp = s.enemies[0].hp;
+    assert!(s.enemies[0].flags.contains_key("bayun_perch"));
+
+    // Targeted strike misses because cat is on high perch!
+    play(&c, &mut s, 0, "t_hit", Some(t));
+    assert_eq!(s.enemies[0].hp, start_hp, "Targeted strike cannot reach cat on his perch");
+
+    // AllFoes sweeping strike hits!
+    play(&c, &mut s, 0, "t_hit_all", None);
+    assert_eq!(s.enemies[0].hp, start_hp - 4, "Sweeping strike hits cat on his perch");
+}
+
+#[test]
+fn ogneya_runs_hotter_with_every_attack() {
+    let (c, mut s) = solo(&["t_block"], &["ogneya"]);
+    let lash = c.enemies["ogneya"].moves.iter().position(|m| m.id == "fire_whip").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: lash, target: Some(0) });
+    end_round(&c, &mut s);
+    assert_eq!(s.enemies[0].statuses.get(&StatusKind::Strength).copied().unwrap_or(0), 1);
+}
+
+#[test]
+fn a_fallen_gorynych_head_grows_back_and_is_seen_to() {
+    let (c, mut s) = solo(&["t_block"], &["gorynych_fire", "gorynych_poison"]);
+    let fire = s.enemies[0].uid;
+    s.enemies[0].hp = 0;
+    s.enemies[0].alive = false;
+    // the hero stands through it all
+    s.heroes[0].max_hp = 999;
+    s.heroes[0].hp = 999;
+    let mut seen = false;
+    for _ in 0..3 {
+        let round = s.round;
+        let ev = apply(&c, &mut s, 0, &CombatAction::Ready(true)).unwrap();
+        seen |= ev.iter().any(|e| matches!(e, Event::Summoned { enemy, .. } if *enemy == fire));
+        assert!(s.round > round);
+    }
+    assert!(s.enemies[0].alive, "the head grew back");
+    assert!(seen, "and the others were told");
+}
+
+#[test]
+fn bayun_leaps_down_to_pounce_and_climbs_back_to_purr() {
+    let (c, mut s) = solo(&["t_block"], &["kot_bayun"]);
+    s.heroes[0].max_hp = 999;
+    s.heroes[0].hp = 999;
+    let moves = &c.enemies["kot_bayun"].moves;
+    let pounce = moves.iter().position(|m| m.id == "pounce").unwrap();
+    let purr = moves.iter().position(|m| m.id == "purr").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: pounce, target: Some(0) });
+    end_round(&c, &mut s);
+    assert!(!s.enemies[0].flags.contains_key("bayun_perch"), "down off his post, in reach");
+    s.enemies[0].intent = Some(Intent { mv: purr, target: None });
+    end_round(&c, &mut s);
+    assert!(s.enemies[0].flags.contains_key("bayun_perch"), "back up again");
+}

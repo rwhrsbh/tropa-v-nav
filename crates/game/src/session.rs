@@ -65,6 +65,8 @@ impl Session {
 fn delay(e: &Event) -> f32 {
     match e {
         Event::CardPlayed { .. } => 0.28,
+        // the turned-up card is held up to be read before it does anything
+        Event::PikeTurned { .. } => 0.7,
         Event::Damage { attack: true, .. } => 0.32,
         Event::Damage { .. } => 0.22,
         Event::EnemyMove { .. } => 0.35,
@@ -160,6 +162,12 @@ fn show(shown: &mut Combat, truth: &Combat, e: &Event) {
             }
         }
         Event::Summoned { enemy, .. } => {
+            // one that fell and grows back (a head of the Gorynych) stands up where it lay
+            if let (Some(en), Some(real)) = (shown.enemies.iter_mut().find(|x| x.uid == *enemy && !x.alive), truth.enemy(*enemy)) {
+                en.alive = true;
+                en.hp = real.hp;
+                en.intent = None;
+            }
             if shown.enemy(*enemy).is_none() {
                 if let Some(en) = truth.enemy(*enemy) {
                     let mut en = en.clone();

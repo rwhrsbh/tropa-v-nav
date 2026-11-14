@@ -362,6 +362,18 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 h.flags.remove("winter");
             }
         }
+        // Kot Bayun leaps down off his post to pounce, and is in reach of a plain blow until he
+        // climbs back up to purr
+        "bayun_leap" | "bayun_climb" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                if name == "bayun_leap" {
+                    e.flags.remove("bayun_perch");
+                } else {
+                    e.flags.insert("bayun_perch".into(), 1);
+                }
+            }
+        }
         // Kot Bayun: Heavy Eyelids into hand of standing heroes
         "bayun_eyelids" => {
             let heroes: Vec<u8> = ex.s.standing_heroes().map(|h| h.slot).collect();

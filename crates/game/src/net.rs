@@ -24,7 +24,9 @@ pub fn plugin(app: &mut App) {
     app.init_resource::<NetStatus>()
         .add_systems(Startup, hook_callbacks.run_if(resource_exists::<Steam>))
         .add_systems(PreUpdate, (steam_events, receive).chain().run_if(resource_exists::<Steam>))
-        .add_systems(Update, (crate::session::submit, local_peers, autopilot, notes, follow_stage).chain().run_if(resource_exists::<Net>))
+        // each system asks for the party on its own: one of them may leave it mid-chain (a lost
+        // connection given up), and those after it must not run without it
+        .add_systems(Update, (crate::session::submit, local_peers, autopilot, notes, follow_stage).chain().distributive_run_if(resource_exists::<Net>))
         .add_systems(PostUpdate, send.run_if(resource_exists::<Net>));
 }
 

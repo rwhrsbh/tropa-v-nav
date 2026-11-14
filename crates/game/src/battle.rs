@@ -69,7 +69,7 @@ pub fn plugin(app: &mut App) {
             )
                 .chain()
                 .run_if(in_state(AppState::Battle))
-                .run_if(resource_exists::<Session>),
+                .distributive_run_if(resource_exists::<Session>),
         )
         .add_observer(on_drag_start)
         .add_observer(on_card_click)
@@ -519,6 +519,13 @@ fn enter(
         // in the heart of the forest. The first such foe in the fight decides
         for e in &session.truth.enemies {
             want.push(format!("bg/at_{}", e.def));
+        }
+        // a foe that is one part of a greater beast (a head of the Gorynych) is met in the
+        // beast's own lair, when it has none of its own
+        for e in &session.truth.enemies {
+            if let Some((kin, _)) = e.def.rsplit_once('_') {
+                want.push(format!("bg/at_{kin}"));
+            }
         }
         match run.and_then(|r| r.fighting) {
             Some(nav_core::NodeKind::Boss) if real_act >= 4 => want.push("bg/koschei".to_string()),
@@ -1085,7 +1092,7 @@ fn swap_form_art(
     assets: Res<AssetServer>,
     mut preloaded: Local<Preloaded>,
     mut sprites: Query<(&mut UnitSprite, &Children)>,
-    skins: Query<(&MaterialNode<rig::RigMaterial>, &rig::RigSkin, &mut Visibility)>,
+    skins: Query<(&MaterialNode<rig::RigMaterial>, &rig::RigSkin, &mut Visibility, &mut Node)>,
     mut rigs: ResMut<Assets<rig::RigMaterial>>,
 ) {
     let mut skins = skins;
@@ -1154,10 +1161,18 @@ fn swap_form_art(
             // a form cut into parts shows its body and parts; one that is not, its whole
             // picture, the parts' skins hidden
             let parts = rig::parts_of(&art, &assets, &want);
+            // a whole picture is drawn at its own shape: a pose may be wider than the rest
+            let shape = art.aspect(&want);
             let mut iter = skins.iter_many_mut(children);
-            while let Some(Ok((skin, part, mut vis))) = iter.fetch_next() {
+            while let Some(Ok((skin, part, mut vis, mut node))) = iter.fetch_next() {
                 match (&parts, part.part) {
-                    (Some((body, _)), None) => rig::repaint(&mut rigs, skin, body.clone()),
+                    (Some((body, _)), None) => {
+                        rig::repaint(&mut rigs, skin, body.clone());
+                        // back from a wider pose, the body is its own shape again
+                        if let Some(a) = shape {
+                            rig::fit(&mut node, s.draw, a);
+                        }
+                    }
                     (Some((_, parts)), Some(p)) => match parts.iter().find(|(cut, _)| cut.0 == p) {
                         Some((_, picture)) => {
                             rig::repaint(&mut rigs, skin, picture.clone());
@@ -1165,7 +1180,12 @@ fn swap_form_art(
                         }
                         None => *vis = Visibility::Hidden,
                     },
-                    (None, None) => rig::repaint(&mut rigs, skin, handle.clone()),
+                    (None, None) => {
+                        rig::repaint(&mut rigs, skin, handle.clone());
+                        if let Some(a) = shape {
+                            rig::fit(&mut node, s.draw, a);
+                        }
+                    }
                     (None, Some(_)) => *vis = Visibility::Hidden,
                 }
             }
@@ -2432,12 +2452,14 @@ fn update_tooltip(
                     let desc = format!("{key}-desc");
                     // the kind first: it names the picture over the enemy's head
                     let kind = l10n.t(&format!("intent-{:?}", mv.intent));
-                    lines.push((format!("{kind} · {}", l10n.t(&key)), if l10n.has(&desc) { l10n.t(&desc) } else { String::new() }));
+                    // a hand-written line where there is one, else what the move does, read off it
+                    let text = if l10n.has(&desc) { l10n.t(&desc) } else { l10n.move_text(&mv.effects) };
+                    lines.push((format!("{kind} · {}", l10n.t(&key)), text));
                 }
             }
         }
         // everything the row under the unit shows, by name, with what it does
-        for c in status_row::chips(&l10n, &session, w.unit) {
+        for c in status_row::chips(&l10n, &db.0, &session, w.unit) {
             let name = match c.n {
                 Some(n) => format!("{} {}", c.name, c.shown.unwrap_or_else(|| n.to_string())),
                 None => c.name,
