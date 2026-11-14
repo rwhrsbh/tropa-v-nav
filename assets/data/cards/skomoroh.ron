@@ -31,9 +31,10 @@
         up: (cost: 0),
     ),
     (
+        // кувырок перебирает руку: взял две, одну скинул — сброс есть у Скомороха с первого боя
         id: "sk_tumble", hero: "skomoroh", kind: Skill, cost: 1,
-        effects: [Block(N(4), Me), Draw(N(1))],
-        up: (effects: [Block(N(6), Me), Draw(N(1))]),
+        effects: [Block(N(4), Me), Draw(N(2)), Discard(N(1))],
+        up: (effects: [Block(N(6), Me), Draw(N(2)), Discard(N(1))]),
     ),
     (
         // в одиночку намерения перемешивать не с кем — остаётся щит

@@ -62,7 +62,7 @@ pub fn plugin(app: &mut App) {
             Update,
             (
                 playback,
-                (sync_units, gore::lay_out_the_headless, sync_hand, sync_potions, cue_effects).chain(),
+                (sync_units, gore::lay_out_the_headless, sync_hand, live_costs, sync_potions, flask_menu, count_relics, cue_effects).chain(),
                 no_eyes,
                 (pick_hover, layout_hand, layout_units, swap_form_art, animate_sprites, update_labels, update_intent_icons, update_bars, update_tooltip),
                 (floaters, fly_ghosts, dying, style_buttons, impact::shake_screen, turn_timer, send_pings, show_pings, light_bonuses),
@@ -101,6 +101,12 @@ struct RelicChip {
     id: String,
     at: Vec2,
 }
+/// The number in the corner of a relic that keeps a count: the hero's flag it is read from.
+#[derive(Component)]
+struct RelicCount(String);
+/// The little menu under a flask on the belt, opened with the right button: to pour it out.
+#[derive(Component)]
+struct FlaskMenu;
 /// A potion on the belt: click to drink, drag onto a unit to throw.
 #[derive(Component)]
 struct PotionChip {
@@ -289,9 +295,14 @@ const BELT_LEFT: f32 = 520.0;
 const RELIC_LEFT: f32 = 700.0;
 const RELIC_RIGHT: f32 = 1720.0;
 
+/// Where the relics start for one whose belt has this many places: a longer belt pushes them on.
+fn relic_left(slots: usize) -> f32 {
+    RELIC_LEFT + slots.saturating_sub(POTION_SLOTS) as f32 * 60.0
+}
+
 /// The size of a relic's chip: full size while one row holds them all, then small enough for two.
-fn relic_side(count: usize) -> f32 {
-    let room = RELIC_RIGHT - RELIC_LEFT;
+fn relic_side(count: usize, left: f32) -> f32 {
+    let room = RELIC_RIGHT - left;
     if count as f32 * 46.0 <= room {
         42.0
     } else {
@@ -301,12 +312,12 @@ fn relic_side(count: usize) -> f32 {
 }
 
 /// The place of the i-th of `count` relics in the strip.
-fn relic_at(i: usize, count: usize) -> Vec2 {
-    let side = relic_side(count);
-    let across = (((RELIC_RIGHT - RELIC_LEFT) / (side + 4.0)) as usize).max(1);
+fn relic_at(i: usize, count: usize, left: f32) -> Vec2 {
+    let side = relic_side(count, left);
+    let across = (((RELIC_RIGHT - left) / (side + 4.0)) as usize).max(1);
     // one row sits in the middle of the bar, more start at its top
     let top = if count <= across { (crate::between::BAR_H - side) / 2.0 } else { 4.0 };
-    Vec2::new(RELIC_LEFT + (i % across) as f32 * (side + 4.0), top + (i / across) as f32 * (side + 4.0))
+    Vec2::new(left + (i % across) as f32 * (side + 4.0), top + (i / across) as f32 * (side + 4.0))
 }
 
 pub(crate) fn hero_foot(slot: u8) -> Vec2 {
@@ -318,6 +329,34 @@ pub(crate) fn hero_foot(slot: u8) -> Vec2 {
         _ => Vec2::new(120.0, 630.0),
     }
 }
+
+/// Where a hero of a party of `n` stands in this fight: the backdrop's own place for them (or the
+/// usual rank), with the party drawn out leftwards from the one nearest the foes so that broad
+/// figures do not stand in one another, as far as the screen's left edge allows.
+pub(crate) fn hero_spot(slot: u8, n: usize) -> Vec2 {
+    spread_out(&|s: u8| stands::hero(s).unwrap_or_else(|| hero_foot(s)), slot, n)
+}
+
+/// The same off the battlefield, where only the usual ranks stand.
+pub(crate) fn hero_rank(slot: u8, n: usize) -> Vec2 {
+    spread_out(&hero_foot, slot, n)
+}
+
+fn spread_out(base: &dyn Fn(u8) -> Vec2, slot: u8, n: usize) -> Vec2 {
+    let front = base(0);
+    let back = (0..n.max(1) as u8).map(|s| base(s).x).fold(front.x, f32::min);
+    let at = base(slot);
+    if front.x - back < 1.0 {
+        return at;
+    }
+    let spread = ((front.x - HERO_LEFT_EDGE) / (front.x - back)).clamp(1.0, HERO_SPREAD);
+    Vec2::new(front.x - (front.x - at.x) * spread, at.y)
+}
+
+/// How much further apart than their ranks a party stands, at most, and how near the screen's
+/// left edge the last of them may come.
+const HERO_SPREAD: f32 = 1.18;
+const HERO_LEFT_EDGE: f32 = 150.0;
 
 fn enemy_foot(i: usize, n: usize) -> Vec2 {
     let span = 780.0;
@@ -331,7 +370,7 @@ fn enemy_foot(i: usize, n: usize) -> Vec2 {
 /// Feet position and sprite size of a unit on the stage.
 fn unit_place(shown: &Combat, unit: UnitRef) -> Option<(Vec2, Vec2)> {
     match unit {
-        UnitRef::Hero(i) => shown.hero(i).map(|_| (stands::hero(i).unwrap_or_else(|| hero_foot(i)), HERO_SIZE)),
+        UnitRef::Hero(i) => shown.hero(i).map(|_| (hero_spot(i, shown.heroes.len()), HERO_SIZE)),
         UnitRef::Enemy(uid) => {
             let i = shown.enemies.iter().position(|e| e.uid == uid)?;
             Some((stands::foe(uid, || shown.enemies.iter().map(|e| (e.uid, e.alive)).collect()).unwrap_or_else(|| enemy_foot(i, shown.enemies.len())), ENEMY_SIZE))
@@ -339,8 +378,16 @@ fn unit_place(shown: &Combat, unit: UnitRef) -> Option<(Vec2, Vec2)> {
     }
 }
 
+/// How much larger than at the start a hero stands: a hero whose health has grown past what it
+/// began with is drawn 3% taller for every full 10 more, and one worn below it as much smaller.
+pub(crate) fn hp_stature(db: &Content, hero: &str, max_hp: i32) -> f32 {
+    let base = db.heroes.get(hero).map_or(max_hp, |h| h.max_hp);
+    let steps = (max_hp - base) / 10;
+    (1.0 + 0.03 * steps as f32).clamp(0.7, 1.5)
+}
+
 /// How large a unit's picture is drawn, for one whose picture is broader than its slot.
-pub(super) fn hero_draw(stem: &str, size: Vec2) -> Vec2 {
+pub(crate) fn hero_draw(stem: &str, size: Vec2) -> Vec2 {
     // the stove is broad: drawn as large as an elite, it would stand on its neighbours
     if stem == "heroes/emelya" {
         Vec2::splat(size.y * 1.08)
@@ -445,6 +492,7 @@ fn enter(
     session: Option<Res<Session>>,
     net: Option<Res<crate::net::Net>>,
     profile: Res<crate::profile::Profile>,
+    db: Res<Db>,
     stage: Single<Entity, With<Stage>>,
     fonts: Res<Fonts>,
     l10n: Res<L10n>,
@@ -574,9 +622,10 @@ fn enter(
             // what the player carries, along the bar: a picture where one is painted, else the
             // first letters of its name
             let count = mine.relics.len();
-            let side = relic_side(count);
+            let left = relic_left(potion_slots(&mine.relics));
+            let side = relic_side(count, left);
             for (i, id) in mine.relics.iter().enumerate() {
-                let at = relic_at(i, count);
+                let at = relic_at(i, count, left);
                 let picture = art.image(&assets, &format!("relics/{id}"));
                 let mut chip = p.spawn((
                     RelicChip { id: id.clone(), at },
@@ -604,6 +653,15 @@ fn enter(
                         let short: String = l10n.t(&format!("relic-{id}")).chars().filter(|c| c.is_alphabetic()).take(2).collect();
                         chip.with_child(theme::text(short, &fonts.title, 17.0, theme::BONE));
                     }
+                }
+                // one that keeps a count shows it in its corner: how far along it is
+                if let Some((key, _)) = db.0.relics.get(id).and_then(|d| d.counter()) {
+                    chip.with_child((
+                        Node { position_type: PositionType::Absolute, right: px(0), bottom: px(0), padding: UiRect::axes(px((side * 0.09).round()), px(0)), border_radius: BorderRadius::top_left(px(6)), ..default() },
+                        BackgroundColor(theme::SOOT.with_alpha(0.92)),
+                        Pickable::IGNORE,
+                        children![(RelicCount(key), theme::text("0", &fonts.num, (side * 0.4).round(), theme::CANDLE))],
+                    ));
                 }
             }
 
@@ -739,6 +797,7 @@ fn exit(mut commands: Commands, roots: Query<Entity, With<BattleRoot>>) {
 fn sync_units(
     mut commands: Commands,
     session: Res<Session>,
+    db: Res<Db>,
     layer: Single<Entity, With<UnitLayer>>,
     widgets: Query<(Entity, &UnitWidget, Has<Dying>)>,
     corpses: Query<(Entity, &gore::Corpse)>,
@@ -800,6 +859,11 @@ fn sync_units(
             None if stem == "heroes/emelya" => Vec2::splat(size.y * 1.08),
             None if wide => Vec2::splat(size.y * 1.25),
             None => size,
+        };
+        // a hero grown sturdier stands taller, one worn thin shrinks
+        let draw = match unit {
+            UnitRef::Hero(i) => shown.hero(i).map_or(draw, |h| draw * hp_stature(&db.0, &h.def, h.max_hp)),
+            UnitRef::Enemy(_) => draw,
         };
         commands
             .spawn((
@@ -1695,11 +1759,15 @@ pub fn card_face(c: &mut ChildSpawnerCommands, card: &Card, def: &CardDef, form:
         "X".into()
     } else if card.free {
         "0".into()
+    } else if view.drowse > 0 {
+        view.drowse.to_string()
     } else {
         view.cost.to_string()
     };
+    // a card paid for in sleep wears its cost on the blue of Nav
+    let sleepy = view.drowse > 0 && !card.free && !view.has(Keyword::Unplayable);
     // a card made free this fight wears its new cost in green, glowing, as the Spire shows it
-    let (cost_ink, cost_glow) = if card.free && !view.x_cost { (FREE_INK, Some(FREE_INK)) } else { (theme::CANDLE, None) };
+    let (cost_ink, cost_glow) = if card.free && !view.x_cost { (FREE_INK, Some(FREE_INK)) } else if sleepy { (theme::FROST, None) } else { (theme::CANDLE, None) };
     {
         {
             // a blinded hero sees only the backs: which card is which must be remembered
@@ -1761,12 +1829,61 @@ pub fn card_face(c: &mut ChildSpawnerCommands, card: &Card, def: &CardDef, form:
                         justify_content: JustifyContent::Center,
                         ..default()
                     },
-                    BackgroundColor(theme::SOOT),
+                    BackgroundColor(if sleepy { theme::NAV_BLUE } else { theme::SOOT }),
                     BorderColor::all(cost_ink),
                     cost_glow.map(|g| BoxShadow::new(g.with_alpha(0.85), px(0), px(0), px(4), px(14))).unwrap_or_default(),
                     Pickable::IGNORE,
-                    children![(theme::text(cost, &fonts.num, 28.0, cost_ink), TextShadow { offset: Vec2::ZERO, color: cost_glow.unwrap_or(Color::NONE) })],
+                    CostBadge,
+                    children![(theme::text(cost, &fonts.num, 28.0, cost_ink), TextShadow { offset: Vec2::ZERO, color: cost_glow.unwrap_or(Color::NONE) }, CostInk)],
                 ));
+            }
+        }
+    }
+}
+
+/// The round badge in a card's corner with what it costs, and the number in it.
+#[derive(Component)]
+pub struct CostBadge;
+#[derive(Component)]
+pub struct CostInk;
+
+/// A card in the hand tells what it costs now, not only what is printed on it: one made cheaper
+/// by something played before it (the Volhv's free rune) shows its lower price in green.
+fn live_costs(
+    session: Res<Session>,
+    db: Res<Db>,
+    cards: Query<(&CardWidget, &Children)>,
+    mut badges: Query<(&Children, &mut BorderColor), With<CostBadge>>,
+    mut inks: Query<(&mut Text, &mut TextColor), With<CostInk>>,
+) {
+    let h = session.my_hero();
+    if h.flags.contains_key("blind") {
+        return;
+    }
+    for (w, kids) in &cards {
+        let Some(card) = h.hand.iter().find(|c| c.uid == w.uid) else { continue };
+        let Some(def) = db.0.cards.get(&card.def) else { continue };
+        let view = def.view(card.upgraded, h.form);
+        // an echo keeps the look it was printed with; X and sleep are not priced in energy
+        if card.free || view.x_cost || view.drowse > 0 || view.has(Keyword::Unplayable) {
+            continue;
+        }
+        let now = nav_core::combat::energy_cost(h, card, &view);
+        let (want, ink) = if now < view.cost { (now.to_string(), FREE_INK) } else { (view.cost.to_string(), theme::CANDLE) };
+        for kid in kids.iter() {
+            let Ok((inner, mut edge)) = badges.get_mut(kid) else { continue };
+            if *edge != BorderColor::all(ink) {
+                *edge = BorderColor::all(ink);
+            }
+            for t in inner.iter() {
+                if let Ok((mut text, mut color)) = inks.get_mut(t) {
+                    if text.0 != want {
+                        text.0 = want.clone();
+                    }
+                    if color.0 != ink {
+                        color.0 = ink;
+                    }
+                }
             }
         }
     }
@@ -1876,8 +1993,9 @@ fn sync_potions(
     assets: Res<AssetServer>,
 ) {
     let potions = &session.my_hero().potions;
+    let slots = potion_slots(&session.my_hero().relics);
     let same = chips.iter().count() == potions.len() && chips.iter().all(|(_, c)| potions.get(c.slot as usize) == Some(&c.id));
-    if same && !empty.is_empty() == (potions.len() < POTION_SLOTS) {
+    if same && empty.iter().count() == slots.saturating_sub(potions.len()) {
         return;
     }
     for (e, _) in &chips {
@@ -1896,7 +2014,7 @@ fn sync_potions(
             Btn(theme::SOOT),
             Pickable { should_block_lower: false, is_hoverable: true },
             // a flask: its picture when painted (potions/<id>), else a disc; what it does on hover
-            crate::run_ui::CardHints::new(vec![(l10n.t(&format!("potion-{id}")), l10n.t(&format!("potion-{id}-desc")))]),
+            crate::run_ui::CardHints::new(vec![(l10n.t(&format!("potion-{id}")), l10n.t(&format!("potion-{id}-desc"))), (l10n.t("potion-drop-hint"), String::new())]),
             Node { width: px(50), height: px(50), padding: UiRect::all(px(3)), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
             BackgroundColor(theme::SOOT),
             BorderColor::all(theme::ROTLIGHT),
@@ -1918,16 +2036,31 @@ fn sync_potions(
             };
         });
         // untargeted and ally draughts are drunk on a click; the rest must be thrown at something
+        // a flask dragged out and brought back to its place is put back, not drunk: the release
+        // over it would otherwise count as a click
         if !needs_target {
-            e.observe(move |_: On<Activate>, mut outbox: ResMut<Outbox>| outbox.0.push(CombatAction::UsePotion { slot, target: None }));
+            e.observe(move |ev: On<Activate>, mut outbox: ResMut<Outbox>, swung: Query<&Swung>, time: Res<Time>| {
+                if swung.get(ev.event_target()).is_ok_and(|s| s.0 > time.elapsed_secs()) {
+                    return;
+                }
+                outbox.0.push(CombatAction::UsePotion { slot, target: None });
+            });
         }
         // dragged, every potion is aimed with the arrow from its place on the belt, as cards are
-        e.observe(move |ev: On<PointerDrag>, mut commands: Commands| {
-            commands.entity(ev.event_target()).insert(aim::Thrown);
+        e.observe(move |ev: On<PointerDrag>, mut commands: Commands, scale: Res<UiScale>, time: Res<Time>| {
+            let mut it = commands.entity(ev.event_target());
+            it.insert(aim::Thrown);
+            if ev.distance.length() / scale.0 > SWING {
+                it.insert(Swung(time.elapsed_secs() + 60.0));
+            }
         });
         // one that lands on nobody in particular is drunk once the arrow has been drawn far enough
-        e.observe(move |ev: On<PointerDragEnd>, mut commands: Commands, scale: Res<UiScale>, session: Option<Res<Session>>, db: Res<Db>, mut outbox: ResMut<Outbox>, chips: Query<&PotionChip>| {
+        e.observe(move |ev: On<PointerDragEnd>, mut commands: Commands, scale: Res<UiScale>, session: Option<Res<Session>>, db: Res<Db>, mut outbox: ResMut<Outbox>, chips: Query<&PotionChip>, swung: Query<&Swung>, time: Res<Time>| {
             commands.entity(ev.event_target()).remove::<aim::Thrown>();
+            if swung.get(ev.event_target()).is_ok() {
+                // the click that may follow this release is still the drag's own
+                commands.entity(ev.event_target()).insert(Swung(time.elapsed_secs() + 0.3));
+            }
             let (Some(session), Ok(chip)) = (session, chips.get(ev.event_target())) else { return };
             let alone = session.truth.standing_heroes().count() == 1;
             let aimed = db.0.potions.get(&chip.id).is_some_and(|d| aim::needs_unit(d.target, alone));
@@ -1936,7 +2069,7 @@ fn sync_potions(
             }
         });
     }
-    for _ in potions.len()..POTION_SLOTS {
+    for _ in potions.len()..slots {
         commands.spawn((
             EmptyFlask,
             Node { width: px(50), height: px(50), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
@@ -1945,6 +2078,74 @@ fn sync_potions(
             Pickable::IGNORE,
             ChildOf(*belt),
         ));
+    }
+}
+
+/// How far a flask must be dragged, in stage pixels, before its release is no longer a click.
+const SWING: f32 = 12.0;
+
+/// A flask that was dragged, and until when its release is not taken for a click.
+#[derive(Component)]
+struct Swung(f32);
+
+/// The right button on a flask of the belt opens a little menu under it: to pour the potion out,
+/// to no effect, and make room for another. Any press elsewhere shuts it.
+fn flask_menu(
+    mut commands: Commands,
+    mouse: Res<ButtonInput<MouseButton>>,
+    session: Res<Session>,
+    chips: Query<(Entity, &PotionChip, &Hovered)>,
+    menus: Query<(Entity, &Hovered), With<FlaskMenu>>,
+    fonts: Res<Fonts>,
+    l10n: Res<L10n>,
+) {
+    if !mouse.just_pressed(MouseButton::Right) && !mouse.just_pressed(MouseButton::Left) {
+        return;
+    }
+    // a press on the menu itself is its button's to answer
+    if menus.iter().any(|(_, over)| over.get()) {
+        return;
+    }
+    let open = !menus.is_empty();
+    for (m, _) in &menus {
+        commands.entity(m).despawn();
+    }
+    if open || !mouse.just_pressed(MouseButton::Right) || session.my_hero().downed || session.truth.phase != Phase::Heroes {
+        return;
+    }
+    let Some((flask, chip, _)) = chips.iter().find(|(_, _, over)| over.get()) else { return };
+    let slot = chip.slot;
+    let color = theme::FRESH_BLOOD.lighter(0.1);
+    commands.spawn((
+        FlaskMenu,
+        Button,
+        Hovered::default(),
+        Btn(theme::PEAT),
+        // under the flask and to its left: what the flask tells of itself opens to its right
+        Node { position_type: PositionType::Absolute, left: px(-150), top: px(58), width: px(190), padding: UiRect::axes(px(14), px(8)), border: UiRect::all(px(2)), justify_content: JustifyContent::Center, ..default() },
+        BackgroundColor(theme::PEAT),
+        BorderColor::all(color),
+        // over what the flask tells of itself, which opens beside it
+        GlobalZIndex(450),
+        children![theme::text(l10n.t("potion-drop"), &fonts.title, 22.0, color)],
+        observe(move |_: On<Activate>, mut commands: Commands, mut outbox: ResMut<Outbox>, menus: Query<Entity, With<FlaskMenu>>| {
+            outbox.0.push(CombatAction::DropPotion { slot });
+            for m in &menus {
+                commands.entity(m).despawn();
+            }
+        }),
+        ChildOf(flask),
+    ));
+}
+
+/// The counts in the corners of the relics that keep one follow the fight.
+fn count_relics(session: Res<Session>, mut counts: Query<(&RelicCount, &mut Text)>) {
+    let flags = &session.my_hero().flags;
+    for (count, mut text) in &mut counts {
+        let now = flags.get(&count.0).copied().unwrap_or(0).to_string();
+        if text.0 != now {
+            text.0 = now;
+        }
     }
 }
 
@@ -2061,13 +2262,13 @@ fn layout_hand(
         let card = &h.hand[i];
         if let Some(def) = db.0.cards.get(&card.def) {
             let view = def.view(card.upgraded, h.form);
-            let cost = if view.x_cost { 0 } else { view.cost };
+            let cost = if view.x_cost { 0 } else { nav_core::combat::energy_cost(h, card, &view) };
             // held in the mire or asleep, coiled (no attacks), or this card frozen by Mara
             let held = h.flags.contains_key("mired") || h.flags.contains_key("asleep");
             let coiled = view.kind == CardType::Attack && h.flags.contains_key("coiled");
             let frozen = (i as i32) < h.flags.get("frozen").copied().unwrap_or(0);
             let no_arm = nav_core::combat::needs_lost_arm(&view, h.lost_arms, h.def.as_str(), h.form);
-            let ok = !view.has(Keyword::Unplayable) && cost <= h.energy && !h.downed && !held && !coiled && !frozen && !no_arm;
+            let ok = !view.has(Keyword::Unplayable) && cost <= h.energy && (card.free || view.drowse <= h.statuses.get(&nav_core::StatusKind::Drowse).copied().unwrap_or(0)) && !h.downed && !held && !coiled && !frozen && !no_arm;
             let frame = card_frame(def);
             let want = if sees_nothing(&session) { Color::BLACK } else if frozen { frame.mix(&theme::FROST, 0.55) } else if ok { frame } else { frame.mix(&theme::SOOT, 0.45) };
             if bg.0 != want {
@@ -2599,13 +2800,17 @@ mod relic_strip {
     #[test]
     fn relics_stay_in_their_strip_however_many() {
         for count in [1, 8, 30, 31, 60, 100, 200] {
-            let side = relic_side(count);
-            for i in 0..count {
-                let at = relic_at(i, count);
-                assert!(at.x >= RELIC_LEFT && at.x + side <= RELIC_RIGHT + 1.0, "{count}: {at}");
-                assert!(at.y + side <= crate::between::BAR_H, "{count}: {at}");
+            // with the belt of three places, and with the sash's five
+            for left in [relic_left(POTION_SLOTS), relic_left(SASH_POTION_SLOTS)] {
+                let side = relic_side(count, left);
+                for i in 0..count {
+                    let at = relic_at(i, count, left);
+                    assert!(at.x >= left && at.x + side <= RELIC_RIGHT + 1.0, "{count}: {at}");
+                    assert!(at.y + side <= crate::between::BAR_H, "{count}: {at}");
+                }
             }
         }
-        assert_eq!(relic_side(10), 42.0, "a few relics keep their full size");
+        assert_eq!(relic_side(10, RELIC_LEFT), 42.0, "a few relics keep their full size");
+        assert!(relic_left(SASH_POTION_SLOTS) >= BELT_LEFT + SASH_POTION_SLOTS as f32 * 60.0, "the relics start past the longer belt");
     }
 }

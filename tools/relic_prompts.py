@@ -94,6 +94,16 @@ WHAT = {
     "wolf_alt_wolf_berry": "a sprig of glossy red wolfberries with dark leaves",
     "vor_alt_tear_vial": "a tiny glass vial of clear tears with a black thread around the neck",
     "bog_alt_brother_bracelet": "a heavy twisted bronze bracelet, worn smooth",
+    "potion_sash": "a wide woven red and ochre cloth sash laid in a coil, five leather loops sewn on it, each holding a small stoppered clay flask",
+    "sunflower": "a single wilted sunflower head with dark seeds and a few ragged yellow petals, on a short dry stalk",
+    "rattle": "a Slavic wooden ratchet rattle: a fan of thin linden plates strung on a cord with two finger loops",
+    "memory_knots": "a length of grey wool cord tied with many small tight knots, three of them stained rust red",
+    "holey_pocket": "a torn-off linen coat pocket with a ragged hole in its bottom, one small coin falling through the hole",
+    "ash_handful": "a small heap of grey ash on a scrap of birch bark, a few embers still glowing in it",
+    "flail": "a kisten flail: a rusty spiked iron ball on a short chain with a worn wooden handle",
+    "spindle": "an old wooden hand spindle wound with coarse grey thread, a stone whorl at its end",
+    "wooden_gong": "a bilo: a thick dark oak plank hung on two ropes, a wooden mallet leaning against it",
+    "icon_lamp": "a small tarnished copper icon lamp hanging on three thin chains, a tiny amber flame behind red glass",
 }
 
 

@@ -163,6 +163,11 @@ pub enum Effect {
     Once(String, Vec<Effect>),
     /// Runs once per round for this hero, keyed by name.
     OncePerTurn(String, Vec<Effect>),
+    /// Counts up each time it is reached, for this hero and by name, and runs on every `.1`-th
+    /// time; the count then starts again. Kept through the fight.
+    Every(String, i32, Vec<Effect>),
+    /// As `Every`, but the count starts again with every round.
+    EveryThisTurn(String, i32, Vec<Effect>),
     MaxHp(Amount, Tgt),
     /// A free, exhausting copy of the last card an ally played this round
     /// (your own last card when alone) into the hands of these heroes.
@@ -181,12 +186,20 @@ pub enum Effect {
     ExhaustCards(Amount),
     /// Brings this many random cards back from the discard pile into the hand.
     Recall(Amount),
+    /// The pike's will: the card on top of the source hero's draw pile plays itself, for nothing.
+    PikeWill,
     /// Escape hatch into named Rust code for one-off mechanics.
     Hook(String),
 }
 
 fn one() -> i32 {
     1
+}
+
+/// The name a hero's flags keep the count of an `Every` (or an `EveryThisTurn`) under.
+pub fn counter_key(name: &str, this_turn: bool) -> String {
+    // per-round keys live under `turn_`, which the round start wipes
+    if this_turn { format!("turn_count_{name}") } else { format!("count_{name}") }
 }
 
 data_enum!(Trigger {
@@ -219,6 +232,7 @@ pub struct Passive {
 #[serde(default)]
 pub struct CardPatch {
     pub cost: Option<i32>,
+    pub drowse: Option<i32>,
     pub kind: Option<CardType>,
     pub target: Option<CardTarget>,
     pub effects: Option<Vec<Effect>>,
@@ -238,6 +252,9 @@ pub struct CardDef {
     pub rarity: Rarity,
     #[serde(default)]
     pub cost: i32,
+    /// Drowse the card is paid for with, beside (or instead of) energy.
+    #[serde(default)]
+    pub drowse: i32,
     #[serde(default)]
     pub x_cost: bool,
     #[serde(default = "no_target")]
@@ -277,6 +294,7 @@ fn no_target() -> CardTarget {
 #[derive(Clone, Debug)]
 pub struct CardView {
     pub cost: i32,
+    pub drowse: i32,
     pub x_cost: bool,
     pub kind: CardType,
     pub target: CardTarget,
@@ -296,6 +314,7 @@ impl CardDef {
     pub fn view(&self, upgraded: bool, form: Form) -> CardView {
         let mut v = CardView {
             cost: self.cost,
+            drowse: self.drowse,
             x_cost: self.x_cost,
             kind: self.kind,
             target: self.target,
@@ -308,6 +327,9 @@ impl CardDef {
             let Some(p) = p else { return };
             if let Some(c) = p.cost {
                 v.cost = c;
+            }
+            if let Some(d) = p.drowse {
+                v.drowse = d;
             }
             if let Some(k) = p.kind {
                 v.kind = k;
@@ -413,6 +435,22 @@ pub struct RelicDef {
     pub passives: Vec<Passive>,
 }
 
+impl RelicDef {
+    /// The count this relic keeps, if it keeps one: the flag it is under, and what it runs to.
+    pub fn counter(&self) -> Option<(String, i32)> {
+        fn find(effects: &[Effect]) -> Option<(String, i32)> {
+            effects.iter().find_map(|e| match e {
+                Effect::Every(name, n, _) => Some((counter_key(name, false), *n)),
+                Effect::EveryThisTurn(name, n, _) => Some((counter_key(name, true), *n)),
+                Effect::If(_, a, b) => find(a).or_else(|| find(b)),
+                Effect::Repeat(_, a) | Effect::Once(_, a) | Effect::OncePerTurn(_, a) => find(a),
+                _ => None,
+            })
+        }
+        self.passives.iter().find_map(|p| find(&p.effects))
+    }
+}
+
 fn any_pool() -> RelicPool {
     RelicPool::Any
 }
@@ -455,6 +493,8 @@ pub enum RunFx {
     SewHeadOn,
     /// The chooser gets a lost limb back, and much of their health goes with it.
     SewLimbOn,
+    /// The chooser sits down to play with the hollow: nothing happens yet, the stakes come after.
+    Gamble,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -685,7 +725,7 @@ impl Content {
                         walk(a, f);
                         walk(b, f);
                     }
-                    Effect::Repeat(_, a) | Effect::Once(_, a) | Effect::OncePerTurn(_, a) => walk(a, f),
+                    Effect::Repeat(_, a) | Effect::Once(_, a) | Effect::OncePerTurn(_, a) | Effect::Every(_, _, a) | Effect::EveryThisTurn(_, _, a) => walk(a, f),
                     _ => {}
                 }
             }

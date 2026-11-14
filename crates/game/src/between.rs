@@ -129,9 +129,16 @@ pub(crate) fn coin_mark() -> impl Bundle {
     stat_mark(theme::CANDLE, Color::srgb(0.45, 0.30, 0.10), BorderRadius::MAX)
 }
 
+/// How many of this player's spins at the hollow have been shown to their end. Until the drums
+/// of the latest have stopped, the bar along the top keeps what it shows: a purse must not tell
+/// how they will stop before they have.
+#[derive(Resource, Default)]
+pub struct BarHold(pub u32);
+
 #[allow(clippy::too_many_arguments)]
 fn top_bar(
     mut commands: Commands,
+    hold: Res<BarHold>,
     net: Option<Res<Net>>,
     db: Res<Db>,
     canvas: Single<Entity, With<Canvas>>,
@@ -148,7 +155,8 @@ fn top_bar(
     let in_shop = matches!(run.stage, Stage::Shop { .. });
     let sig = BarSig(format!("{}|{}|{}|{:?}|{:?}|{}|{pelted}{in_shop}", pl.hp, pl.max_hp, pl.gold, pl.potions, pl.relics, pl.deck.len()));
     if let Ok((_, old)) = bars.single() {
-        if *old == sig {
+        let turning = matches!(&run.stage, Stage::Hollow { spins, .. } if spins.get(me as usize) != Some(&hold.0));
+        if *old == sig || turning {
             return;
         }
     }
@@ -176,7 +184,7 @@ fn top_bar(
     commands.spawn((theme::text(pl.gold.to_string(), &fonts.num, 28.0, theme::CANDLE), TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK }, ChildOf(purse)));
     // the potion belt: a flask is drunk, thrown or poured out from a little menu under it
     let belt = commands.spawn((Node { column_gap: px(10), margin: UiRect::left(px(20)), ..default() }, Pickable::IGNORE, ChildOf(bar))).id();
-    for slot in 0..POTION_SLOTS {
+    for slot in 0..potion_slots(&pl.relics) {
         let id = pl.potions.get(slot).cloned();
         let mut e = commands.spawn((
             Node { width: px(50), height: px(50), padding: UiRect::all(px(3)), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, ..default() },
@@ -379,24 +387,49 @@ pub fn open_player(
                 height: px(STAGE_H - BAR_H),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                padding: UiRect::top(px(22)),
-                row_gap: px(14),
+                padding: UiRect::vertical(px(DECK_EDGE)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.03, 0.03, 0.035).with_alpha(0.97)),
+            // what was on the screen stays in sight, dimmed: the sheet is a window laid over it
+            BackgroundColor(Color::srgb(0.02, 0.02, 0.025).with_alpha(0.86)),
             // over the hand and whatever flies in a fight, under the card hints
             GlobalZIndex(65),
             ChildOf(*canvas),
         ))
         .id();
     commands.entity(view).observe(|ev: On<Activate>, mut commands: Commands| commands.entity(ev.event_target()).despawn());
+    // the window itself, under everything on the sheet: a framed board, its head strip darker
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: px((STAGE_W - DECK_WINDOW_W) / 2.0),
+            top: px(DECK_EDGE),
+            width: px(DECK_WINDOW_W),
+            height: px(STAGE_H - BAR_H - 2.0 * DECK_EDGE),
+            border: UiRect::all(px(2)),
+            border_radius: BorderRadius::all(px(12)),
+            overflow: Overflow::clip(),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.115, 0.098, 0.088)),
+        BorderColor::all(SORT_EDGE),
+        BoxShadow::new(Color::BLACK.with_alpha(0.8), px(0), px(8), px(0), px(30)),
+        Pickable::IGNORE,
+        ChildOf(view),
+        children![(
+            Node { width: percent(100), height: px(DECK_HEAD_H), border: UiRect::bottom(px(2)), ..default() },
+            BackgroundColor(theme::SOOT),
+            BorderColor::all(SORT_EDGE),
+            Pickable::IGNORE,
+        )],
+    ));
     // another player's sheet has a head: whose it is and how they are, and what they carry. One's
     // own has none: all of that is on the bar along the top already
     if net.node.my_slot() != Some(seat.0) {
     let head = commands
         .spawn((
             theme::panel_edged(
-                Node { width: px(DECK_W), padding: UiRect::axes(px(24), px(14)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), align_items: AlignItems::Center, column_gap: px(28), ..default() },
+                Node { width: px(DECK_W), padding: UiRect::axes(px(24), px(14)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), align_items: AlignItems::Center, column_gap: px(28), margin: UiRect::top(px(14)), flex_shrink: 0.0, ..default() },
                 hue.with_alpha(0.7),
             ),
             Pickable::IGNORE,
@@ -427,7 +460,7 @@ pub fn open_player(
     }
     // how the cards are laid out: one way at a time, and the same way pressed again turns it round
     let bar = commands
-        .spawn((Node { width: px(DECK_W), align_items: AlignItems::Center, column_gap: px(12), ..default() }, Pickable::IGNORE, ChildOf(view)))
+        .spawn((Node { width: px(DECK_W), height: px(DECK_HEAD_H), flex_shrink: 0.0, align_items: AlignItems::Center, column_gap: px(12), ..default() }, Pickable::IGNORE, ChildOf(view)))
         .id();
     commands.spawn((theme::text(l10n.tf("bar-deck", &[("n", (pl.deck.len() as i32).into())]), &fonts.title, 26.0, theme::BONE), Node { margin: UiRect::right(px(24)), flex_shrink: 0.0, ..default() }, ChildOf(bar)));
     commands.spawn((theme::text(l10n.t("deck-sort"), &fonts.body, 20.0, theme::DIM), Node { flex_shrink: 0.0, ..default() }, ChildOf(bar)));
@@ -493,12 +526,39 @@ pub fn open_player(
     let grid = commands
         .spawn((
             DeckGrid(seat.0),
-            Node { width: px(DECK_W), flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::FlexStart, column_gap: px(DECK_GAP), row_gap: px(DECK_GAP), padding: UiRect::new(px(0), px(0), px(6), px(40)), ..default() },
+            Node { width: px(DECK_W), flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::FlexStart, column_gap: px(DECK_GAP), row_gap: px(DECK_GAP), padding: UiRect::new(px(0), px(0), px(DECK_GRID_TOP), px(40)), ..default() },
             Pickable::IGNORE,
             ChildOf(scroller),
         ))
         .id();
     lay_deck(&mut commands, grid, &pl.deck, &sort, &db.0, &l10n, &fonts, &art, &assets);
+    // down the window's right edge, a slider for a deck of more rows than fit: it shows how far
+    // down the cards are rolled, and is dragged to roll them
+    commands.spawn((
+        DeckSlider,
+        Button,
+        Hovered::default(),
+        Node {
+            position_type: PositionType::Absolute,
+            left: px((STAGE_W + DECK_WINDOW_W) / 2.0 - 30.0),
+            top: px(DECK_EDGE + DECK_HEAD_H + 16.0),
+            width: px(14),
+            height: px(STAGE_H - BAR_H - 2.0 * DECK_EDGE - DECK_HEAD_H - 32.0),
+            border: UiRect::all(px(1)),
+            border_radius: BorderRadius::all(px(7)),
+            ..default()
+        },
+        BackgroundColor(theme::SOOT),
+        BorderColor::all(SORT_EDGE),
+        Visibility::Hidden,
+        ChildOf(view),
+        children![(
+            DeckThumb,
+            Node { position_type: PositionType::Absolute, left: px(1), width: px(10), top: percent(0), height: percent(100), border_radius: BorderRadius::all(px(5)), ..default() },
+            BackgroundColor(theme::CANDLE.with_alpha(0.85)),
+            Pickable::IGNORE,
+        )],
+    ));
 }
 
 /// How wide the sheet's head and its grid of cards are: `DECK_COLS` cards and the gaps between.
@@ -508,6 +568,13 @@ const DECK_GAP: f32 = 22.0;
 const DECK_K: f32 = 0.82;
 const DECK_W: f32 = DECK_COLS * crate::battle::CARD_W * DECK_K + (DECK_COLS - 1.0) * DECK_GAP;
 const SORT_EDGE: Color = Color::srgb(0.42, 0.33, 0.22);
+/// The sheet's window: how far it stands from the bar above and the screen's foot, how wide it
+/// is (the cards, and room either side for the slider), and how tall its head strip is.
+const DECK_EDGE: f32 = 14.0;
+const DECK_WINDOW_W: f32 = DECK_W + 112.0;
+const DECK_HEAD_H: f32 = 76.0;
+/// Room above the first row of cards: a card under the cursor grows, and its top is not to be cut.
+const DECK_GRID_TOP: f32 = 30.0;
 
 /// What the cards of a sheet are laid out by.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
@@ -544,6 +611,11 @@ struct DeckGrid(u8);
 /// What the wheel rolls on a sheet.
 #[derive(Component)]
 struct DeckScroll;
+/// The slider down the side of a sheet whose cards do not all fit, and the piece of it that moves.
+#[derive(Component)]
+struct DeckSlider;
+#[derive(Component)]
+struct DeckThumb;
 #[derive(Component)]
 struct SortButton(DeckOrder);
 /// The little arrow on a sort button, showing which way the order runs.
@@ -634,15 +706,63 @@ fn light_sort(sort: Res<DeckSort>, mut buttons: Query<(&SortButton, &mut BorderC
     }
 }
 
-/// The wheel rolls the cards of an open sheet; the layout itself stops it at the last row.
-fn scroll_deck(mut wheel: MessageReader<bevy::input::mouse::MouseWheel>, mut scrolls: Query<&mut ScrollPosition, With<DeckScroll>>) {
+/// The wheel rolls the cards of an open sheet, and so does its slider, dragged or pressed
+/// anywhere along its length. The slider is there only while the cards do not all fit, and its
+/// moving piece is as long as the share of them in sight.
+#[allow(clippy::too_many_arguments)]
+fn scroll_deck(
+    mut wheel: MessageReader<bevy::input::mouse::MouseWheel>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    window: Single<&Window, With<bevy::window::PrimaryWindow>>,
+    pointers: Query<(&bevy::picking::pointer::PointerId, &bevy::picking::pointer::PointerLocation)>,
+    mut scrolls: Query<(&mut ScrollPosition, &ComputedNode), With<DeckScroll>>,
+    grids: Query<&ComputedNode, With<DeckGrid>>,
+    mut sliders: Query<(&ComputedNode, &UiGlobalTransform, &Hovered, &mut Visibility), With<DeckSlider>>,
+    mut thumbs: Query<&mut Node, With<DeckThumb>>,
+    mut held: Local<bool>,
+) {
     use bevy::input::mouse::MouseScrollUnit;
     let turned: f32 = wheel.read().map(|w| if w.unit == MouseScrollUnit::Line { w.y * 110.0 } else { w.y }).sum();
-    if turned == 0.0 {
+    let (Ok((mut at, frame)), Ok(grid)) = (scrolls.single_mut(), grids.single()) else {
+        *held = false;
         return;
+    };
+    // in the stage's own pixels, as the scroll position is
+    let seen = frame.size().y * frame.inverse_scale_factor();
+    let all = grid.size().y * grid.inverse_scale_factor();
+    let most = (all - seen).max(0.0);
+    let share = if all > 0.0 { (seen / all).clamp(0.08, 1.0) } else { 1.0 };
+    let mut to = at.0.y - turned;
+    if let Ok((track, place, over, mut shown)) = sliders.single_mut() {
+        shown.set_if_neq(if most > 1.0 { Visibility::Inherited } else { Visibility::Hidden });
+        if mouse.just_pressed(MouseButton::Left) && over.get() && most > 1.0 {
+            *held = true;
+        }
+        if !mouse.pressed(MouseButton::Left) {
+            *held = false;
+        }
+        // held, the moving piece follows the cursor: its middle goes where the cursor is
+        // (the picking pointer, as hovering uses, in the window's physical pixels like the node's place)
+        let cursor = pointers.iter().find(|(id, _)| id.is_mouse()).and_then(|(_, l)| l.location.as_ref()).map(|l| l.position * window.scale_factor());
+        if let (true, Some(cursor)) = (*held, cursor) {
+            let length = track.size().y;
+            let top = place.translation.y - length / 2.0;
+            let piece = length * share;
+            if length > piece {
+                to = ((cursor.y - top - piece / 2.0) / (length - piece)).clamp(0.0, 1.0) * most;
+            }
+        }
     }
-    for mut at in &mut scrolls {
-        at.0.y = (at.0.y - turned).max(0.0);
+    let to = to.clamp(0.0, most);
+    if (at.0.y - to).abs() > 0.01 {
+        at.0.y = to;
+    }
+    for mut thumb in &mut thumbs {
+        let (height, top) = (percent(share * 100.0), percent(if most > 0.0 { to / most * (1.0 - share) * 100.0 } else { 0.0 }));
+        if thumb.height != height || thumb.top != top {
+            thumb.height = height;
+            thumb.top = top;
+        }
     }
 }
 
@@ -690,7 +810,7 @@ fn shake_pedlar(time: Res<Time>, mut shake: ResMut<PedlarShake>, mut pedlar: Que
 /// in a fight (but with nothing to fight), and the pedlar on the right, who opens his counter
 /// when clicked.
 #[allow(clippy::too_many_arguments)]
-pub fn pedlar_clearing(commands: &mut Commands, root: Entity, run: &Run, fonts: &Fonts, l10n: &L10n, art: &Art, assets: &AssetServer) {
+pub fn pedlar_clearing(commands: &mut Commands, root: Entity, run: &Run, db: &Content, fonts: &Fonts, l10n: &L10n, art: &Art, assets: &AssetServer) {
     let act = run.act.clamp(1, 3);
     let backdrop = [format!("bg/shop_act{act}"), format!("bg/act{act}_battle"), "bg/act1_battle".to_string()].into_iter().find(|s| art.image(assets, s).is_some()).unwrap_or_default();
     let lift = crate::battle::ground_lift(&backdrop);
@@ -716,10 +836,11 @@ pub fn pedlar_clearing(commands: &mut Commands, root: Entity, run: &Run, fonts: 
     let size = crate::battle::HERO_SIZE;
     // the back row first, so the front stands before it
     let mut order: Vec<usize> = (0..run.players.len()).collect();
+    let n = run.players.len();
     order.sort_by(|a, b| crate::battle::hero_foot(*a as u8).y.total_cmp(&crate::battle::hero_foot(*b as u8).y));
     for i in order {
         let pl = &run.players[i];
-        let foot = crate::battle::hero_foot(i as u8) + Vec2::new(0.0, CLEARING_DROP);
+        let foot = crate::battle::hero_rank(i as u8, n) + Vec2::new(0.0, CLEARING_DROP);
         // who has lost their head is carried along and laid down here too
         if pl.beheaded {
             if let Some(h) = art.image(assets, &format!("heroes/{}_dead_headless", pl.hero)) {
@@ -732,6 +853,8 @@ pub fn pedlar_clearing(commands: &mut Commands, root: Entity, run: &Run, fonts: 
             }
             continue;
         }
+        // the stove is broad: it is drawn as large as in a fight, not squeezed into a man's place
+        let size = crate::battle::hero_draw(&format!("heroes/{}", pl.hero), size) * crate::battle::hp_stature(db, &pl.hero, pl.max_hp);
         if pl.walks_headless {
             let place = Node { position_type: PositionType::Absolute, left: px(foot.x - size.x / 2.0), top: px(foot.y - size.y), width: px(size.x), height: px(size.y), ..default() };
             figure_with_no_head(commands, root, &format!("heroes/{}", pl.hero), pl.lost_arms, place, Color::WHITE, false, art, assets);

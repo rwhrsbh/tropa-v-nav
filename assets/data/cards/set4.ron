@@ -285,7 +285,7 @@
         up: (effects: [DiscardHand, Heal(Discarded(2), Me), Draw(N(3))]),
     ),
     (id: "em_golden_dream", hero: "emelya", kind: Attack, rarity: Rare, cost: 1, level: 10,
-        effects: [Damage(Stat(Drowse, Me, 3), RandomFoe)],
-        up: (effects: [Damage(Stat(Drowse, Me, 4), RandomFoe)]),
+        effects: [Damage(Stat(Drowse, Me, 2), RandomFoe)],
+        up: (effects: [Damage(Stat(Drowse, Me, 3), RandomFoe)]),
     ),
 ]

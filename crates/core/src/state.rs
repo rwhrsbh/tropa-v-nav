@@ -227,6 +227,8 @@ pub enum CombatAction {
     UsePotion { slot: u8, target: Option<UnitRef> },
     /// Throw this card from the hand, as a card that says "discard" asked.
     Discard { card: u32 },
+    /// Pour the potion in this slot out on the ground: nothing comes of it.
+    DropPotion { slot: u8 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -305,6 +307,8 @@ pub enum Event {
     HerbAdded { player: u8, herb: Id },
     Brewed { player: u8, recipe: Id },
     PotionUsed { player: u8, potion: Id, target: Option<UnitRef> },
+    /// Poured out, to no effect.
+    PotionDropped { player: u8, potion: Id },
     Passed { from: u8, to: u8, card: Id },
     /// An enemy passed into its second phase.
     Phase2 { enemy: u32 },

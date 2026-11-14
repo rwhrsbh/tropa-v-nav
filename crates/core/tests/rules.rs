@@ -1602,3 +1602,77 @@ fn test_switcheroo_with_two_enemies_redirects_to_other_enemy() {
     // Dummy took 10 damage from hitter!
     assert_eq!(dummy_hp_before - s.enemies[1].hp, 10, "Other enemy took 10 damage from hitter");
 }
+
+// ---- relics that keep a count ----
+
+#[test]
+fn a_counting_relic_runs_on_every_nth_time_and_shows_its_count() {
+    let c = content();
+    let mut h = hero("t_plain", &["t_hit"; 12]);
+    h.relics = vec!["rattle".into()];
+    let (mut s, _) = start(&c, &[h], &ids(&["dummy"]), 7);
+    let (key, of) = c.relics["rattle"].counter().expect("the rattle keeps a count");
+    assert_eq!(of, 5);
+    let foe_hp = |s: &Combat| s.enemies[0].hp;
+    for k in 1..=4 {
+        let target = foe(&s, 0);
+        play(&c, &mut s, 0, "t_hit", Some(target));
+        assert_eq!(s.heroes[0].flags.get(&key).copied().unwrap_or(0), k);
+        assert_eq!(foe_hp(&s), 100 - 10 * k, "nothing but the blows themselves yet");
+    }
+    let target = foe(&s, 0);
+    play(&c, &mut s, 0, "t_hit", Some(target));
+    assert_eq!(foe_hp(&s), 100 - 50 - 4, "the fifth card rattles for 4");
+    assert_eq!(s.heroes[0].flags.get(&key).copied().unwrap_or(0), 0, "and the count starts again");
+}
+
+#[test]
+fn a_count_within_a_turn_starts_again_with_the_next() {
+    let c = content();
+    let mut h = hero("t_plain", &["t_hit"; 12]);
+    h.relics = vec!["flail".into()];
+    let (mut s, _) = start(&c, &[h], &ids(&["dummy"]), 7);
+    let (key, of) = c.relics["flail"].counter().unwrap();
+    assert_eq!(of, 3);
+    for _ in 0..2 {
+        let target = foe(&s, 0);
+        play(&c, &mut s, 0, "t_hit", Some(target));
+    }
+    assert_eq!(s.heroes[0].flags.get(&key).copied(), Some(2));
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].flags.get(&key).copied().unwrap_or(0), 0);
+    assert_eq!(s.status(ME, S::Strength), 0);
+    for _ in 0..3 {
+        let target = foe(&s, 0);
+        play(&c, &mut s, 0, "t_hit", Some(target));
+    }
+    assert_eq!(s.status(ME, S::Strength), 1);
+}
+
+#[test]
+fn the_sunflower_gives_energy_every_third_turn() {
+    let c = content();
+    let mut h = hero("t_plain", &["t_block"; 12]);
+    h.relics = vec!["sunflower".into()];
+    let (mut s, _) = start(&c, &[h], &ids(&["dummy"]), 7);
+    let base = s.heroes[0].energy;
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].energy, base);
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].energy, base + 1, "the third turn");
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].energy, base);
+}
+
+#[test]
+fn a_move_stunned_out_of_is_tried_again_next_round() {
+    let c = content();
+    let party = [hero("t_plain", &["t_block"])];
+    let (mut s, _) = start(&c, &party, &ids(&["kladovik"]), 3);
+    let first = s.enemies[0].intent.clone().unwrap().mv;
+    s.enemies[0].statuses.insert(StatusKind::Stun, 1);
+    end_round(&c, &mut s);
+    assert_eq!(s.enemies[0].intent.clone().unwrap().mv, first, "still counting its coins, not throwing them");
+    end_round(&c, &mut s);
+    assert_ne!(s.enemies[0].intent.clone().unwrap().mv, first, "and once it has, it goes on");
+}

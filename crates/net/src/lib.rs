@@ -791,6 +791,7 @@ fn mark(run: &Run) -> u64 {
         Stage::Omen { .. } => 8,
         Stage::Trophy { .. } => 9,
         Stage::Chest(_) => 10,
+        Stage::Hollow { .. } => 11,
         Stage::Victory => 5,
         Stage::Defeat => 6,
     };

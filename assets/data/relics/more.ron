@@ -14,7 +14,7 @@
     (id: "wolf_tooth_necklace", rarity: Uncommon, passives: [(on: Kill, effects: [Apply(TempStrength, N(2), Me)])]),
     (id: "mossy_stone", rarity: Uncommon, passives: [(on: TurnEnd, effects: [Block(N(2), Me)])]),
     (id: "firebird_feather", rarity: Rare, passives: [(on: CombatStart, effects: [Energy(N(1), Me), Draw(N(1))])]),
-    (id: "sword_kladenets", rarity: Rare, passives: [(on: CombatStart, effects: [Apply(Strength, N(2), Me)])]),
+    (id: "sword_kladenets", rarity: Rare, passives: [(on: TurnStart, effects: [Apply(TempStrength, N(3), Me)])]),
     (id: "samobranka", rarity: Rare, passives: [(on: TurnStart, effects: [Heal(N(1), Me)])]),
 
     // ---- геройские ----
@@ -23,10 +23,10 @@
     (id: "vor_black_hen", rarity: Uncommon, hero: "vorozheya", passives: [(on: CombatStart, effects: [Apply(Hex, N(1), AllFoes)])]),
     (id: "vor_grave_dirt", rarity: Rare, hero: "vorozheya", passives: [(on: TurnStart, effects: [Apply(Rot, N(1), AllFoes)])]),
     (id: "vol_rune_stone", rarity: Uncommon, hero: "volhv", passives: [(on: CombatStart, effects: [Rune(Frost, Me)])]),
-    (id: "vol_perun_axe", rarity: Rare, hero: "volhv", passives: [(on: CombatStart, effects: [Rune(Thunder, Me)])]),
+    (id: "vol_perun_axe", rarity: Rare, hero: "volhv", passives: [(on: AttackPlayed, effects: [Every("perun_axe", 3, [Invoke])])]),
     (id: "wolf_moon_stone", rarity: Uncommon, hero: "volkolak", passives: [(on: Shifted, effects: [Block(N(6), Me)])]),
     (id: "wolf_alpha_pelt", rarity: Rare, hero: "volkolak", passives: [(on: Kill, effects: [Heal(N(3), Me), Draw(N(1))])]),
-    (id: "zn_mortar", rarity: Uncommon, hero: "znaharka", passives: [(on: CombatStart, effects: [Herb("wormwood")])]),
+    (id: "zn_mortar", rarity: Uncommon, hero: "znaharka", passives: [(on: SkillPlayed, effects: [Every("zn_mortar", 3, [Herb("nettle")])])]),
     (id: "zn_spring_water", rarity: Rare, hero: "znaharka", passives: [(on: TurnEnd, effects: [Heal(N(1), AllFriends)])]),
     (id: "sk_painted_mask", rarity: Uncommon, hero: "skomoroh", passives: [(on: MaskChanged, effects: [Block(N(4), Me)])]),
     (id: "sk_bear_on_chain", rarity: Rare, hero: "skomoroh", passives: [(on: CombatStart, effects: [Mask(Bear), Apply(Strength, N(1), Me)])]),

@@ -7,6 +7,7 @@
 //!   TROPA_FORCE=shop|omen|rest|trophy|chest  open `run` straight at that stage
 //!   TROPA_SHRINE=<0..2>         pretend the shrine stands at this level (in memory only; never saved by a screenshot run)
 //!   TROPA_FIGHT=<id>,<id>       open `run` on a fight with exactly these enemies
+//!   TROPA_MAX_HP=<n>            every hero of `run` has this much max health
 //!   TROPA_HERO_HP=<n>[@slot]    the heroes of that fight, or the one in that seat, are down to that HP
 //!   TROPA_FOE_STR=<n>           the foes of that fight hit that much harder
 //!   TROPA_HEADLESS=<seat>       the player in that seat lies without a head
@@ -14,6 +15,8 @@
 //!   TROPA_HAND=<id>,<id>|all    the heroes of that fight hold these cards, or every card (a text that cannot fit is logged)
 //!   TROPA_SEED=<n>              fixed seed for that run
 //!   TROPA_POTIONS=<id>,<id>     every player's belt holds these draughts
+//!   TROPA_RELICS=<id>,<id>      every player carries these relics besides their own
+//!   TROPA_DECK=<id>,<id>|all    these cards are added to every deck, or every card of the hero
 //!   TROPA_DRIVE=<file>          steps written to this file are played as they come (also `p <png>` a shot, `q` quit)
 //!   TROPA_ROBOT=<script>        feed the game mouse input, as the window itself would: steps separated by `;`,
 //!                               `w <seconds>`, `m <x> <y>` (glide there, stage pixels), `d` (press), `u` (release),
@@ -62,6 +65,7 @@ fn open_screen(
         "coop" => next.set(AppState::Coop),
         "village" => next.set(AppState::Village),
         "chronicle" => next.set(AppState::Chronicle),
+        "library" => next.set(AppState::Library),
         "settings" => next.set(AppState::Settings),
         "lobby" => {
             crate::net::start_offline(&mut commands, &db.0, "dev", bots);

@@ -10,6 +10,16 @@ use serde::{Deserialize, Serialize};
 pub const FLOORS: usize = 15;
 pub const MAP_WIDTH: u8 = 7;
 pub const POTION_SLOTS: usize = 3;
+/// The relic that makes room on the belt, and how much room there is with it.
+pub const POTION_SASH: &str = "potion_sash";
+pub const SASH_POTION_SLOTS: usize = 5;
+/// Of a hundred fights an omen turns out to be, this many are against an elite.
+pub const OMEN_ELITE_CHANCE: i32 = 20;
+
+/// How many potions one who carries these relics has room for.
+pub fn potion_slots(relics: &[Id]) -> usize {
+    if relics.iter().any(|r| r == POTION_SASH) { SASH_POTION_SLOTS } else { POTION_SLOTS }
+}
 /// Is this one short of a head, and still carrying it? A head thrown away cannot be sewn back on.
 fn head_to_sew(pl: &Player) -> bool {
     (pl.beheaded || pl.walks_headless) && carries(pl, &format!("own_head_{}", pl.hero))
@@ -171,6 +181,84 @@ pub fn beats(a: u8, b: u8) -> bool {
 /// What the pedlar pays, flustered, for a potion broken over his head.
 pub const PELT_GOLD: i32 = 25;
 
+/// The omen of the hollow that plays for stakes. It is met like the pedlar or an ambush, as
+/// likely as any one tale, and may be met again.
+pub const HOLLOW_OMEN: &str = "greedy_hollow";
+/// Sides of each of the hollow's three drums.
+pub const HOLLOW_FACES: u8 = 8;
+/// The purses the hollow takes.
+pub const HOLLOW_GOLD_STAKES: [i32; 3] = [25, 50, 100];
+/// Percent of max HP the hollow keeps when an arm was played for and not won back.
+pub const HOLLOW_SEAM_PCT: i32 = 10;
+/// What the hollow gives for a potion it could not find room for on the belt.
+pub const HOLLOW_SPILL_GOLD: i32 = 25;
+/// Out of a thousand spins: the firebird's three, three of a dear sign, three of a plain one.
+/// The rest lose. A purse comes back as 0.82 of itself on the whole: the hollow is fed.
+pub const HOLLOW_ODDS: [u32; 3] = [20, 90, 220];
+
+/// How dear a side of the drum is: 1 the plain signs, 2 the dear ones, 3 the firebird.
+pub fn hollow_tier(face: u8) -> u8 {
+    match face {
+        7 => 3,
+        4..=6 => 2,
+        _ => 1,
+    }
+}
+
+/// How many times over a purse comes back for three of a sign of this tier (0: it does not).
+pub fn hollow_pays(tier: u8) -> i32 {
+    [0, 2, 3, 5][tier.min(3) as usize]
+}
+
+/// What is laid before the hollow: a purse, a relic or a potion by its place, an arm
+/// (`combat::WEAPON_ARM` or `SHIELD_ARM`). An arm already gone is played for with one's own
+/// health: won, it grows back for nothing; lost, health goes and no arm comes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Stake {
+    Gold(i32),
+    Relic(u8),
+    Potion(u8),
+    Arm(u8),
+}
+
+/// A thing won from the hollow or left in it.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Loot {
+    Gold(i32),
+    Relic(Id),
+    Potion(Id),
+    Arm(u8),
+    MaxHp(i32),
+}
+
+/// One turn of the drums, as everyone at the hollow sees it.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Spin {
+    pub faces: [u8; 3],
+    /// 0 lost; else the tier of the three alike.
+    pub tier: u8,
+    pub stake: Stake,
+    /// The arm staked was already gone: health was played for it.
+    pub for_seam: bool,
+    pub won: Vec<Loot>,
+    pub lost: Vec<Loot>,
+}
+
+/// May this player lay this before the hollow.
+pub fn stake_open(c: &Content, pl: &Player, stake: Stake) -> bool {
+    match stake {
+        Stake::Gold(n) => HOLLOW_GOLD_STAKES.contains(&n) && pl.gold >= n,
+        // what a hero set out with is not theirs to gamble away
+        Stake::Relic(i) => pl.relics.get(i as usize).and_then(|id| c.relics.get(id)).is_some_and(|r| r.rarity != Rarity::Starter),
+        Stake::Potion(i) => (i as usize) < pl.potions.len(),
+        Stake::Arm(arm) => {
+            let known = arm == crate::combat::WEAPON_ARM || arm == crate::combat::SHIELD_ARM;
+            // an arm gone is played for with health, while there is health to play with
+            known && (pl.lost_arms & arm == 0 || pl.max_hp > LEAST_MAX_HP)
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Stage {
     /// Choosing the next node; `votes[player]` indexes into [`Run::choices`].
@@ -186,6 +274,9 @@ pub enum Stage {
     Trophy { offers: Vec<Vec<Id>>, picks: Vec<Option<u8>> },
     /// A chest shared by the party: a relic for every player.
     Chest(Chest),
+    /// The hollow that plays for stakes: each player turns its drums for themselves, as often as
+    /// they dare. `spins[player]` counts their turns, `last[player]` is the latest, `done` have left.
+    Hollow { spins: Vec<u32>, done: Vec<bool>, last: Vec<Option<Spin>> },
     Victory,
     Defeat,
 }
@@ -276,6 +367,9 @@ pub struct Run {
     /// Omens already met this run; none comes twice while others are left.
     #[serde(default)]
     pub omens_seen: Vec<String>,
+    /// The foes of the last fight, by kind: the next one brings none of them back if it can.
+    #[serde(default)]
+    pub last_foes: Vec<Id>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -319,6 +413,10 @@ pub enum RunAction {
     FindSecret { act: u8 },
     /// The player shut the book before the tale's chapter was done.
     SkipTale,
+    /// Lay a stake before the hollow and turn its drums.
+    Spin(Stake),
+    /// Walk away from the hollow.
+    LeaveHollow,
 }
 
 /// What a potion heals when drunk between fights: `(amount, everyone)`. Potions that do
@@ -373,6 +471,12 @@ pub enum RunEvent {
     Raised { player: u8, who: u8 },
     /// `player` has one limb more, sewn on.
     LimbSewn { player: u8 },
+    /// The hollow's drums stopped for `player`.
+    Spun { player: u8, faces: [u8; 3], tier: u8 },
+    /// The hollow took `player`'s arm.
+    ArmTorn { player: u8, arm: u8 },
+    RelicLost { player: u8, relic: Id },
+    PotionLost { player: u8, potion: Id },
     Combat(Event),
     Voted { player: u8, choice: u8 },
     /// A tied vote was settled by lot among `tied`.
@@ -484,36 +588,35 @@ pub fn generate_map(rng: &mut Rng, circle: Circle) -> Map {
                 8 => NodeKind::Chest,
                 14 => NodeKind::Rest,
                 _ => {
-                    let parents: Vec<NodeKind> =
-                        if floor == 0 { vec![] } else { floors[floor - 1].iter().filter(|p| p.next.contains(&(i as u8))).map(|p| p.kind).collect() };
+                    let parents: Vec<&MapNode> = floors[floor - 1].iter().filter(|p| p.next.contains(&(i as u8))).collect();
+                    // what the other ways of the same forks already are: a fork is a choice only
+                    // when its ways differ
+                    let siblings: Vec<NodeKind> = parents.iter().flat_map(|p| p.next.iter()).filter(|j| (**j as usize) < i).map(|j| floors[floor][*j as usize].kind).collect();
+                    let mut bag: Vec<(NodeKind, u32)> = vec![(NodeKind::Fight, 45), (NodeKind::Event, 22)];
+                    // no fire right before the guaranteed one
+                    if floor != 13 {
+                        bag.push((NodeKind::Rest, 12));
+                    }
+                    if floor >= 5 {
+                        bag.push((NodeKind::Elite, circle.elite_weight()));
+                    }
+                    if floor >= 2 {
+                        bag.push((NodeKind::Shop, 6));
+                    }
+                    // two fires, shops or elites in a row make a dull path
+                    bag.retain(|(k, _)| !(matches!(k, NodeKind::Rest | NodeKind::Shop | NodeKind::Elite) && parents.iter().any(|p| p.kind == *k)));
+                    let apart: Vec<(NodeKind, u32)> = bag.iter().copied().filter(|(k, _)| !siblings.contains(k)).collect();
+                    // a fork too wide to be all of different kinds repeats one
+                    let bag = if apart.is_empty() { bag } else { apart };
+                    let total: u32 = bag.iter().map(|b| b.1).sum();
+                    let mut roll = rng.below(total);
                     let mut pick = NodeKind::Fight;
-                    for _ in 0..8 {
-                        let mut bag: Vec<(NodeKind, u32)> = vec![(NodeKind::Fight, 45), (NodeKind::Event, 22)];
-                        // no fire right before the guaranteed one
-                        if floor != 13 {
-                            bag.push((NodeKind::Rest, 12));
-                        }
-                        if floor >= 5 {
-                            bag.push((NodeKind::Elite, circle.elite_weight()));
-                        }
-                        if floor >= 2 {
-                            bag.push((NodeKind::Shop, 6));
-                        }
-                        let total: u32 = bag.iter().map(|b| b.1).sum();
-                        let mut roll = rng.below(total);
-                        for (k, w) in bag {
-                            if roll < w {
-                                pick = k;
-                                break;
-                            }
-                            roll -= w;
-                        }
-                        // two fires, shops or elites in a row make a dull path
-                        let special = matches!(pick, NodeKind::Rest | NodeKind::Shop | NodeKind::Elite);
-                        if !(special && parents.contains(&pick)) {
+                    for (k, w) in bag {
+                        if roll < w {
+                            pick = k;
                             break;
                         }
-                        pick = NodeKind::Fight;
+                        roll -= w;
                     }
                     pick
                 }
@@ -521,7 +624,50 @@ pub fn generate_map(rng: &mut Rng, circle: Circle) -> Map {
             floors[floor][i].kind = kind;
         }
     }
-    Map { floors }
+    let mut map = Map { floors };
+    stand_a_pedlar(&mut map, rng);
+    map
+}
+
+/// Every land has a pedlar somewhere on it. Where the lot gave none, a fight or an omen in the
+/// middle floors becomes one: the node most of the ways up lead through.
+fn stand_a_pedlar(map: &mut Map, rng: &mut Rng) {
+    let floors = &map.floors;
+    if floors.iter().flatten().any(|n| n.kind == NodeKind::Shop) {
+        return;
+    }
+    // for every node, which of the starting nodes lead to it
+    let mut from: Vec<Vec<u32>> = floors.iter().map(|f| vec![0; f.len()]).collect();
+    for i in 0..floors[0].len() {
+        from[0][i] = 1 << i;
+    }
+    for f in 0..floors.len() - 1 {
+        for i in 0..floors[f].len() {
+            for j in &floors[f][i].next {
+                from[f + 1][*j as usize] |= from[f][i];
+            }
+        }
+    }
+    let mut best: Vec<(usize, usize)> = Vec::new();
+    let mut most = 0;
+    for f in 3..floors.len().min(13) {
+        for (i, node) in floors[f].iter().enumerate() {
+            if !matches!(node.kind, NodeKind::Fight | NodeKind::Event) {
+                continue;
+            }
+            let ways = from[f][i].count_ones();
+            if ways > most {
+                most = ways;
+                best.clear();
+            }
+            if ways == most {
+                best.push((f, i));
+            }
+        }
+    }
+    if let Some(&(f, i)) = rng.pick(&best) {
+        map.floors[f][i].kind = NodeKind::Shop;
+    }
 }
 
 /// Generates a 6-floor map for Act 4 (Buyan Island) leading to the final battle with Koschei.
@@ -594,6 +740,7 @@ impl Run {
             bosses_slain: 0,
             secrets: vec![],
             omens_seen: vec![],
+            last_foes: vec![],
         })
     }
 
@@ -843,7 +990,7 @@ impl Run {
                 if pl.gold < price {
                     return Err(RunError::NotEnoughGold);
                 }
-                if matches!(action, RunAction::BuyPotion(_)) && pl.potions.len() >= POTION_SLOTS {
+                if matches!(action, RunAction::BuyPotion(_)) && pl.potions.len() >= potion_slots(&pl.relics) {
                     return Err(RunError::NoRoom);
                 }
                 pl.gold -= price;
@@ -996,8 +1143,13 @@ impl Run {
                     }
                     // everyone decides for themselves, at once
                     EventKind::Personal | EventKind::Schism => {
+                        // those who sat down to play stay at the hollow; the rest wait for them
+                        let plays: Vec<bool> = picks.iter().map(|v| v.and_then(|i| def.options.get(i as usize)).is_some_and(|o| o.fx.contains(&RunFx::Gamble))).collect();
                         self.apply_option(c, p, option, &mut ev);
-                        if all {
+                        if all && plays.iter().any(|b| *b) {
+                            let n = plays.len();
+                            self.stage = Stage::Hollow { spins: vec![0; n], done: plays.iter().map(|b| !b).collect(), last: vec![None; n] };
+                        } else if all {
                             self.to_map(c, &mut ev);
                         }
                     }
@@ -1026,6 +1178,28 @@ impl Run {
                             self.to_map(c, &mut ev);
                         }
                     }
+                }
+            }
+            (RunAction::Spin(stake), Stage::Hollow { done, .. }) => {
+                if done[p] {
+                    return Err(RunError::AlreadyDone);
+                }
+                if !stake_open(c, &self.players[p], *stake) {
+                    return Err(if matches!(stake, Stake::Gold(_)) { RunError::NotEnoughGold } else { RunError::BadChoice });
+                }
+                let spin = self.spin(c, p, *stake, &mut ev);
+                if let Stage::Hollow { spins, last, .. } = &mut self.stage {
+                    spins[p] += 1;
+                    last[p] = Some(spin);
+                }
+            }
+            (RunAction::LeaveHollow, Stage::Hollow { done, .. }) => {
+                if done[p] {
+                    return Err(RunError::AlreadyDone);
+                }
+                done[p] = true;
+                if done.iter().all(|d| *d) {
+                    self.to_map(c, &mut ev);
                 }
             }
             (RunAction::DropPotion(i), _) => {
@@ -1142,7 +1316,7 @@ impl Run {
                 self.stage = Stage::Shop { stock, done: vec![false; self.players.len()] };
             }
             NodeKind::Event => {
-                let pool: Vec<&EventDef> = c.events.values().filter(|e| !e.for_the_maimed).collect();
+                let pool: Vec<&EventDef> = c.events.values().filter(|e| !e.for_the_maimed && e.id != HOLLOW_OMEN).collect();
                 if let Some(e) = self.rng.pick(&pool) {
                     self.stage = Stage::Omen { id: e.id.clone(), picks: vec![None; self.players.len()] };
                 }
@@ -1297,7 +1471,7 @@ impl Run {
                 self.floors_cleared += 1;
                 let act = self.act;
                 let open = 20 + 15 * self.unlocks.omen_tier as usize;
-                let fits: Vec<&EventDef> = c.events.values().filter(|e| !e.for_the_maimed).take(open).filter(|e| e.act == 0 || e.act == act).collect();
+                let fits: Vec<&EventDef> = c.events.values().filter(|e| !e.for_the_maimed && e.id != HOLLOW_OMEN).take(open).filter(|e| e.act == 0 || e.act == act).collect();
                 let fresh: Vec<&EventDef> = fits.iter().copied().filter(|e| !self.omens_seen.contains(&e.id)).collect();
                 // a long road may run out of new omens; only then does an old one return
                 let pool = if fresh.is_empty() { fits } else { fresh };
@@ -1305,7 +1479,28 @@ impl Run {
                 let someone_to_ask = self.players.iter().any(|pl| !pl.beheaded);
                 let missing = self.players.iter().any(|pl| pl.beheaded || pl.walks_headless || pl.lost_limbs > 0);
                 let waiting = if someone_to_ask && missing && self.rng.chance(SEAMSTRESS_CHANCE) { c.events.values().find(|e| e.for_the_maimed) } else { None };
-                match waiting.or_else(|| self.rng.pick(&pool).copied()) {
+                // not every sign on the road is a tale: the pedlar may be standing there, or foes
+                // lying in wait, each as likely as any one of the omens
+                // and so may the hollow that plays for stakes, which is never the same twice
+                let hollow = c.events.get(HOLLOW_OMEN);
+                let roll = self.rng.below(pool.len() as u32 + 2 + hollow.is_some() as u32) as usize;
+                if let (None, Some(e), true) = (waiting, hollow, roll == pool.len() + 2) {
+                    self.stage = Stage::Omen { id: e.id.clone(), picks: vec![None; self.players.len()] };
+                    return;
+                }
+                if waiting.is_none() && roll == pool.len() {
+                    let stock = (0..self.players.len()).map(|p| self.roll_stock(c, p)).collect();
+                    self.stage = Stage::Shop { stock, done: vec![false; self.players.len()] };
+                    return;
+                }
+                if waiting.is_none() && roll > pool.len() {
+                    // the fight counts the floor itself, when it is won
+                    self.floors_cleared -= 1;
+                    let kind = if self.rng.chance(OMEN_ELITE_CHANCE) { NodeKind::Elite } else { NodeKind::Fight };
+                    self.start_fight(c, kind, ev);
+                    return;
+                }
+                match waiting.or_else(|| pool.get(roll).copied()) {
                     Some(e) => {
                         self.omens_seen.push(e.id.clone());
                         self.stage = Stage::Omen { id: e.id.clone(), picks: vec![None; self.players.len()] };
@@ -1323,8 +1518,25 @@ impl Run {
             NodeKind::Boss => EncounterKind::Boss,
             _ => EncounterKind::Normal,
         };
+        let n = self.players.len();
+        // who an encounter brings for a party this size, before the extras
+        let lineup = |e: &EncounterDef| if n == 1 && !e.solo.is_empty() { e.solo.clone() } else { e.enemies.clone() };
+        let last = self.last_foes.clone();
         let pick = |rng: &mut Rng, act: u8, kind: EncounterKind| -> Option<EncounterDef> {
             let pool: Vec<&EncounterDef> = c.encounters.values().filter(|e| e.act == act && e.kind == kind).collect();
+            // the same foes are not met twice running: a fight with none of the last one's kinds
+            // in it if there is one, else at least another lineup
+            let fresh: Vec<&EncounterDef> = pool.iter().copied().filter(|e| !lineup(e).iter().any(|id| last.contains(id))).collect();
+            let other: Vec<&EncounterDef> = pool.iter().copied().filter(|e| {
+                let mut a = lineup(e);
+                let mut b = last.clone();
+                a.sort();
+                a.dedup();
+                b.sort();
+                b.dedup();
+                a != b
+            }).collect();
+            let pool = if !fresh.is_empty() { fresh } else if !other.is_empty() { other } else { pool };
             rng.pick(&pool).map(|e| (*e).clone())
         };
         // fall back so a thin content set never strands the party
@@ -1335,8 +1547,8 @@ impl Run {
             self.stage = Stage::Map { votes: vec![None; self.players.len()] };
             return;
         };
-        let n = self.players.len();
-        let mut enemies = if n == 1 && !enc.solo.is_empty() { enc.solo.clone() } else { enc.enemies.clone() };
+        let mut enemies = lineup(&enc);
+        self.last_foes = enemies.clone();
         if n == 3 && self.rng.chance(50) {
             enemies.extend(enc.extra3.iter().cloned());
         }
@@ -1378,6 +1590,14 @@ impl Run {
 
     /// Puts the party straight into a fight with exactly these enemies.
     /// For tests and the dev build's screen shortcuts; never reachable by a player action.
+    /// Opens a fight of this kind as the road would: for tests and tools.
+    #[doc(hidden)]
+    pub fn open_fight(&mut self, c: &Content, kind: NodeKind) -> Vec<RunEvent> {
+        let mut ev = Vec::new();
+        self.start_fight(c, kind, &mut ev);
+        ev
+    }
+
     pub fn force_fight(&mut self, c: &Content, enemies: &[Id]) {
         let party: Vec<HeroSetup> = self
             .players
@@ -1579,16 +1799,11 @@ impl Run {
                         self.sew_head(who, player, ev);
                     }
                 }
+                RunFx::Gamble => {}
                 RunFx::SewLimbOn => {
                     let pl = &mut self.players[p];
-                    if let Some((back, card)) = arm_to_sew(pl) {
-                        take_from_deck(pl, &card);
-                        // with the arm back the makeshifts go; those for no arms at all go too
-                        for gone in crate::combat::stump_cards(back).iter().chain(crate::combat::BOTH_ARMS_CARDS.iter()) {
-                            take_from_deck(pl, gone);
-                        }
-                        pl.lost_limbs -= 1;
-                        pl.lost_arms &= !back;
+                    if let Some((back, _)) = arm_to_sew(pl) {
+                        put_arm_back(pl, back);
                         pl.max_hp = (pl.max_hp - pl.max_hp * LIMB_SEAM_PCT / 100).max(LEAST_MAX_HP);
                         pl.hp = pl.hp.min(pl.max_hp);
                         ev.push(RunEvent::LimbSewn { player });
@@ -1639,9 +1854,105 @@ impl Run {
         }
     }
 
+    /// The hollow's drums are turned for this stake, and what was won or lost changes hands.
+    fn spin(&mut self, c: &Content, p: usize, stake: Stake, ev: &mut Vec<RunEvent>) -> Spin {
+        let player = p as u8;
+        let (faces, tier) = roll_hollow(&mut self.rng);
+        ev.push(RunEvent::Spun { player, faces, tier });
+        let win = tier > 0;
+        let mut won: Vec<Loot> = Vec::new();
+        let mut lost: Vec<Loot> = Vec::new();
+        let mut for_seam = false;
+        // what is won besides the stake itself: relics (dear ones first), gold
+        let (mut rare, mut any, mut gold) = (0, 0, 0);
+        match stake {
+            Stake::Gold(n) if win => gold = n * (hollow_pays(tier) - 1),
+            Stake::Gold(n) => {
+                self.players[p].gold -= n;
+                ev.push(RunEvent::Gold { player, delta: -n });
+                lost.push(Loot::Gold(n));
+            }
+            Stake::Potion(_) if win => {
+                for _ in 0..[0, 1, 2, 4][tier as usize] {
+                    let before = self.players[p].potions.len();
+                    self.give_potion(c, p, ev);
+                    match self.players[p].potions.get(before) {
+                        Some(potion) => won.push(Loot::Potion(potion.clone())),
+                        // no room on the belt: the hollow pays for it instead
+                        None => gold += HOLLOW_SPILL_GOLD,
+                    }
+                }
+            }
+            Stake::Potion(i) => {
+                let potion = self.players[p].potions.remove(i as usize);
+                ev.push(RunEvent::PotionLost { player, potion: potion.clone() });
+                lost.push(Loot::Potion(potion));
+            }
+            Stake::Relic(_) if win => (rare, any) = [(0, 0), (0, 1), (1, 0), (1, 1)][tier as usize],
+            Stake::Relic(i) => {
+                let pl = &mut self.players[p];
+                let relic = pl.relics.remove(i as usize);
+                // a belt made shorter holds less
+                pl.potions.truncate(potion_slots(&pl.relics));
+                ev.push(RunEvent::RelicLost { player, relic: relic.clone() });
+                lost.push(Loot::Relic(relic));
+            }
+            Stake::Arm(arm) if self.players[p].lost_arms & arm != 0 => {
+                for_seam = true;
+                let pl = &mut self.players[p];
+                if win {
+                    // the hollow is a gamble, not a seamstress: an arm won is back as it was
+                    put_arm_back(pl, arm);
+                    ev.push(RunEvent::LimbSewn { player });
+                    won.push(Loot::Arm(arm));
+                } else {
+                    let cut = (pl.max_hp * HOLLOW_SEAM_PCT / 100).max(1).min(pl.max_hp - LEAST_MAX_HP).max(0);
+                    pl.max_hp -= cut;
+                    pl.hp = pl.hp.min(pl.max_hp);
+                    lost.push(Loot::MaxHp(cut));
+                }
+            }
+            Stake::Arm(_) if win => (rare, any, gold) = [(0, 0, 0), (1, 0, 0), (1, 0, 100), (1, 1, 200)][tier as usize],
+            Stake::Arm(arm) => {
+                self.tear_arm(c, p, arm);
+                ev.push(RunEvent::ArmTorn { player, arm });
+                lost.push(Loot::Arm(arm));
+            }
+        }
+        for want in std::iter::repeat_n(Some(Rarity::Rare), rare).chain(std::iter::repeat_n(None, any)) {
+            if let Some(relic) = self.roll_relic_of(c, p, want) {
+                self.players[p].relics.push(relic.clone());
+                ev.push(RunEvent::RelicGained { player, relic: relic.clone() });
+                won.push(Loot::Relic(relic));
+            }
+        }
+        if gold > 0 {
+            self.players[p].gold += gold;
+            ev.push(RunEvent::Gold { player, delta: gold });
+            won.push(Loot::Gold(gold));
+        }
+        Spin { faces, tier, stake, for_seam, won, lost }
+    }
+
+    /// An arm comes off away from any fight, as a heavy blow takes it in one: it is carried from
+    /// then on, and what is left to fight with is put in the deck.
+    fn tear_arm(&mut self, c: &Content, p: usize, arm: u8) {
+        let pl = &mut self.players[p];
+        pl.lost_limbs += 1;
+        pl.lost_arms |= arm;
+        let part = format!("own_{}_{}", if arm == crate::combat::WEAPON_ARM { "weapon" } else { "shield" }, pl.hero);
+        let both = pl.lost_limbs >= 2;
+        let makeshifts = crate::combat::stump_cards(arm).iter().chain(if both { crate::combat::BOTH_ARMS_CARDS.iter() } else { [].iter() });
+        for card in std::iter::once(part.as_str()).chain(makeshifts.copied()) {
+            if c.cards.contains_key(card) {
+                pl.deck.push((card.into(), false));
+            }
+        }
+    }
+
     /// A random potion, if the player has a free slot.
     fn give_potion(&mut self, c: &Content, p: usize, ev: &mut Vec<RunEvent>) {
-        if self.players[p].potions.len() >= POTION_SLOTS {
+        if self.players[p].potions.len() >= potion_slots(&self.players[p].relics) {
             return;
         }
         let open = 10 * (self.unlocks.potion_tier as usize + 1);
@@ -1743,17 +2054,72 @@ impl Run {
     }
 
     fn roll_relic(&mut self, c: &Content, p: usize) -> Option<Id> {
+        self.roll_relic_of(c, p, None)
+    }
+
+    /// A relic of this rarity; of any, when none of it is left or the smithy has not opened it.
+    fn roll_relic_of(&mut self, c: &Content, p: usize, rarity: Option<Rarity>) -> Option<Id> {
+        if let Some(want) = rarity {
+            let any_such = c.relics.values().any(|r| r.rarity == want && r.pool == RelicPool::Any && (r.hero.is_empty() || r.hero == self.players[p].hero) && !self.players[p].relics.contains(&r.id) && self.unlocks.relic_ok(r.rarity));
+            if !any_such {
+                return self.roll_relic_of(c, p, None);
+            }
+        }
         let pl = &self.players[p];
         let pool: Vec<&RelicDef> = c
             .relics
             .values()
             .filter(|r| r.rarity != Rarity::Starter && (r.pool == RelicPool::Any || (r.pool == RelicPool::Book && self.unlocks.secrets.contains(&r.id))) && (r.hero.is_empty() || r.hero == pl.hero))
+            .filter(|r| rarity.is_none_or(|want| r.rarity == want && r.pool == RelicPool::Any))
             .filter(|r| !pl.relics.contains(&r.id) && self.unlocks.relic_ok(r.rarity))
             .collect();
         // what another player has is found only when nothing else is left
         let unclaimed: Vec<&RelicDef> = pool.iter().copied().filter(|r| !self.players.iter().any(|o| o.relics.contains(&r.id))).collect();
         self.rng.pick(if unclaimed.is_empty() { &pool } else { &unclaimed }).map(|r| r.id.clone())
     }
+}
+
+/// An arm back where it was: the arm carried goes from the deck, and with it the makeshifts,
+/// those for no arms at all too.
+fn put_arm_back(pl: &mut Player, arm: u8) {
+    let own = format!("own_{}_{}", if arm == crate::combat::WEAPON_ARM { "weapon" } else { "shield" }, pl.hero);
+    take_from_deck(pl, &own);
+    for gone in crate::combat::stump_cards(arm).iter().chain(crate::combat::BOTH_ARMS_CARDS.iter()) {
+        take_from_deck(pl, gone);
+    }
+    pl.lost_limbs = pl.lost_limbs.saturating_sub(1);
+    pl.lost_arms &= !arm;
+}
+
+/// Where the hollow's three drums stop, and the tier of the three alike (0: they are not).
+/// Whether they are alike is decided first, as the odds say; a loss is then shown as drums that
+/// did not agree, often two of them teasingly alike.
+pub fn roll_hollow(rng: &mut Rng) -> ([u8; 3], u8) {
+    let r = rng.below(1000);
+    let [bird, dear, plain] = HOLLOW_ODDS;
+    let tier = if r < bird {
+        3
+    } else if r < bird + dear {
+        2
+    } else if r < bird + dear + plain {
+        1
+    } else {
+        0
+    };
+    let faces = match tier {
+        3 => [7; 3],
+        2 => [4 + rng.below(3) as u8; 3],
+        1 => [rng.below(4) as u8; 3],
+        _ => {
+            let a = rng.below(HOLLOW_FACES as u32) as u8;
+            let other = |rng: &mut Rng| (a + 1 + rng.below(HOLLOW_FACES as u32 - 1) as u8) % HOLLOW_FACES;
+            let b = if rng.chance(45) { a } else { other(rng) };
+            let mut faces = [a, b, other(rng)];
+            rng.shuffle(&mut faces);
+            faces
+        }
+    };
+    (faces, tier)
 }
 
 /// A sensible action for a seat nobody is steering.
@@ -1855,6 +2221,8 @@ pub fn run_bot(c: &Content, run: &Run, player: u8) -> Option<RunAction> {
             x = x.wrapping_mul(0x2C1B_3C6D);
             Some(RunAction::Throw(((x >> 16) % 3) as u8))
         }
+        // the autopilot does not gamble
+        Stage::Hollow { done, .. } => (!*done.get(p)?).then_some(RunAction::LeaveHollow),
         Stage::Victory | Stage::Defeat => None,
     }
 }

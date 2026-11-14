@@ -340,6 +340,17 @@ pub fn start_offline_run(commands: &mut Commands, db: &nav_core::Content, bots: 
             }
         }
     }
+    // dev shortcut: TROPA_MAX_HP=120 gives every hero that much health, to see them stand taller
+    if let Some(max) = std::env::var("TROPA_MAX_HP").ok().and_then(|v| v.parse::<i32>().ok()) {
+        for n in std::iter::once(&mut node).chain(locals.iter_mut()) {
+            if let Some(run) = n.state.as_mut() {
+                for pl in &mut run.players {
+                    pl.max_hp = max;
+                    pl.hp = max;
+                }
+            }
+        }
+    }
     // dev shortcut: TROPA_OMEN=well opens on that omen
     if let Ok(id) = std::env::var("TROPA_OMEN") {
         for n in std::iter::once(&mut node).chain(locals.iter_mut()) {
@@ -355,6 +366,34 @@ pub fn start_offline_run(commands: &mut Commands, db: &nav_core::Content, bots: 
             if let Some(run) = n.state.as_mut() {
                 for p in &mut run.players {
                     p.potions = potions.clone();
+                }
+            }
+        }
+    }
+    // dev shortcuts: TROPA_RELICS=a,b adds those relics to every player, and TROPA_DECK=a,b,all
+    // those cards to every deck (`all`: every card of the player's own hero)
+    if let Ok(list) = std::env::var("TROPA_RELICS") {
+        let relics: Vec<String> = list.split(',').map(|s| s.trim().to_string()).filter(|s| db.relics.contains_key(s)).collect();
+        for n in std::iter::once(&mut node).chain(locals.iter_mut()) {
+            if let Some(run) = n.state.as_mut() {
+                for p in &mut run.players {
+                    p.relics.extend(relics.iter().cloned());
+                }
+            }
+        }
+    }
+    if let Ok(list) = std::env::var("TROPA_DECK") {
+        for n in std::iter::once(&mut node).chain(locals.iter_mut()) {
+            if let Some(run) = n.state.as_mut() {
+                for p in &mut run.players {
+                    for id in list.split(',').map(str::trim) {
+                        if id == "all" {
+                            let own = db.cards.values().filter(|c| c.hero == p.hero && c.rarity != nav_core::Rarity::Starter).map(|c| (c.id.clone(), false));
+                            p.deck.extend(own);
+                        } else if db.cards.contains_key(id) {
+                            p.deck.push((id.to_string(), false));
+                        }
+                    }
                 }
             }
         }
@@ -720,7 +759,7 @@ fn follow_stage(
         Stage::Reward { .. } => AppState::Reward,
         Stage::Rest { .. } => AppState::Rest,
         Stage::Shop { .. } => AppState::Shop,
-        Stage::Omen { .. } | Stage::Trophy { .. } | Stage::Chest(_) => AppState::Omen,
+        Stage::Omen { .. } | Stage::Trophy { .. } | Stage::Chest(_) | Stage::Hollow { .. } => AppState::Omen,
         Stage::Victory | Stage::Defeat => AppState::RunEnd,
     };
     let now = *state.get();

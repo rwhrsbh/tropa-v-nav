@@ -14,7 +14,7 @@
     (
         id: "em_sloth", hero: "emelya", kind: Curse, rarity: Starter, cost: 0,
         keywords: [Unplayable],
-        in_hand_end: [Apply(Drowse, N(1), Me)],
+        in_hand_end: [Apply(Drowse, N(2), Me)],
     ),
     (
         id: "em_yawn", hero: "emelya", kind: Skill, rarity: Common, cost: 0,
@@ -59,8 +59,8 @@
     ),
     (
         id: "em_by_the_pike", hero: "emelya", kind: Attack, rarity: Rare, cost: 3,
-        effects: [Hits(N(7), 5, RandomFoe)],
-        up: (effects: [Hits(N(9), 5, RandomFoe)]),
+        effects: [Hits(N(7), 5, RandomFoe), PikeWill],
+        up: (effects: [Hits(N(9), 5, RandomFoe), PikeWill]),
     ),
     (
         id: "em_nap", hero: "emelya", kind: Skill, rarity: Common, cost: 1,
@@ -141,13 +141,13 @@
     ),
     (
         id: "em_brick", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 2,
-        effects: [Damage(Stat(Drowse, Me, 2), RandomFoe), Block(N(6), Me)],
-        up: (effects: [Damage(Stat(Drowse, Me, 3), RandomFoe), Block(N(8), Me)]),
+        effects: [Damage(Stat(Drowse, Me, 1), RandomFoe), Block(N(8), Me)],
+        up: (effects: [Damage(Stat(Drowse, Me, 2), RandomFoe), Block(N(8), Me)]),
     ),
     (
         id: "em_dream_wall", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 1,
-        effects: [Block(Stat(Drowse, Me, 2), Me)],
-        up: (effects: [Block(Stat(Drowse, Me, 3), Me)]),
+        effects: [Block(N(4), Me), Block(Stat(Drowse, Me, 1), Me)],
+        up: (effects: [Block(N(4), Me), Block(Stat(Drowse, Me, 2), Me)]),
     ),
     (
         id: "em_bad_dream", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 2,
@@ -177,9 +177,9 @@
     ),
     (
         id: "em_pike_mercy", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 1,
-        effects: [Apply(Strength, N(1), Me), Block(N(4), Me)],
+        effects: [Apply(Strength, N(1), Me), Block(N(4), Me), PikeWill],
         keywords: [Exhaust],
-        up: (effects: [Apply(Strength, N(2), Me), Block(N(4), Me)]),
+        up: (effects: [Apply(Strength, N(2), Me), Block(N(4), Me), PikeWill]),
     ),
     (
         id: "em_fish_soup", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 1,

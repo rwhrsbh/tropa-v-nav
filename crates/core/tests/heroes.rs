@@ -336,11 +336,14 @@ fn death_dance_counts_the_whole_partys_cards() {
 #[test]
 fn every_hero_has_ninety_four_cards_five_of_them_for_company() {
     let c = content();
-    for hero in ["bogatyr", "vorozheya", "volhv", "volkolak", "znaharka", "skomoroh"] {
+    for hero in ["bogatyr", "vorozheya", "volhv", "volkolak", "znaharka", "skomoroh", "emelya"] {
         let mine: Vec<&CardDef> = c.cards.values().filter(|d| d.hero == hero).collect();
-        assert_eq!(mine.len(), 94, "{hero}");
-        assert!(mine.iter().filter(|d| d.keywords.contains(&Keyword::Coop)).count() >= 5, "{hero}");
-        let free = mine.iter().filter(|d| d.cost == 0 && !d.x_cost && d.rarity != Rarity::Starter).count();
+        // the jester has nine more: the fifth set, his discards; Yemelya has three to start with, not four
+        assert_eq!(mine.len(), match hero { "skomoroh" => 103, "emelya" => 93, _ => 94 }, "{hero}");
+        // Yemelya keeps to himself: none of his cards is for company
+        assert!(hero == "emelya" || mine.iter().filter(|d| d.keywords.contains(&Keyword::Coop)).count() >= 5, "{hero}");
+        // what is paid for in sleep is not free
+        let free = mine.iter().filter(|d| d.cost == 0 && d.drowse == 0 && !d.x_cost && d.rarity != Rarity::Starter).count();
         assert!(free <= 8, "{hero} has {free} free cards");
     }
 }
@@ -362,6 +365,7 @@ fn every_hero_card_can_be_played() {
                     s.heroes[0].form = Form::Beast;
                 }
                 s.heroes[0].energy = 9;
+                s.heroes[0].statuses.insert(StatusKind::Drowse, 30);
                 s.heroes[0].hand.push(Card { uid: 9000, def: def.id.clone(), upgraded, free: false });
                 let view = def.view(upgraded, s.heroes[0].form);
                 if view.has(Keyword::Unplayable) {
@@ -545,4 +549,67 @@ fn the_armless_still_have_their_own_cards() {
         let v = c.cards.get(id).unwrap().view(false, Form::Human);
         assert!(!needs_lost_arm(&v, WEAPON_ARM | SHIELD_ARM, "bogatyr", Form::Human), "{id}");
     }
+}
+
+#[test]
+fn some_of_yemelyas_cards_are_paid_for_in_sleep() {
+    let (c, mut s) = fight("emelya", &["em_oven_fork"], &["dummy"]);
+    assert_eq!(try_play(&c, &mut s, 0, "em_oven_fork", None).err(), Some(ActionError::NotEnoughEnergy), "no sleep, no card");
+    s.heroes[0].statuses.insert(StatusKind::Drowse, 5);
+    let (hp, energy) = (s.enemies[0].hp, s.heroes[0].energy);
+    play(&c, &mut s, 0, "em_oven_fork", None);
+    assert_eq!(s.status(UnitRef::Hero(0), StatusKind::Drowse), 3, "two of the five are spent");
+    assert_eq!(s.heroes[0].energy, energy, "and no strength at all");
+    assert_eq!(hp - s.enemies[0].hp, 8);
+}
+
+#[test]
+fn the_pikes_will_plays_the_top_of_the_deck_for_nothing() {
+    let card = |uid, def: &str| Card { uid, def: def.into(), upgraded: false, free: false };
+    let (c, mut s) = fight("emelya", &["em_pike_fetch"], &["dummy"]);
+    s.heroes[0].discard.clear();
+    s.heroes[0].draw = vec![card(9001, "em_lie"), card(9002, "em_stove_door")];
+    s.heroes[0].energy = 1;
+    let hp = s.enemies[0].hp;
+    play(&c, &mut s, 0, "em_pike_fetch", None);
+    assert_eq!(hp - s.enemies[0].hp, 8, "the card on top struck by itself");
+    assert_eq!(s.heroes[0].energy, 0, "only the card played by hand was paid for");
+    assert!(s.heroes[0].discard.iter().any(|x| x.uid == 9002), "and it lies where played cards lie");
+    assert!(s.heroes[0].hand.iter().any(|x| x.uid == 9001), "the draw that follows takes the next one");
+
+    // sloth on top is not played even by the pike: it is thrown away as it is
+    let (c, mut s) = fight("emelya", &["em_pike_fetch"], &["dummy"]);
+    s.heroes[0].discard.clear();
+    s.heroes[0].draw = vec![card(9001, "em_stove_door"), card(9002, "em_sloth")];
+    let hp = s.enemies[0].hp;
+    play(&c, &mut s, 0, "em_pike_fetch", None);
+    assert_eq!(s.enemies[0].hp, hp);
+    assert!(s.heroes[0].discard.iter().any(|x| x.uid == 9002));
+    assert!(s.heroes[0].hand.iter().any(|x| x.uid == 9001));
+}
+
+#[test]
+fn two_shifts_in_one_turn_turn_the_werewolf_back() {
+    let (c, mut s) = fight("volkolak", &["wolf_shift", "wolf_lunar_tide"], &["dummy"]);
+    s.heroes[0].energy = 5;
+    play(&c, &mut s, 0, "wolf_shift", None);
+    assert_eq!(s.heroes[0].form, Form::Beast);
+    play(&c, &mut s, 0, "wolf_lunar_tide", None);
+    assert_eq!(s.heroes[0].form, Form::Human, "the second shift turns him back");
+}
+
+#[test]
+fn a_card_that_shifts_the_man_shifts_the_beast_too() {
+    let c = content();
+    let shifts = |fx: &[Effect]| fx.iter().any(|e| matches!(e, Effect::Shift));
+    let mut bad = Vec::new();
+    for def in c.cards.values().filter(|d| d.hero == "volkolak") {
+        for up in [false, true] {
+            let (man, beast) = (def.view(up, Form::Human), def.view(up, Form::Beast));
+            if shifts(&man.effects) != shifts(&beast.effects) || shifts(&man.on_discard) != shifts(&beast.on_discard) {
+                bad.push(format!("{}{}", def.id, if up { "+" } else { "" }));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "{bad:?}");
 }

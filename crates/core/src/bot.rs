@@ -114,12 +114,12 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
         .filter(|(i, _)| *i >= frozen)
         .filter_map(|(_, card)| {
             let v = c.cards.get(&card.def)?.view(card.upgraded, h.form);
-            let cost = if v.x_cost { 1 } else { v.cost };
+            let cost = if v.x_cost { 1 } else { crate::combat::energy_cost(h, card, &v) };
             // paying in blood is for players who can count; the autopilot never does
             let bleeds = v.effects.iter().any(|e| matches!(e, Effect::LoseHp(_, Tgt::Me)));
             // wrapped by the serpent, attacks are refused: don't offer them
             let affordable = !bleeds && !(v.kind == CardType::Attack && h.flags.contains_key("coiled")) && !crate::combat::needs_lost_arm(&v, h.lost_arms, h.def.as_str(), h.form);
-            (!v.has(Keyword::Unplayable) && cost <= h.energy && affordable && !matches!(v.kind, CardType::Curse | CardType::Status)).then_some((card, v))
+            (!v.has(Keyword::Unplayable) && cost <= h.energy && v.drowse <= h.statuses.get(&StatusKind::Drowse).copied().unwrap_or(0) && affordable && !matches!(v.kind, CardType::Curse | CardType::Status)).then_some((card, v))
         })
         .collect();
 

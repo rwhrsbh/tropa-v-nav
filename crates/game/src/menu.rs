@@ -116,6 +116,10 @@ fn enter_menu(
                 observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Village)),
             ),
             (
+                menu_button(l10n.t("menu-library"), &fonts),
+                observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Library)),
+            ),
+            (
                 menu_button(l10n.t("menu-settings"), &fonts),
                 observe(|_: On<Activate>, mut next: ResMut<NextState<AppState>>| next.set(AppState::Settings)),
             ),

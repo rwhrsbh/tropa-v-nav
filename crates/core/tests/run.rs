@@ -613,7 +613,7 @@ fn a_schism_parts_the_party() {
 #[test]
 fn fifty_omens_of_all_four_kinds() {
     let c = content();
-    assert_eq!(c.events.values().filter(|e| !e.for_the_maimed).count(), 53);
+    assert_eq!(c.events.values().filter(|e| !e.for_the_maimed && e.id != HOLLOW_OMEN).count(), 53);
     for kind in [EventKind::Personal, EventKind::Vote, EventKind::Sacrifice, EventKind::Schism] {
         assert!(c.events.values().any(|e| e.kind == kind), "{kind:?}");
     }
@@ -723,7 +723,7 @@ fn the_card_pool_matches_the_design_document() {
     assert_eq!(count(&|d| d.hero.is_empty() && !matches!(d.kind, CardType::Curse | CardType::Status) && d.rarity != Rarity::Special), 30, "neutral");
     assert_eq!(count(&|d| d.kind == CardType::Curse), 13, "curses");
     assert_eq!(count(&|d| d.kind == CardType::Status), 9, "statuses");
-    assert_eq!(count(&|d| !d.hero.is_empty()), 564, "hero cards");
+    assert_eq!(count(&|d| !d.hero.is_empty()), 564 + 9, "hero cards, the jester's fifth set among them");
 }
 
 #[test]
@@ -1107,4 +1107,337 @@ fn what_was_thrown_away_cannot_be_sewn_back_on() {
     run.stage = Stage::Omen { id: "needle_crone".into(), picks: vec![None; 2] };
     assert_eq!(run.apply(&c, 0, &RunAction::Choose(0)), Err(RunError::BadChoice), "no head in the deck, nothing to sew");
     assert!(run.players[1].beheaded);
+}
+
+// ---- the map's forks, its pedlar, and what an omen may turn out to be ----
+
+#[test]
+fn every_land_has_a_pedlar() {
+    for seed in 0..400 {
+        let map = generate_map(&mut Rng::new(seed), Circle(0));
+        assert!(map.floors.iter().flatten().any(|n| n.kind == NodeKind::Shop), "seed {seed}: no pedlar anywhere");
+    }
+}
+
+#[test]
+fn a_fork_leads_to_different_places() {
+    let (mut forks, mut alike) = (0, 0);
+    for seed in 0..300 {
+        let map = generate_map(&mut Rng::new(seed), Circle(0));
+        for (f, floor) in map.floors.iter().enumerate() {
+            // the floors that are all one kind by design are no choice of kind
+            if f + 1 >= FLOORS || matches!(f + 1, 8 | 14) {
+                continue;
+            }
+            for node in floor.iter().filter(|n| n.next.len() > 1) {
+                let mut kinds: Vec<NodeKind> = node.next.iter().map(|j| map.floors[f + 1][*j as usize].kind).collect();
+                kinds.sort();
+                kinds.dedup();
+                forks += 1;
+                if kinds.len() < node.next.len() {
+                    alike += 1;
+                }
+            }
+        }
+    }
+    assert!(forks > 1000);
+    assert!(alike * 50 < forks, "{alike} of {forks} forks have two ways of one kind");
+}
+
+#[test]
+fn an_omen_may_be_the_pedlar_or_a_fight() {
+    let c = content();
+    let (mut tales, mut shops, mut fights, mut elites) = (0, 0, 0, 0);
+    for seed in 0..3000 {
+        let mut run = party(&c, 1, seed, 0);
+        for node in run.map.floors[0].iter_mut() {
+            node.kind = NodeKind::Event;
+        }
+        run.apply(&c, 0, &RunAction::Vote(0)).unwrap();
+        match (&run.stage, run.fighting) {
+            (Stage::Omen { .. }, _) => tales += 1,
+            (Stage::Shop { .. }, _) => shops += 1,
+            (Stage::Combat, Some(NodeKind::Elite)) => elites += 1,
+            (Stage::Combat, Some(NodeKind::Fight)) => fights += 1,
+            other => panic!("seed {seed}: an omen led to {other:?}"),
+        }
+    }
+    assert!(tales > shops + fights + elites, "most omens are still tales");
+    assert!(shops > 0 && fights > 0 && elites > 0, "{shops} pedlars, {fights} fights, {elites} elites");
+    // the pedlar is as likely as a fight of either kind, and one fight in five is an elite
+    assert!(shops * 2 > fights + elites && shops < (fights + elites) * 2, "{shops} pedlars against {} fights", fights + elites);
+    assert!(elites * 2 < fights, "{elites} elites against {fights} plain fights");
+}
+
+#[test]
+fn a_potion_is_poured_out_in_a_fight_to_no_effect() {
+    let c = content();
+    let mut run = party(&c, 1, 3, 0);
+    run.players[0].potions = vec!["mead".into(), "fire_water".into()];
+    run.apply(&c, 0, &RunAction::Vote(0)).unwrap();
+    let before = run.combat.clone().unwrap();
+    run.apply(&c, 0, &RunAction::Combat(CombatAction::DropPotion { slot: 0 })).unwrap();
+    let after = run.combat.as_ref().unwrap();
+    assert_eq!(after.heroes[0].potions, vec!["fire_water".to_string()]);
+    assert_eq!(after.heroes[0].energy, before.heroes[0].energy, "mead poured out gives no energy");
+    assert_eq!(after.enemies.iter().map(|e| e.hp).collect::<Vec<_>>(), before.enemies.iter().map(|e| e.hp).collect::<Vec<_>>());
+    assert_eq!(run.apply(&c, 0, &RunAction::Combat(CombatAction::DropPotion { slot: 5 })), Err(RunError::Combat(ActionError::NoSuchPotion)));
+}
+
+#[test]
+fn the_sash_makes_room_for_five_potions() {
+    assert_eq!(potion_slots(&[]), 3);
+    assert_eq!(potion_slots(&[POTION_SASH.to_string()]), 5);
+    assert!(content().relics.contains_key(POTION_SASH));
+}
+
+// ---- the hollow that plays for stakes ----
+
+/// A run of one, sat down at the hollow.
+fn at_the_hollow(c: &Content, seed: u64) -> Run {
+    let mut run = party(c, 1, seed, 0);
+    run.stage = Stage::Omen { id: HOLLOW_OMEN.into(), picks: vec![None] };
+    run.apply(c, 0, &RunAction::Choose(0)).unwrap();
+    assert!(matches!(run.stage, Stage::Hollow { .. }));
+    run
+}
+
+fn last_spin(run: &Run) -> Spin {
+    let Stage::Hollow { last, .. } = &run.stage else { panic!("not at the hollow") };
+    last[0].clone().expect("a spin")
+}
+
+#[test]
+fn the_hollow_is_fed_on_the_whole() {
+    let mut rng = Rng::new(11);
+    let (n, mut back, mut wins, mut near) = (200_000, 0i64, 0, 0);
+    for _ in 0..n {
+        let (faces, tier) = roll_hollow(&mut rng);
+        let alike = faces[0] == faces[1] && faces[1] == faces[2];
+        assert_eq!(alike, tier > 0, "{faces:?} for tier {tier}");
+        assert!(faces.iter().all(|f| *f < HOLLOW_FACES));
+        if alike {
+            assert_eq!(hollow_tier(faces[0]), tier);
+            wins += 1;
+            back += hollow_pays(tier) as i64;
+        } else if faces[0] == faces[1] || faces[1] == faces[2] || faces[0] == faces[2] {
+            near += 1;
+        }
+    }
+    let (win_pct, back_pct) = (wins * 100 / n, back * 100 / n as i64);
+    assert!((30..=36).contains(&win_pct), "three alike {win_pct}% of the time");
+    assert!((76..=88).contains(&back_pct), "a purse comes back as {back_pct}% of itself");
+    assert!(near * 4 > n, "a loss often teases: {near} of {n}");
+}
+
+#[test]
+fn one_may_walk_past_the_hollow_and_the_rest_wait() {
+    let c = content();
+    let mut run = party(&c, 2, 3, 0);
+    run.stage = Stage::Omen { id: HOLLOW_OMEN.into(), picks: vec![None; 2] };
+    run.apply(&c, 0, &RunAction::Choose(1)).unwrap();
+    run.apply(&c, 1, &RunAction::Choose(0)).unwrap();
+    let Stage::Hollow { done, .. } = &run.stage else { panic!("{:?}", run.stage) };
+    assert_eq!(done, &vec![true, false]);
+    assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Gold(25))), Err(RunError::AlreadyDone), "who passed by does not play");
+    run.apply(&c, 1, &RunAction::Spin(Stake::Gold(25))).unwrap();
+    run.apply(&c, 1, &RunAction::LeaveHollow).unwrap();
+    assert!(matches!(run.stage, Stage::Map { .. }));
+    // and if nobody plays, the road simply goes on
+    let mut run = party(&c, 2, 3, 0);
+    run.stage = Stage::Omen { id: HOLLOW_OMEN.into(), picks: vec![None; 2] };
+    run.apply(&c, 0, &RunAction::Choose(1)).unwrap();
+    run.apply(&c, 1, &RunAction::Choose(1)).unwrap();
+    assert!(matches!(run.stage, Stage::Map { .. }));
+}
+
+#[test]
+fn gold_at_the_hollow_is_won_or_lost_whole() {
+    let c = content();
+    let (mut won, mut lost) = (0, 0);
+    for seed in 0..300 {
+        let mut run = at_the_hollow(&c, seed);
+        run.players[0].gold = 100;
+        assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Gold(40))), Err(RunError::NotEnoughGold), "only the purses it names");
+        run.apply(&c, 0, &RunAction::Spin(Stake::Gold(50))).unwrap();
+        let spin = last_spin(&run);
+        if spin.tier > 0 {
+            won += 1;
+            assert_eq!(run.players[0].gold, 100 + 50 * (hollow_pays(spin.tier) - 1));
+            assert_eq!(spin.won, vec![Loot::Gold(50 * (hollow_pays(spin.tier) - 1))]);
+        } else {
+            lost += 1;
+            assert_eq!(run.players[0].gold, 50);
+            assert_eq!(spin.lost, vec![Loot::Gold(50)]);
+        }
+        // as often as one dares, while the purse lasts
+        run.players[0].gold = 25;
+        run.apply(&c, 0, &RunAction::Spin(Stake::Gold(25))).unwrap();
+        if run.players[0].gold < 100 {
+            assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Gold(100))), Err(RunError::NotEnoughGold));
+        }
+    }
+    assert!(won > 60 && lost > 150, "{won} won, {lost} lost");
+}
+
+#[test]
+fn relics_and_potions_are_staked_too() {
+    let c = content();
+    let (mut kept, mut gone) = (0, 0);
+    for seed in 0..200 {
+        let mut run = at_the_hollow(&c, seed);
+        assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Relic(0))), Err(RunError::BadChoice), "not what the hero set out with");
+        assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Potion(0))), Err(RunError::BadChoice), "no potion to stake");
+        run.players[0].relics.push(POTION_SASH.into());
+        let potion = c.potions.keys().next().unwrap().clone();
+        run.players[0].potions = vec![potion.clone(); 5];
+        run.apply(&c, 0, &RunAction::Spin(Stake::Relic(1))).unwrap();
+        let spin = last_spin(&run);
+        if spin.tier > 0 {
+            kept += 1;
+            assert!(run.players[0].relics.iter().any(|r| r == POTION_SASH));
+            assert!(spin.won.iter().any(|l| matches!(l, Loot::Relic(_))), "{:?}", spin.won);
+            assert!(run.players[0].relics.len() >= 3);
+        } else {
+            gone += 1;
+            assert!(!run.players[0].relics.iter().any(|r| r == POTION_SASH));
+            assert_eq!(run.players[0].potions.len(), 3, "a shorter belt holds less");
+            assert_eq!(spin.lost, vec![Loot::Relic(POTION_SASH.into())]);
+        }
+        run.players[0].potions = vec![potion.clone(); 2];
+        let gold = run.players[0].gold;
+        run.apply(&c, 0, &RunAction::Spin(Stake::Potion(0))).unwrap();
+        let spin = last_spin(&run);
+        if spin.tier > 0 {
+            let room = potion_slots(&run.players[0].relics);
+            assert!(run.players[0].potions.len() > 2 && run.players[0].potions.len() <= room);
+            // what the belt had no room for is paid in gold
+            let got = [0usize, 1, 2, 4][spin.tier as usize];
+            let poured = run.players[0].potions.len() - 2;
+            assert_eq!(run.players[0].gold, gold + (got - poured) as i32 * HOLLOW_SPILL_GOLD);
+        } else {
+            assert_eq!(run.players[0].potions.len(), 1);
+        }
+    }
+    assert!(kept > 40 && gone > 100, "{kept} kept, {gone} gone");
+}
+
+#[test]
+fn an_arm_is_staked_torn_off_and_won_back() {
+    let c = content();
+    let arm = nav_core::combat::WEAPON_ARM;
+    let (mut torn, mut prized, mut sewn, mut paid) = (0, 0, 0, 0);
+    for seed in 0..300 {
+        let mut run = at_the_hollow(&c, seed);
+        assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Arm(7))), Err(RunError::BadChoice));
+        let hero = run.players[0].hero.clone();
+        let (deck, relics) = (run.players[0].deck.len(), run.players[0].relics.len());
+        run.apply(&c, 0, &RunAction::Spin(Stake::Arm(arm))).unwrap();
+        let spin = last_spin(&run);
+        assert!(!spin.for_seam);
+        if spin.tier > 0 {
+            prized += 1;
+            assert_eq!(run.players[0].lost_arms, 0);
+            let won = &run.players[0].relics[relics];
+            assert_eq!(c.relics[won.as_str()].rarity, Rarity::Rare, "an arm staked and kept wins a rare relic");
+            continue;
+        }
+        torn += 1;
+        assert_eq!((run.players[0].lost_limbs, run.players[0].lost_arms), (1, arm));
+        assert!(run.players[0].deck.iter().any(|(id, _)| *id == format!("own_weapon_{hero}")), "the arm is carried from now on");
+        assert!(run.players[0].deck.iter().any(|(id, _)| id == "stump_bash"));
+        assert!(run.players[0].deck.len() > deck);
+        // now it is health that is staked, and the arm that is won
+        let max = run.players[0].max_hp;
+        run.apply(&c, 0, &RunAction::Spin(Stake::Arm(arm))).unwrap();
+        let spin = last_spin(&run);
+        assert!(spin.for_seam);
+        if spin.tier > 0 {
+            sewn += 1;
+            assert_eq!((run.players[0].lost_limbs, run.players[0].lost_arms), (0, 0));
+            assert_eq!(run.players[0].max_hp, max, "an arm won back costs nothing more");
+            assert!(spin.lost.is_empty());
+            assert_eq!(run.players[0].deck.len(), deck, "arm and makeshifts are gone from the deck");
+        } else {
+            paid += 1;
+            assert_eq!(run.players[0].lost_arms, arm);
+            assert_eq!(run.players[0].max_hp, max - max * HOLLOW_SEAM_PCT / 100);
+            assert!(run.players[0].hp <= run.players[0].max_hp);
+        }
+    }
+    assert!(torn > 150 && prized > 60 && sewn > 30 && paid > 90, "{torn} torn, {prized} prized, {sewn} sewn, {paid} paid");
+}
+
+#[test]
+fn health_is_not_staked_to_the_last() {
+    let c = content();
+    let mut run = at_the_hollow(&c, 1);
+    run.players[0].lost_limbs = 1;
+    run.players[0].lost_arms = nav_core::combat::SHIELD_ARM;
+    run.players[0].max_hp = 10;
+    run.players[0].hp = 10;
+    assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Arm(nav_core::combat::SHIELD_ARM))), Err(RunError::BadChoice));
+    // the other arm is still there to lose
+    run.apply(&c, 0, &RunAction::Spin(Stake::Arm(nav_core::combat::WEAPON_ARM))).unwrap();
+}
+
+#[test]
+fn the_hollow_is_met_on_the_road_now_and_then() {
+    let c = content();
+    let (mut hollows, mut shops) = (0, 0);
+    for seed in 0..4000 {
+        let mut run = party(&c, 1, seed, 0);
+        for node in run.map.floors[0].iter_mut() {
+            node.kind = NodeKind::Event;
+        }
+        run.apply(&c, 0, &RunAction::Vote(0)).unwrap();
+        match &run.stage {
+            Stage::Omen { id, .. } if id == HOLLOW_OMEN => hollows += 1,
+            Stage::Shop { .. } => shops += 1,
+            _ => {}
+        }
+    }
+    assert!(hollows > 0 && hollows * 3 > shops && hollows < shops * 3, "{hollows} hollows against {shops} pedlars");
+}
+
+#[test]
+fn no_two_fights_running_bring_the_same_foes() {
+    let c = content();
+    for seed in 0..40 {
+        let Some(mut run) = Run::new(&c, &ids(&["bogatyr"]), seed, 0) else { continue };
+        let mut before: Vec<Id> = Vec::new();
+        for _ in 0..12 {
+            run.open_fight(&c, NodeKind::Fight);
+            let now = run.last_foes.clone();
+            assert!(!now.iter().any(|f| before.contains(f)), "seed {seed}: {before:?} then {now:?}");
+            before = now;
+        }
+    }
+}
+
+#[test]
+fn no_two_relics_do_the_same() {
+    let c = content();
+    // what a relic does, with the names its counters are kept under left out
+    let key = |r: &RelicDef| {
+        let mut s = format!("{:?}", r.passives);
+        for head in ["OncePerTurn(\"", "EveryThisTurn(\"", "Every(\"", "Once(\""] {
+            let mut out = String::new();
+            let mut rest = s.as_str();
+            while let Some(at) = rest.find(head) {
+                out.push_str(&rest[..at + head.len()]);
+                rest = &rest[at + head.len()..];
+                rest = &rest[rest.find('"').unwrap_or(0)..];
+            }
+            out.push_str(rest);
+            s = out;
+        }
+        s
+    };
+    let mut by: std::collections::BTreeMap<String, Vec<&str>> = Default::default();
+    for r in c.relics.values().filter(|r| !r.passives.is_empty()) {
+        by.entry(key(r)).or_default().push(&r.id);
+    }
+    let twins: Vec<_> = by.values().filter(|v| v.len() > 1).collect();
+    assert!(twins.is_empty(), "relics that do the same: {twins:?}");
 }

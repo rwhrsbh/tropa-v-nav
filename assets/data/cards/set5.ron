@@ -1,0 +1,73 @@
+// Пятый набор: Скоморох чаще сбрасывает карты и чаще получает за сброшенное.
+// «Если эту карту сбросить» (on_discard) срабатывает И при сбросе, сама карта при этом играется как обычно.
+// Первые пять записей переписывают карты третьего набора (файлы читаются по порядку имён,
+// поздняя запись с тем же id заменяет раннюю): к ним добавлен сброс или эффект при сбросе.
+[
+    // ---------------- прежние карты, теперь со сбросом ----------------
+    (id: "sk_coin_trick", hero: "skomoroh", kind: Skill, rarity: Common, cost: 0,
+        effects: [Draw(N(1)), Discard(N(1))],
+        up: (effects: [Draw(N(2)), Discard(N(1))]),
+    ),
+    (id: "sk_jingle", hero: "skomoroh", kind: Skill, rarity: Common, cost: 1,
+        effects: [Draw(N(3)), Discard(N(1))],
+        up: (effects: [Draw(N(4)), Discard(N(1))]),
+    ),
+    (id: "sk_juggle_knives", hero: "skomoroh", kind: Attack, rarity: Common, cost: 1,
+        effects: [Damage(N(3), RandomFoe), Damage(N(3), RandomFoe)], on_discard: [Damage(N(4), RandomFoe)],
+        up: (effects: [Damage(N(5), RandomFoe), Damage(N(5), RandomFoe)], on_discard: [Damage(N(6), RandomFoe)]),
+    ),
+    (id: "sk_curtsy", hero: "skomoroh", kind: Skill, rarity: Common, cost: 0,
+        effects: [Block(N(3), Me)], on_discard: [Block(N(3), Me)],
+        up: (effects: [Block(N(5), Me)], on_discard: [Block(N(5), Me)]),
+    ),
+    (id: "sk_squib", hero: "skomoroh", kind: Attack, rarity: Common, cost: 1,
+        effects: [Damage(N(4), AllFoes)], on_discard: [Damage(N(2), AllFoes)],
+        up: (effects: [Damage(N(6), AllFoes)], on_discard: [Damage(N(3), AllFoes)]),
+    ),
+    // ---------------- новые карты ----------------
+    // Нож из рукава
+    (id: "sk_sleeve_knife", hero: "skomoroh", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(N(7), Target)], on_discard: [Damage(N(5), RandomFoe)],
+        up: (effects: [Damage(N(10), Target)], on_discard: [Damage(N(7), RandomFoe)]),
+    ),
+    // Швырок: сбрось карту и ударь
+    (id: "sk_fling", hero: "skomoroh", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Discard(N(1)), Damage(N(9), Target)],
+        up: (effects: [Discard(N(1)), Damage(N(12), Target)]),
+    ),
+    // Затеряться в толпе
+    (id: "sk_hide_in_crowd", hero: "skomoroh", kind: Skill, rarity: Common, cost: 1,
+        effects: [Discard(N(1)), Block(N(8), Me)],
+        up: (effects: [Discard(N(1)), Block(N(11), Me)]),
+    ),
+    // Запасная личина
+    (id: "sk_spare_mask", hero: "skomoroh", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Block(N(5), Me)], on_discard: [Draw(N(2))],
+        up: (effects: [Block(N(8), Me)], on_discard: [Draw(N(2))]),
+    ),
+    // Напёрстки
+    (id: "sk_shell_game", hero: "skomoroh", kind: Skill, rarity: Uncommon, cost: 0,
+        effects: [Discard(N(2)), Energy(N(1), Me)],
+        up: (effects: [Discard(N(1)), Energy(N(1), Me)]),
+    ),
+    // Плюх в лужу
+    (id: "sk_belly_flop", hero: "skomoroh", kind: Attack, rarity: Uncommon, cost: 1,
+        effects: [Damage(N(4), AllFoes)], on_discard: [Apply(Weak, N(1), AllFoes)],
+        up: (effects: [Damage(N(7), AllFoes)], on_discard: [Apply(Weak, N(1), AllFoes)]),
+    ),
+    // Раскидать реквизит
+    (id: "sk_scatter_props", hero: "skomoroh", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Discard(N(2)), Damage(Discarded(6), Target)],
+        up: (effects: [Discard(N(2)), Damage(Discarded(8), Target)]),
+    ),
+    // Пустышка: сыграть нельзя, только сбросить
+    (id: "sk_dud", hero: "skomoroh", kind: Skill, rarity: Uncommon, cost: 0, keywords: [Unplayable],
+        on_discard: [Block(N(7), Me), Draw(N(1))],
+        up: (on_discard: [Block(N(10), Me), Draw(N(1))]),
+    ),
+    // Балаганная выучка
+    (id: "sk_show_drill", hero: "skomoroh", kind: Power, rarity: Rare, cost: 1,
+        passives: [(on: Discarded, effects: [OncePerTurn("show_drill", [Draw(N(1))])])],
+        up: (cost: 0),
+    ),
+]

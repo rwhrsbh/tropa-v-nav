@@ -346,7 +346,7 @@ fn forecast_energy(session: Res<Session>, db: Res<Db>, aim: Res<Aim>, mut labels
     let Some(c) = h.hand.iter().find(|c| c.uid == card) else { return };
     let Some(def) = db.0.cards.get(&c.def) else { return };
     let view = def.view(c.upgraded, h.form);
-    let cost = if c.free { 0 } else if view.x_cost { h.energy } else { view.cost };
+    let cost = if c.free { 0 } else if view.x_cost { h.energy } else { nav_core::combat::energy_cost(h, c, &view) };
     for (label, mut text) in &mut labels {
         if *label == Label::Energy {
             let line = format!("{} → {}", h.energy, (h.energy - cost).max(0));

@@ -40,7 +40,7 @@ impl CardFlip {
 /// Whether the upgrade changes anything to show.
 pub fn upgrades(def: &CardDef, form: Form, l10n: &L10n) -> bool {
     let (now, up) = (def.view(false, form), def.view(true, form));
-    now.cost != up.cost || l10n.card_text(&def.id, def, &now) != l10n.card_text(&def.id, def, &up)
+    now.cost != up.cost || now.drowse != up.drowse || l10n.card_text(&def.id, def, &now) != l10n.card_text(&def.id, def, &up)
 }
 
 /// A press with the right button is not a press of the button under it.

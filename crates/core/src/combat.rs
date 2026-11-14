@@ -54,7 +54,7 @@ pub fn bonus_ready(c: &Content, s: &Combat, slot: u8, effects: &[Effect]) -> boo
                     conds(then, out);
                     conds(other, out);
                 }
-                Effect::Repeat(_, body) | Effect::Once(_, body) | Effect::OncePerTurn(_, body) => conds(body, out),
+                Effect::Repeat(_, body) | Effect::Once(_, body) | Effect::OncePerTurn(_, body) | Effect::Every(_, _, body) | Effect::EveryThisTurn(_, _, body) => conds(body, out),
                 _ => {}
             }
         }
@@ -137,7 +137,7 @@ fn any_effect(effects: &[Effect], test: &dyn Fn(&Effect) -> bool) -> bool {
         test(e)
             || match e {
                 Effect::If(_, then, other) => any_effect(then, test) || any_effect(other, test),
-                Effect::Repeat(_, inner) | Effect::Once(_, inner) | Effect::OncePerTurn(_, inner) => any_effect(inner, test),
+                Effect::Repeat(_, inner) | Effect::Once(_, inner) | Effect::OncePerTurn(_, inner) | Effect::Every(_, _, inner) | Effect::EveryThisTurn(_, _, inner) => any_effect(inner, test),
                 _ => false,
             }
     })
@@ -276,6 +276,13 @@ pub fn apply(c: &Content, s: &mut Combat, player: u8, action: &CombatAction) -> 
         CombatAction::Raise { ally, discard } => ex.raise(player, *ally, *discard)?,
         CombatAction::Pass { card, to } => ex.pass(player, *card, *to)?,
         CombatAction::UsePotion { slot, target } => ex.use_potion(player, *slot, *target)?,
+        CombatAction::DropPotion { slot } => {
+            if *slot as usize >= ex.s.heroes[player as usize].potions.len() {
+                return Err(ActionError::NoSuchPotion);
+            }
+            let potion = ex.s.heroes[player as usize].potions.remove(*slot as usize);
+            ex.ev.push(Event::PotionDropped { player, potion });
+        }
     }
     ex.check_end();
     ex.maybe_close();
@@ -912,16 +919,14 @@ impl<'a> Exec<'a> {
                 return Err(ActionError::Hidden);
             }
         }
-        let carves = view.effects.iter().any(|e| matches!(e, Effect::Rune(..)));
-        let free_rune = carves && h.flags.get("free_rune").copied().unwrap_or(0) > 0;
-        let cost = if card.free || free_rune {
-            0
-        } else if view.x_cost {
-            h.energy
-        } else {
-            view.cost
-        };
+        let free_rune = carves_free(h, &view);
+        let cost = if view.x_cost && !card.free { h.energy } else { energy_cost(h, &card, &view) };
         if h.energy < cost {
+            return Err(ActionError::NotEnoughEnergy);
+        }
+        // some of Yemelya's cards are paid for in sleep, not in strength
+        let drowse = if card.free { 0 } else { view.drowse };
+        if h.statuses.get(&S::Drowse).copied().unwrap_or(0) < drowse {
             return Err(ActionError::NotEnoughEnergy);
         }
         let target = match (view.target, target) {
@@ -963,9 +968,64 @@ impl<'a> Exec<'a> {
         if free_rune {
             *h.flags.entry("free_rune".into()).or_insert(1) -= 1;
         }
+        self.add_status(UnitRef::Hero(p), S::Drowse, -drowse);
+        self.resolve(p, card, view, target, cost, charmed && target.is_none());
+        Ok(())
+    }
+
+    /// The pike's will: the card on top of the draw pile plays itself, for nothing, at whoever
+    /// it may fall on. What cannot be played goes to the discard pile as it is.
+    fn play_top(&mut self, p: u8) {
+        // what lies on top is not known to one who only looks ahead
+        if self.s.foretelling || self.s.heroes[p as usize].downed {
+            return;
+        }
+        if self.s.heroes[p as usize].draw.is_empty() {
+            let mut pile = std::mem::take(&mut self.s.heroes[p as usize].discard);
+            if pile.is_empty() {
+                return;
+            }
+            self.s.rng.shuffle(&mut pile);
+            self.s.heroes[p as usize].draw = pile;
+            self.ev.push(Event::Shuffled { player: p });
+        }
+        let Some(card) = self.hero(p).draw.pop() else { return };
+        let h = &self.s.heroes[p as usize];
+        let view = self.c.cards.get(&card.def).map(|d| d.view(card.upgraded, h.form));
+        let barred = match &view {
+            None => true,
+            Some(v) => v.has(Keyword::Unplayable) || (v.kind == CardType::Attack && h.flags.contains_key("coiled")) || needs_lost_arm(v, h.lost_arms, h.def.as_str(), h.form),
+        };
+        let aim = view.as_ref().map_or(CardTarget::None, |v| v.target);
+        let target = match aim {
+            CardTarget::None => None,
+            CardTarget::Enemy => {
+                let foes = self.living();
+                self.s.rng.pick(&foes).copied().map(UnitRef::Enemy)
+            }
+            CardTarget::Ally => {
+                let others: Vec<u8> = self.standing().into_iter().filter(|s| *s != p).collect();
+                self.s.rng.pick(&others).copied().map(UnitRef::Hero)
+            }
+            CardTarget::AnyHero => Some(UnitRef::Hero(p)),
+            CardTarget::Downed => self.s.heroes.iter().find(|a| a.downed).map(|a| UnitRef::Hero(a.slot)),
+        };
+        let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed) && target.is_none();
+        match view {
+            Some(view) if !barred && !nobody => self.resolve(p, card, view, target, 0, false),
+            _ => {
+                self.ev.push(Event::CardAdded { player: p, card: card.def.clone(), pile: Pile::Discard });
+                self.hero(p).discard.push(card);
+            }
+        }
+    }
+
+    /// A card already out of its pile and paid for does what it says, and goes where played
+    /// cards go.
+    fn resolve(&mut self, p: u8, card: Card, view: CardView, target: Option<UnitRef>, cost: i32, wasted: bool) {
         self.ev.push(Event::CardPlayed { player: p, card: card.def.clone(), upgraded: card.upgraded, target });
         // charmed and alone: the blow has no friend to turn on, and is seen to go to waste
-        if charmed && target.is_none() {
+        if wasted {
             self.ev.push(Event::Missed { unit: UnitRef::Hero(p) });
         }
         let mut ctx = Ctx {
@@ -991,7 +1051,7 @@ impl<'a> Exec<'a> {
         self.s.log.push(Played { player: p, card: card.def.clone(), upgraded: card.upgraded, kind: view.kind });
 
         if self.s.heroes[p as usize].downed {
-            return Ok(());
+            return;
         }
         self.fire(p, Trigger::CardPlayed);
         if view.kind == CardType::Skill {
@@ -1013,7 +1073,6 @@ impl<'a> Exec<'a> {
             let to = self.s.rng.pick(&others).copied().unwrap_or(p);
             self.gain_block(UnitRef::Hero(to), 2);
         }
-        Ok(())
     }
 
     fn use_potion(&mut self, p: u8, slot: u8, target: Option<UnitRef>) -> Result<(), ActionError> {
@@ -1608,6 +1667,17 @@ impl<'a> Exec<'a> {
                         }
                     }
                 }
+                Effect::Every(name, n, body) | Effect::EveryThisTurn(name, n, body) => {
+                    if let UnitRef::Hero(i) = ctx.src {
+                        let key = counter_key(name, matches!(e, Effect::EveryThisTurn(..)));
+                        let at = self.hero(i).flags.entry(key).or_insert(0);
+                        *at += 1;
+                        if *at >= *n {
+                            *at = 0;
+                            self.run(body, ctx);
+                        }
+                    }
+                }
                 Effect::MaxHp(a, t) => {
                     let n = self.amount(ctx, a);
                     for u in self.targets(ctx, *t) {
@@ -1671,6 +1741,11 @@ impl<'a> Exec<'a> {
                     }
                 }
                 Effect::Hook(name) => crate::hooks::run(self, ctx, name),
+                Effect::PikeWill => {
+                    if let UnitRef::Hero(me) = ctx.src {
+                        self.play_top(me);
+                    }
+                }
                 Effect::Discard(a) => {
                     let n = self.amount(ctx, a);
                     if let UnitRef::Hero(me) = ctx.src {
@@ -2021,7 +2096,6 @@ impl<'a> Exec<'a> {
                 continue;
             }
             let Some(intent) = self.s.enemies[idx].intent.clone() else { continue };
-            self.s.enemies[idx].step += 1;
             let me = UnitRef::Enemy(uid);
             let Some(mv) = self.c.enemies.get(&self.s.enemies[idx].def).and_then(|d| d.moves.get(intent.mv)).cloned() else {
                 continue;
@@ -2035,6 +2109,10 @@ impl<'a> Exec<'a> {
                 self.clear_status(me, S::Fear);
                 self.ev.push(Event::EnemySkipped { enemy: uid, fear: true });
             } else {
+                // a move only counts as made when it is made: one stunned or scared out of it is
+                // tried again next round, so a thief stopped mid-theft steals again, and does not
+                // throw a purse it never filled
+                self.s.enemies[idx].step += 1;
                 let mut target = intent.target;
                 if target.is_some_and(|t| self.s.heroes[t as usize].downed) {
                     let standing = self.standing();
@@ -2135,5 +2213,20 @@ impl<'a> Exec<'a> {
             }
             self.ev.push(Event::Ended { won: true });
         }
+    }
+}
+
+/// A card that carves a rune while the next rune is promised free.
+fn carves_free(h: &Hero, view: &CardView) -> bool {
+    view.effects.iter().any(|e| matches!(e, Effect::Rune(..))) && h.flags.get("free_rune").copied().unwrap_or(0) > 0
+}
+
+/// What playing this card costs this hero in energy right now: nothing for an echo or a rune
+/// promised free, else what is printed on it (an X card is not priced here).
+pub fn energy_cost(h: &Hero, card: &Card, view: &CardView) -> i32 {
+    if card.free || carves_free(h, view) {
+        0
+    } else {
+        view.cost
     }
 }

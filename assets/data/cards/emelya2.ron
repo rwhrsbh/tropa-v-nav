@@ -1,0 +1,185 @@
+// Емеля, вторая печь: Дрёмы у него теперь больше, и часть карт ею и оплачивается (drowse вместо
+// cost). Щучье веление (PikeWill) само разыгрывает верхнюю карту колоды, даром.
+[
+    (
+        id: "em_pike_fetch", hero: "emelya", kind: Skill, rarity: Common, cost: 1,
+        effects: [PikeWill, Draw(N(1))],
+        up: (effects: [PikeWill, Draw(N(2))]),
+    ),
+    (
+        id: "em_sweet_nap", hero: "emelya", kind: Skill, rarity: Common, cost: 0,
+        effects: [Apply(Drowse, N(2), Me)],
+        up: (effects: [Apply(Drowse, N(3), Me)]),
+    ),
+    (
+        id: "em_oven_fork", hero: "emelya", kind: Attack, rarity: Common, cost: 0, drowse: 2,
+        effects: [Damage(N(8), RandomFoe)],
+        up: (effects: [Damage(N(11), RandomFoe)]),
+    ),
+    (
+        id: "em_poker", hero: "emelya", kind: Attack, rarity: Common, cost: 0, drowse: 3,
+        effects: [Damage(N(6), AllFoes)],
+        up: (effects: [Damage(N(9), AllFoes)]),
+    ),
+    (
+        id: "em_sheepskin", hero: "emelya", kind: Skill, rarity: Common, cost: 0, drowse: 2,
+        effects: [Block(N(8), Me)],
+        up: (effects: [Block(N(11), Me)]),
+    ),
+    (
+        id: "em_rolling_pin", hero: "emelya", kind: Attack, rarity: Common, cost: 0, drowse: 1,
+        effects: [Hits(N(3), 2, RandomFoe)],
+        up: (effects: [Hits(N(4), 2, RandomFoe)]),
+    ),
+    (
+        id: "em_stretch", hero: "emelya", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(N(5), Me), Apply(Drowse, N(1), Me), Draw(N(1))],
+        up: (effects: [Block(N(7), Me), Apply(Drowse, N(2), Me), Draw(N(1))]),
+    ),
+    (
+        id: "em_firewood", hero: "emelya", kind: Attack, rarity: Common, cost: 1,
+        effects: [Hits(N(4), 2, RandomFoe), Apply(Drowse, N(1), Me)],
+        up: (effects: [Hits(N(5), 2, RandomFoe), Apply(Drowse, N(2), Me)]),
+    ),
+    (
+        id: "em_kvass", hero: "emelya", kind: Skill, rarity: Common, cost: 0, drowse: 2,
+        effects: [Draw(N(2))],
+        up: (effects: [Draw(N(3))]),
+    ),
+    (
+        id: "em_bream", hero: "emelya", kind: Attack, rarity: Common, cost: 0, drowse: 2,
+        effects: [Damage(N(5), RandomFoe), Apply(Vulnerable, N(1), AllFoes)],
+        up: (effects: [Damage(N(8), RandomFoe), Apply(Vulnerable, N(1), AllFoes)]),
+    ),
+    (
+        id: "em_pike_whisper", hero: "emelya", kind: Attack, rarity: Common, cost: 1,
+        effects: [Damage(N(5), RandomFoe), PikeWill],
+        up: (effects: [Damage(N(8), RandomFoe), PikeWill]),
+    ),
+    (
+        id: "em_seeds", hero: "emelya", kind: Skill, rarity: Common, cost: 1,
+        effects: [Apply(Drowse, N(3), Me), Draw(N(1))],
+        up: (effects: [Apply(Drowse, N(4), Me), Draw(N(1))]),
+    ),
+    (
+        id: "em_sleigh_train", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 0, drowse: 5,
+        effects: [Damage(N(12), AllFoes)],
+        up: (effects: [Damage(N(16), AllFoes)]),
+    ),
+    (
+        id: "em_samovar", hero: "emelya", kind: Power, rarity: Uncommon, cost: 0, drowse: 8,
+        passives: [(on: TurnStart, effects: [Energy(N(1), Me)])],
+        up: (drowse: 6),
+    ),
+    (
+        id: "em_i_want", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 0, drowse: 3,
+        effects: [PikeWill, PikeWill],
+        up: (drowse: 2),
+    ),
+    (
+        id: "em_stove_bench", hero: "emelya", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: TurnEnd, effects: [If(Has(Drowse, Me, 5), [Block(N(5), Me)], [])])],
+        up: (passives: [(on: TurnEnd, effects: [If(Has(Drowse, Me, 5), [Block(N(7), Me)], [])])]),
+    ),
+    (
+        id: "em_pike_grip", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 0, drowse: 4,
+        effects: [Hits(N(5), 3, RandomFoe)],
+        up: (effects: [Hits(N(6), 3, RandomFoe)]),
+    ),
+    (
+        id: "em_sbiten", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 0, drowse: 3,
+        effects: [Heal(N(7), Me)],
+        keywords: [Exhaust],
+        up: (effects: [Heal(N(10), Me)]),
+    ),
+    (
+        id: "em_sloth_friend", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 0,
+        effects: [AddCard(card: "em_sloth", pile: Hand, to: Me), Apply(Drowse, N(3), Me)],
+        up: (effects: [AddCard(card: "em_sloth", pile: Hand, to: Me), Apply(Drowse, N(4), Me)]),
+    ),
+    (
+        id: "em_bucket_row", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 2,
+        effects: [Block(N(10), Me), PikeWill],
+        up: (effects: [Block(N(14), Me), PikeWill]),
+    ),
+    (
+        id: "em_ice_fishing", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Draw(N(2)), Apply(Drowse, N(2), Me)],
+        up: (effects: [Draw(N(3)), Apply(Drowse, N(2), Me)]),
+    ),
+    (
+        id: "em_half_awake", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 1,
+        effects: [If(Has(Drowse, Me, 6), [Damage(N(14), RandomFoe)], [Damage(N(7), RandomFoe)])],
+        up: (effects: [If(Has(Drowse, Me, 6), [Damage(N(18), RandomFoe)], [Damage(N(9), RandomFoe)])]),
+    ),
+    (
+        id: "em_fish_pie", hero: "emelya", kind: Skill, rarity: Uncommon, cost: 0, drowse: 4,
+        effects: [Apply(Strength, N(2), Me)],
+        keywords: [Exhaust],
+        up: (effects: [Apply(Strength, N(3), Me)]),
+    ),
+    (
+        id: "em_splash", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 0, drowse: 3,
+        effects: [Damage(N(5), AllFoes), Apply(Weak, N(1), AllFoes)],
+        up: (effects: [Damage(N(7), AllFoes), Apply(Weak, N(2), AllFoes)]),
+    ),
+    (
+        id: "em_pike_to_work", hero: "emelya", kind: Attack, rarity: Uncommon, cost: 2,
+        effects: [Damage(N(8), AllFoes), PikeWill],
+        up: (effects: [Damage(N(11), AllFoes), PikeWill]),
+    ),
+    (
+        id: "em_mother_pike", hero: "emelya", kind: Power, rarity: Rare, cost: 3,
+        passives: [(on: TurnStart, effects: [PikeWill])],
+        up: (cost: 2),
+    ),
+    (
+        id: "em_sleepy_kingdom", hero: "emelya", kind: Skill, rarity: Rare, cost: 0, drowse: 6,
+        effects: [Apply(Weak, N(3), AllFoes), Apply(Vulnerable, N(3), AllFoes)],
+        keywords: [Exhaust],
+        up: (drowse: 4),
+    ),
+    (
+        id: "em_bear_sleep", hero: "emelya", kind: Skill, rarity: Rare, cost: 2,
+        effects: [Apply(Drowse, N(8), Me), Heal(N(6), Me)],
+        keywords: [Exhaust],
+        up: (effects: [Apply(Drowse, N(11), Me), Heal(N(8), Me)]),
+    ),
+    (
+        id: "em_stove_ram", hero: "emelya", kind: Attack, rarity: Rare, cost: 0, drowse: 8,
+        effects: [Damage(N(30), RandomFoe)],
+        up: (effects: [Damage(N(40), RandomFoe)]),
+    ),
+    (
+        id: "em_golden_pike", hero: "emelya", kind: Skill, rarity: Rare, cost: 1,
+        effects: [PikeWill, PikeWill, PikeWill],
+        keywords: [Exhaust],
+        up: (cost: 0),
+    ),
+    (
+        id: "em_dream_come_true", hero: "emelya", kind: Power, rarity: Rare, cost: 1,
+        passives: [(on: AttackPlayed, effects: [Apply(Drowse, N(1), Me)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "em_all_by_itself", hero: "emelya", kind: Skill, rarity: Rare, cost: 0, drowse: 5,
+        effects: [Energy(N(2), Me), Draw(N(2))],
+        up: (effects: [Energy(N(3), Me), Draw(N(2))]),
+    ),
+    (
+        id: "em_feast", hero: "emelya", kind: Skill, rarity: Rare, cost: 0, drowse: 7,
+        effects: [Heal(N(10), Me), MaxHp(N(3), Me)],
+        keywords: [Exhaust],
+        up: (effects: [Heal(N(14), Me), MaxHp(N(4), Me)]),
+    ),
+    (
+        id: "em_pike_order", hero: "emelya", kind: Attack, rarity: Rare, cost: 0, drowse: 6,
+        effects: [Hits(N(6), 4, RandomFoe), PikeWill],
+        up: (effects: [Hits(N(8), 4, RandomFoe), PikeWill]),
+    ),
+    (
+        id: "em_snowdrift", hero: "emelya", kind: Skill, rarity: Rare, cost: 0, drowse: 5,
+        effects: [Block(N(14), Me), Apply(Thorns, N(3), Me)],
+        up: (effects: [Block(N(18), Me), Apply(Thorns, N(4), Me)]),
+    ),
+]

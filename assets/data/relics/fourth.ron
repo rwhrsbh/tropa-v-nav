@@ -1,0 +1,53 @@
+// Четвёртая партия общих реликвий: кушак под зелья и реликвии со счётом.
+// Счёт (Every / EveryThisTurn) виден цифрой в углу иконки реликвии.
+[
+    (
+        // Кушак травника: мест под зелья пять, а не три (правило в run.rs: POTION_SASH)
+        id: "potion_sash", rarity: Common,
+    ),
+    (
+        // Шляпка подсолнуха: каждый 3-й ход +1 энергия
+        id: "sunflower", rarity: Common,
+        passives: [(on: TurnStart, effects: [Every("sunflower", 3, [Energy(N(1), Me)])])],
+    ),
+    (
+        // Липовая трещотка: каждая 5-я сыгранная карта — 4 урона всем врагам
+        id: "rattle", rarity: Common,
+        passives: [(on: CardPlayed, effects: [Every("rattle", 5, [Damage(N(4), AllFoes)])])],
+    ),
+    (
+        // Узелки на память: каждая 3-я рана от врага — Сила 1
+        id: "memory_knots", rarity: Common,
+        passives: [(on: Hurt, effects: [Every("memory_knots", 3, [Apply(Strength, N(1), Me)])])],
+    ),
+    (
+        // Дырявый карман: каждая 3-я сброшенная карта — доберите 1 карту
+        id: "holey_pocket", rarity: Common,
+        passives: [(on: Discarded, effects: [Every("holey_pocket", 3, [Draw(N(1))])])],
+    ),
+    (
+        // Горсть золы: каждая 2-я истощённая карта — 5 щита
+        id: "ash_handful", rarity: Common,
+        passives: [(on: Exhausted, effects: [Every("ash_handful", 2, [Block(N(5), Me)])])],
+    ),
+    (
+        // Ржавый кистень: каждая 3-я атака за ход — Сила 1
+        id: "flail", rarity: Uncommon,
+        passives: [(on: AttackPlayed, effects: [EveryThisTurn("flail", 3, [Apply(Strength, N(1), Me)])])],
+    ),
+    (
+        // Бабкино веретено: каждое 3-е умение за ход — доберите 1 карту
+        id: "spindle", rarity: Uncommon,
+        passives: [(on: SkillPlayed, effects: [EveryThisTurn("spindle", 3, [Draw(N(1))])])],
+    ),
+    (
+        // Дубовое било: каждая 6-я атака — +1 энергия
+        id: "wooden_gong", rarity: Uncommon,
+        passives: [(on: AttackPlayed, effects: [Every("wooden_gong", 6, [Energy(N(1), Me)])])],
+    ),
+    (
+        // Медная лампада: каждый 3-й ход все союзники получают 6 щита
+        id: "icon_lamp", rarity: Uncommon,
+        passives: [(on: TurnStart, effects: [Every("icon_lamp", 3, [Block(N(6), AllFriends)])])],
+    ),
+]

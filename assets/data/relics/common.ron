@@ -8,7 +8,7 @@
     (
         // Зуб упыря: при добивании врага вылечите 2 HP
         id: "ghoul_tooth", rarity: Common,
-        passives: [(on: Kill, effects: [Heal(N(2), Me)])],
+        passives: [(on: Kill, effects: [MaxHp(N(1), Me)])],
     ),
     (
         id: "whetstone", rarity: Common,
@@ -16,7 +16,7 @@
     ),
     (
         id: "birch_tinder", rarity: Common,
-        passives: [(on: TurnStart, effects: [Once("tinder", [Draw(N(2))])])],
+        passives: [(on: CombatStart, effects: [Damage(N(3), AllFoes), Draw(N(1))])],
     ),
     (
         id: "wolfskin_mitten", rarity: Common,
@@ -40,7 +40,7 @@
     ),
     (
         id: "wax_ear_plugs", rarity: Uncommon,
-        passives: [(on: CombatStart, effects: [Apply(Fortitude, N(1), Me)])],
+        passives: [(on: TurnStart, effects: [Remove(Weak, Me)])],
     ),
     (
         id: "raven_feather", rarity: Uncommon,

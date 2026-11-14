@@ -36,7 +36,7 @@ RELIC_STYLE = (
 
 def cards():
     out = []
-    order = ["volhv3", "volkolak3", "znaharka3", "skomoroh3", "neutral3", "bogatyr4", "vorozheya4", "volhv4", "volkolak4", "znaharka4", "skomoroh4", "emelya4"]
+    order = ["volhv3", "volkolak3", "znaharka3", "skomoroh3", "neutral3", "bogatyr4", "vorozheya4", "volhv4", "volkolak4", "znaharka4", "skomoroh4", "emelya4", "emelya5"]
     for name in order:
         j = json.load(open(os.path.join(ROOT, "docs", "prompts", "plots", name + ".json"), encoding="utf-8"))
         look = LOOK.get(j.get("_look", ""), "")

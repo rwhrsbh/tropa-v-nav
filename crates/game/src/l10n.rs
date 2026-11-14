@@ -277,6 +277,8 @@ impl L10n {
             Effect::Flag(name, _) => self.t(&format!("flag-{name}")),
             Effect::Once(_, body) => self.tf("fx-once", &[("body", self.effects(body).into())]),
             Effect::OncePerTurn(_, body) => self.tf("fx-onceturn", &[("body", self.effects(body).into())]),
+            Effect::Every(_, k, body) => self.tf("fx-every", &[("k", (*k).into()), ("body", self.effects(body).into())]),
+            Effect::EveryThisTurn(_, k, body) => self.tf("fx-everyturn", &[("k", (*k).into()), ("body", self.effects(body).into())]),
             Effect::MaxHp(a, _) => self.fx("maxhp", None, &[("n", n(a))]),
             Effect::Echo(t) => self.fx("echo", Some(*t), &[]),
             Effect::Herb(herb) => self.tf("fx-herb", &[("h", self.t(&format!("herb-{herb}")).into()), ("spill", self.t(&format!("herb-{herb}-spill")).into())]),
@@ -286,6 +288,7 @@ impl L10n {
             Effect::DiscardHand => self.t("fx-discardhand"),
             Effect::ExhaustCards(a) => self.fx("exhaustcards", None, &[("n", n(a))]),
             Effect::Recall(a) => self.fx("recall", None, &[("n", n(a))]),
+            Effect::PikeWill => self.t("fx-pikewill"),
             // a hook with nothing to say to the player says nothing, not its key
             Effect::Hook(name) if !self.has(&format!("hook-{name}")) => String::new(),
             Effect::Hook(name) => self.t(&format!("hook-{name}")),
@@ -324,6 +327,9 @@ impl L10n {
     /// Keywords and statuses a card mentions, for its hover tooltips.
     pub fn card_glossary(&self, view: &CardView) -> Vec<(String, String)> {
         let mut keys: Vec<String> = view.keywords.iter().map(|k| format!("kw-{k:?}")).collect();
+        if view.drowse > 0 {
+            keys.push("kw-DrowseCost".into());
+        }
         fn walk(list: &[Effect], keys: &mut Vec<String>) {
             for e in list {
                 match e {
@@ -347,7 +353,7 @@ impl L10n {
                         walk(a, keys);
                         walk(b, keys);
                     }
-                    Effect::Repeat(_, a) | Effect::Once(_, a) | Effect::OncePerTurn(_, a) => walk(a, keys),
+                    Effect::Repeat(_, a) | Effect::Once(_, a) | Effect::OncePerTurn(_, a) | Effect::Every(_, _, a) | Effect::EveryThisTurn(_, _, a) => walk(a, keys),
                     Effect::ConsumeCurses(_) => keys.push("kw-Curse".into()),
                     Effect::Echo(_) => keys.push("kw-Echo".into()),
                     Effect::Herb(herb) => {
@@ -355,6 +361,7 @@ impl L10n {
                         keys.push("kw-Brew".into());
                     }
                     Effect::Brew => keys.push("kw-Brew".into()),
+                    Effect::PikeWill => keys.push("kw-PikeWill".into()),
                     Effect::Discard(_) | Effect::DiscardHand | Effect::Damage(Amount::Discarded(_) | Amount::DiscardedThisTurn(_), _) => keys.push("kw-Discard".into()),
                     Effect::ExhaustCards(_) => keys.push("kw-Exhaust".into()),
                     Effect::Hook(name) if name == "kolyada" => keys.push("kw-Rune".into()),

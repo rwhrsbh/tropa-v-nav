@@ -70,4 +70,12 @@
             (id: "pass"),
         ],
     ),
+    // the hollow that plays for stakes: met like the pedlar, never as one of the tales
+    (
+        id: "greedy_hollow", kind: Personal,
+        options: [
+            (id: "play", fx: [Gamble]),
+            (id: "pass"),
+        ],
+    ),
 ]

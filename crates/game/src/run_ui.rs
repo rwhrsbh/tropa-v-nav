@@ -16,9 +16,10 @@ use bevy::ui_widgets::{observe, Activate, Button};
 use nav_core::*;
 
 mod chest;
+mod hollow;
 
 pub fn plugin(app: &mut App) {
-    app.add_plugins(chest::plugin);
+    app.add_plugins((chest::plugin, hollow::plugin));
     for state in [AppState::Map, AppState::Reward, AppState::Rest, AppState::Shop, AppState::Omen, AppState::RunEnd] {
         app.add_systems(OnEnter(state), |mut status: ResMut<NetStatus>, mut pick: ResMut<UpgradePick>| {
             status.run_dirty = true;
@@ -780,7 +781,7 @@ fn draw_rest(
             let stem = if pl.beheaded { format!("heroes/{}_dead_headless", pl.hero) } else { format!("heroes/{}", pl.hero) };
             let Some(h) = art.image(&assets, &stem) else { continue };
             let (x, flip) = [(420.0, false), (1340.0, true), (240.0, false), (1530.0, true)][i.min(3)];
-            let height = 400.0;
+            let height = 400.0 * crate::battle::hp_stature(&db.0, &pl.hero, pl.max_hp);
             let width = height * art.aspect(&stem).unwrap_or(0.75);
             // and who walks without one stands there without it
             if pl.walks_headless {
@@ -972,7 +973,7 @@ fn draw_shop(
     }
     let Some(root) = redraw(&mut commands, &mut status, &old, AppState::Shop, *canvas, Color::srgb(0.07, 0.08, 0.06)) else { return };
     // the party in the clearing before the pedlar; clicked, he lays out his counter over it
-    crate::between::pedlar_clearing(&mut commands, root, run, &fonts, &l10n, &art, &assets);
+    crate::between::pedlar_clearing(&mut commands, root, run, &db.0, &fonts, &l10n, &art, &assets);
     party_panel(&mut commands, root, run, me, &fonts, &l10n);
     let pl = &run.players[me as usize];
     if done[me as usize] {
@@ -1054,7 +1055,7 @@ fn draw_shop(
         ware(&mut commands, wares, sold, theme::CANDLE, can, &fonts, &art, &assets);
     }
     commands.spawn((Node { width: px(30), ..default() }, Pickable::IGNORE, ChildOf(wares)));
-    let room = pl.potions.len() < POTION_SLOTS;
+    let room = pl.potions.len() < potion_slots(&pl.relics);
     for (i, slot) in s.potions.iter().enumerate() {
         let sold = slot.as_ref().map(|(id, cost)| (format!("potions/{id}"), l10n.t(&format!("potion-{id}")), l10n.t(&format!("potion-{id}-desc")), *cost, RunAction::BuyPotion(i as u8)));
         let can = room && slot.as_ref().is_some_and(|(_, c)| pl.gold >= *c);
@@ -1117,6 +1118,7 @@ fn describe_fx(l10n: &L10n, db: &Content, o: &EventOption) -> Vec<(String, Tone)
         parts.push(match fx {
             RunFx::SewHeadOn => (l10n.n("fx-run-sew-head", nav_core::HEAD_SEAM_PCT), Tone::Bad),
             RunFx::SewLimbOn => (l10n.n("fx-run-sew-arm", nav_core::LIMB_SEAM_PCT), Tone::Bad),
+            RunFx::Gamble => (l10n.t("fx-run-gamble"), Tone::Plain),
             RunFx::Gold(n) if *n >= 0 => (l10n.n("fx-run-gold", *n), Tone::Good),
             RunFx::Gold(n) => (l10n.n("fx-run-lose-gold", -*n), Tone::Bad),
             RunFx::Hp(n) if *n >= 0 => (l10n.n("fx-run-heal", *n), Tone::Good),

@@ -62,6 +62,7 @@ pub(super) struct LaidOut(u8);
 pub(super) fn lay_out_the_headless(
     mut commands: Commands,
     session: Res<Session>,
+    db: Res<crate::session::Db>,
     art: Res<Art>,
     assets: Res<AssetServer>,
     layer: Option<Single<Entity, With<CorpseLayer>>>,
@@ -79,7 +80,7 @@ pub(super) fn lay_out_the_headless(
         let Some((foot, size)) = unit_place(&session.shown, unit) else { continue };
         let stem = format!("heroes/{}", h.def);
         let Some(picture) = art.image(&assets, &format!("{stem}_dead_headless")) else { continue };
-        let draw = hero_draw(&stem, size);
+        let draw = hero_draw(&stem, size) * super::hp_stature(&db.0, &h.def, h.max_hp);
         commands.spawn((
             LaidOut(h.slot),
             ImageNode::new(picture),
