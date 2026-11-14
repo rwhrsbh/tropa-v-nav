@@ -132,6 +132,7 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
                     "dodge", "flying", "hiding", "enrage", "lifesteal", "piercing", "rises", "hunter", "pack", "spores", "vengeful",
                     "burning", "greedy", "hollow", "growing", "kinetic_moss", "bayun_perch", "spell_mirror", "flicker", "gorynych_head", "yaga_mortar", "overheat",
                     "lone", "changeling", "furrow", "paper_wings", "withering", "blood_scent", "twin_soul",
+                    "glutton", "woe",
                 ] {
                     if real.flags.contains_key(flag) && !(flag == "dodge" && real.flags.contains_key("turn_dodged")) {
                         let key = format!("trait-{flag}");
@@ -139,11 +140,16 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
                     }
                 }
                 // counts a fighter keeps: the black volhv's runes, Chernobog's sun, what a changeling took
-                for flag in ["black_runes", "eclipse", "stolen"] {
+                for flag in ["black_runes", "eclipse", "stolen", "gale"] {
                     if let Some(n) = real.flags.get(flag) {
                         let key = format!("trait-{flag}");
                         out.push(Chip { icon: format!("status/{flag}"), n: Some(*n), shown: None, good: Some(true), name: l10n.t(&key), help: help(l10n, &key) });
                     }
+                }
+                // the Domovoy's house rule: which kind of card is forbidden this round
+                if let Some(r) = real.flags.get("house_rule") {
+                    let help = help(l10n, "trait-house_rule");
+                    out.push(Chip { icon: format!("status/house_rule_{r}"), n: None, shown: None, good: Some(true), name: l10n.t(&format!("trait-house_rule-{r}")), help });
                 }
                 if let Some(n) = real.flags.get("kinetic_charge") {
                     if *n > 0 {

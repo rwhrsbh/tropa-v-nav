@@ -1,0 +1,62 @@
+// Новые боссы первого и второго актов. Особые свойства — в combat.rs и hooks.rs.
+[
+    (
+        // Идолище Поганое: всё, что осталось у героев в руке к концу хода, идёт ему в брюхо — лечит его
+        id: "idolishche", hp: (300, 300), flags: ["glutton"],
+        moves: [
+            (id: "idol_club", intent: Attack, targeted: true, effects: [Damage(N(17), Target)]),
+            (id: "idol_devour", intent: Debuff, targeted: true, effects: [Hook("devour_hand"), Damage(N(8), Target)]),
+            (id: "idol_belly", intent: AttackAll, effects: [Damage(N(10), AllFoes)]),
+            (id: "idol_feast", intent: Buff, effects: [Heal(N(15), Me), Apply(Strength, N(2), Me)]),
+            (id: "idol_stomp", intent: AttackAll, effects: [Hits(N(6), 2, AllFoes)]),
+        ],
+        opening: [1],
+        pattern: [0, 2, 1, 3],
+        phase2_at: 50,
+        phase2: [4, 1, 0, 3],
+    ),
+    (
+        // Вихорь: ветер крепнет каждый раунд и прибавляется к каждому его удару; приёмы героев его унимают
+        id: "vikhor", hp: (270, 270), flags: ["gale"],
+        moves: [
+            (id: "vikhor_lift", intent: Debuff, targeted: true, effects: [Hook("lift"), Damage(N(6), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "vikhor_spin", intent: Attack, targeted: true, effects: [Hits(N(4), 3, Target)]),
+            (id: "vikhor_howl", intent: AttackAll, effects: [Damage(N(7), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "vikhor_gather", intent: Defend, effects: [Block(N(16), Me), Hook("gust")]),
+            (id: "vikhor_storm", intent: AttackAll, effects: [Hits(N(3), 3, AllFoes)]),
+        ],
+        opening: [2],
+        pattern: [1, 0, 3, 1, 2],
+        phase2_at: 50,
+        phase2: [4, 1, 3, 0],
+    ),
+    (
+        // Горе-Злосчастье: липнет к героям картами Горя; пока Горе у кого-то в руке, по нему бьют вполсилы
+        id: "gore", hp: (390, 390), flags: ["woe"],
+        moves: [
+            (id: "gore_cling", intent: Debuff, targeted: true, effects: [AddCard(card: "gore", pile: Draw, to: Target, count: 2), Damage(N(9), Target)]),
+            (id: "gore_bitter", intent: Attack, targeted: true, effects: [Damage(N(20), Target)]),
+            (id: "gore_wail", intent: AttackAll, effects: [Damage(N(11), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "gore_mourn", intent: Defend, effects: [Block(N(20), Me), Heal(N(10), Me)]),
+            (id: "gore_hand", intent: AttackAll, effects: [AddCard(card: "gore", pile: Hand, to: AllFoes), Damage(N(8), AllFoes)]),
+        ],
+        opening: [0],
+        pattern: [1, 2, 0, 3, 1],
+        phase2_at: 50,
+        phase2: [4, 1, 2, 3],
+    ),
+    (
+        // Злой Домовой: в его доме каждый раунд под запретом один вид карт; кто нарушит — платит здоровьем
+        id: "domovoy", hp: (360, 360), flags: ["house_rule"],
+        moves: [
+            (id: "dom_ukhvat", intent: Attack, targeted: true, effects: [Damage(N(18), Target)]),
+            (id: "dom_pots", intent: AttackAll, effects: [Hits(N(5), 2, AllFoes)]),
+            (id: "dom_zaslonka", intent: Defend, effects: [Block(N(18), Me), Apply(Thorns, N(3), Me)]),
+            (id: "dom_scold", intent: Debuff, targeted: true, effects: [Damage(N(8), Target), Apply(Weak, N(2), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "dom_wrath", intent: AttackAll, effects: [Damage(N(14), AllFoes)]),
+        ],
+        pattern: [0, 1, 3, 2, 0],
+        phase2_at: 50,
+        phase2: [4, 0, 1, 2],
+    ),
+]

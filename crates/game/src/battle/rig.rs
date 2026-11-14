@@ -172,6 +172,10 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/chernobog", &[(Part::Head, Vec2::new(0.601, 0.206), 1.0)]),
     ("enemies/zhlya", &[(Part::Head, Vec2::new(0.467, 0.188), 1.0)]),
     ("enemies/karna", &[(Part::Head, Vec2::new(0.52, 0.188), 1.0)]),
+    ("enemies/idolishche", &[(Part::Head, Vec2::new(0.499, 0.206), 1.0)]),
+    ("enemies/vikhor", &[(Part::Head, Vec2::new(0.521, 0.253), 1.0)]),
+    ("enemies/gore", &[(Part::Head, Vec2::new(0.404, 0.206), 1.0)]),
+    ("enemies/domovoy", &[(Part::Head, Vec2::new(0.498, 0.358), 1.0)]),
 ];
 
 /// The parts `stem` is cut into, with their joints.

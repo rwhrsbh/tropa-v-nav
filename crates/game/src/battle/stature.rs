@@ -83,6 +83,10 @@ const STATURE: &[(&str, f32, f32)] = &[
     ("chernobog", 1.9, 0.936),
     ("zhlya", 1.35, 0.936),
     ("karna", 1.35, 0.935),
+    ("idolishche", 1.75, 0.936),
+    ("vikhor", 1.5, 0.935),
+    ("gore", 1.15, 0.936),
+    ("domovoy", 1.0, 0.918),
 ];
 
 /// The drawn height for a foe's picture, when its stature is known.

@@ -148,7 +148,7 @@ pub(super) fn blood_of(comfort: &Comfort, shown: &Combat, unit: UnitRef) -> Colo
     let def = shown.enemy(uid).map(|e| e.def.as_str()).unwrap_or("");
     match def {
         // the drowned and the ghosts: a pale cold ichor
-        "nav_soul" | "weeper" | "mara" | "drowned_maiden" | "mavka" | "koschei_shadow" | "swamp_light" | "sirin" | "vodyanoy" | "nochnitsa" | "polunochnitsa" | "morovitsa" | "sea_guard" | "vodyanoy_tsar" | "ancestor_shade" | "alkonost" | "miller" | "zhlya" | "karna" => Color::srgb(0.50, 0.60, 0.64),
+        "nav_soul" | "weeper" | "mara" | "drowned_maiden" | "mavka" | "koschei_shadow" | "swamp_light" | "sirin" | "vodyanoy" | "nochnitsa" | "polunochnitsa" | "morovitsa" | "sea_guard" | "vodyanoy_tsar" | "ancestor_shade" | "alkonost" | "miller" | "zhlya" | "karna" | "vikhor" | "gore" => Color::srgb(0.50, 0.60, 0.64),
         // wood and fungus bleed sap
         "leshy" | "tree_guard" | "death_oak" | "death_oak_chest" | "mushroom_corpse" | "lesavka" | "chuchelo" | "mokhovik" | "polevik" => Color::srgb(0.42, 0.40, 0.10),
         // things, not bodies: splinters and ash, meltwater, a dying glow
@@ -161,7 +161,7 @@ pub(super) fn blood_of(comfort: &Comfort, shown: &Combat, unit: UnitRef) -> Colo
         // old dead blood, black and thick
         "koschei_guard" | "black_rider" | "vurdalak_elder" | "volot" | "volot_giant" | "gorynych" | "gorynych_fire" | "gorynych_poison" | "gorynych_thunder" | "gagana" | "gravedigger" | "upyr_knyaz" | "nav_hound" | "chernobog" | "chernobog_priest" | "black_volhv" => Color::srgb(0.30, 0.06, 0.04),
         // warm brigand/beast blood
-        "solovey" | "kot_bayun" | "biryuk" | "wolf_herder" | "vedmak" | "tugarin" | "fire_serpent" | "pugach" | "obderikha" => Color::srgb(0.68, 0.08, 0.05),
+        "solovey" | "kot_bayun" | "biryuk" | "wolf_herder" | "vedmak" | "tugarin" | "fire_serpent" | "pugach" | "obderikha" | "idolishche" | "domovoy" => Color::srgb(0.68, 0.08, 0.05),
         // the rest rot: a dark brown-red
         _ => Color::srgb(0.52, 0.09, 0.04),
     }

@@ -507,3 +507,14 @@ trait-eclipse = Black Sun
 trait-eclipse-help = With each of Chernobog's moves the sun climbs unless he took 30 damage. At step 4, eclipse: intents are hidden and he gains 4 Strength.
 trait-stolen = Cards Taken
 trait-stolen-help = How many cards he has carried off your decks.
+
+trait-glutton = Insatiable
+trait-glutton-help = At the end of each turn heals 3 for every card still in the heroes' hands.
+trait-gale = Wind
+trait-gale-help = Each of his blows deals as much more as he has Wind. Wind rises by one per hero each round; every Skill played lulls it by 1.
+trait-woe = Clinging Grief
+trait-woe-help = While anyone holds a Grief card, he takes half damage. Grief can be lived through for 1 energy.
+trait-house_rule-1 = Forbidden: Skills
+trait-house_rule-2 = Forbidden: Powers
+trait-house_rule-3 = Forbidden: Attacks
+trait-house_rule-help = In his house one kind of card is forbidden each round. Whoever plays one loses 4 health through Block. The rule turns each round: Powers, Attacks, Skills.

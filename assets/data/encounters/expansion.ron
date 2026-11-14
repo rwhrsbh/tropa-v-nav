@@ -16,21 +16,21 @@
         extra3: ["grey_wolf"], extra4: ["nochnitsa"],
     ),
     (
-        id: "a1_solovey", act: 1, kind: Boss,
+        id: "a1_solovey", act: 1, kind: Elite,
         enemies: ["solovey"], solo: ["solovey"],
         extra4: ["raven"],
     ),
     (
-        id: "a1_korochun", act: 1, kind: Boss,
+        id: "a1_korochun", act: 1, kind: Elite,
         enemies: ["korochun"], solo: ["korochun"],
     ),
     (
-        id: "a2_baba_yaga", act: 2, kind: Boss,
+        id: "a2_baba_yaga", act: 2, kind: Elite,
         enemies: ["baba_yaga"], solo: ["baba_yaga"],
         extra4: ["anchutka"],
     ),
     (
-        id: "a2_vodyanoy_tsar", act: 2, kind: Boss,
+        id: "a2_vodyanoy_tsar", act: 2, kind: Elite,
         enemies: ["vodyanoy_tsar"], solo: ["vodyanoy_tsar"],
         extra4: ["swamp_light"],
     ),

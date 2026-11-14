@@ -724,7 +724,7 @@ fn the_card_pool_matches_the_design_document() {
     let count = |f: &dyn Fn(&CardDef) -> bool| real.iter().filter(|d| f(d)).count();
     assert_eq!(count(&|d| d.hero.is_empty() && !matches!(d.kind, CardType::Curse | CardType::Status) && d.rarity != Rarity::Special), 30, "neutral");
     assert_eq!(count(&|d| d.kind == CardType::Curse), 13, "curses");
-    assert_eq!(count(&|d| d.kind == CardType::Status), 9 + 2, "statuses, the new wave's foundling and silk among them");
+    assert_eq!(count(&|d| d.kind == CardType::Status), 9 + 3, "statuses: the new wave's foundling and silk, and Gore's grief, among them");
     assert_eq!(count(&|d| !d.hero.is_empty()), 564 + 9 + 60, "hero cards, the jester's fifth set and the sixth set among them");
 }
 

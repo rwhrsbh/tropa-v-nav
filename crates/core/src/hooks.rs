@@ -465,6 +465,36 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 }
             }
         }
+        // ---- the new bosses of the first two acts ----
+        // the Idolishche snatches the dearest card from the aimed hero's draw pile (from the
+        // discard pile when that is empty), swallows it for the fight and grows by its cost
+        "devour_hand" => {
+            let (src, Some(UnitRef::Hero(slot))) = (ctx.src, ctx.target) else { return };
+            let h = &ex.s.heroes[slot as usize];
+            let from_draw = !h.draw.is_empty();
+            let pile = if from_draw { &h.draw } else { &h.discard };
+            let cost = |i: usize| ex.c.cards.get(&pile[i].def).map_or(0, |d| d.view(pile[i].upgraded, h.form).cost);
+            let Some(i) = (0..pile.len()).max_by_key(|i| (cost(*i), std::cmp::Reverse(*i))) else { return };
+            let gain = cost(i).max(1);
+            let h = &mut ex.s.heroes[slot as usize];
+            let card = if from_draw { h.draw.remove(i) } else { h.discard.remove(i) };
+            ex.ev.push(Event::Exhausted { player: slot, card: card.def.clone() });
+            ex.s.heroes[slot as usize].exhaust.push(card);
+            ex.add_status(src, StatusKind::Strength, gain);
+        }
+        // Vikhor lifts a hero off the ground: whatever shield they held is blown away
+        "lift" => {
+            let Some(UnitRef::Hero(slot)) = ctx.target else { return };
+            ex.s.heroes[slot as usize].block = 0;
+        }
+        // ...and gathers more wind
+        "gust" => {
+            let UnitRef::Enemy(uid) = ctx.src else { return };
+            if let Some(e) = ex.s.enemies.iter_mut().find(|e| e.uid == uid) {
+                let w = e.flags.entry("gale".into()).or_insert(0);
+                *w = (*w + 2).min(crate::combat::GALE_MOST);
+            }
+        }
         // ---- the new wave ----
         // the changeling: the top card of the aimed hero's draw pile is carried off (laid aside,
         // as if burnt) and a foundling put in its place; the stolen cards come back on its death

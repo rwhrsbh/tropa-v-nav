@@ -26,10 +26,11 @@ pub fn intent_damage(c: &Content, s: &Combat, e: &Enemy) -> Option<(i32, i32)> {
         };
         let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);
         d = d * s.enemy_dmg / 100;
+        let target_hero = intent.target.or_else(|| if s.heroes.len() == 1 || mv.intent == IntentKind::AttackAll { Some(0) } else { None });
+        d = traits_bonus(s, e, target_hero, d);
         if s.status(me, StatusKind::Weak) > 0 {
             d = d * 3 / 4;
         }
-        let target_hero = intent.target.or_else(|| if s.heroes.len() == 1 || mv.intent == IntentKind::AttackAll { Some(0) } else { None });
         if let Some(slot) = target_hero {
             let u = UnitRef::Hero(slot);
             if s.status(u, StatusKind::Vulnerable) > 0 {
@@ -41,6 +42,20 @@ pub fn intent_damage(c: &Content, s: &Combat, e: &Enemy) -> Option<(i32, i32)> {
         }
         Some((d.max(0), hits))
     })
+}
+
+/// What a foe's own nature adds to each blow, the way `strike` adds it: a lone biryuk, the
+/// hound's nose for blood, Vikhor's wind.
+fn traits_bonus(s: &Combat, e: &Enemy, target: Option<u8>, mut d: i32) -> i32 {
+    if e.flags.contains_key("lone") && s.living_enemies().count() == 1 {
+        d = d * 3 / 2;
+    }
+    if let Some(h) = target.and_then(|t| s.hero(t)) {
+        if e.flags.contains_key("blood_scent") && h.hp * 2 <= h.max_hp {
+            d = d * 3 / 2;
+        }
+    }
+    d + e.flags.get("gale").copied().unwrap_or(0)
 }
 
 /// Total damage aimed at a hero this round.
@@ -68,6 +83,7 @@ pub fn incoming(c: &Content, s: &Combat, slot: u8) -> i32 {
                 };
                 let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);
                 d = d * s.enemy_dmg / 100;
+                d = traits_bonus(s, e, Some(slot), d);
                 if s.status(me, StatusKind::Weak) > 0 {
                     d = d * 3 / 4;
                 }

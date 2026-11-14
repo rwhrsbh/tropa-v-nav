@@ -120,6 +120,21 @@ pub const FEAR_CAP: i32 = 750;
 pub const MARA_FEAR: i32 = 75;
 /// How many blows a round Tugarin's paper wings halve.
 pub const WING_HITS: i32 = 3;
+/// What the Idolishche heals for each card left in a hero's hand as the turn ends.
+pub const GLUTTON_HEAL: i32 = 3;
+/// The most wind Vikhor can gather.
+pub const GALE_MOST: i32 = 10;
+/// What breaking the Domovoy's house rule costs, through any block.
+pub const HOUSE_RULE_COST: i32 = 4;
+
+/// Which kind of card the Domovoy forbids at each value of his `house_rule`.
+pub fn house_rule_kind(rule: i32) -> CardType {
+    match rule {
+        1 => CardType::Skill,
+        2 => CardType::Power,
+        _ => CardType::Attack,
+    }
+}
 /// HP a single blow must take to crack one of the black volhv's runes.
 pub const BLACK_RUNE_BREAK: i32 = 10;
 /// Percent of her life a fallen twin mourner rises with, while her sister stands.
@@ -484,6 +499,10 @@ impl<'a> Exec<'a> {
                         d = d * 3 / 2;
                     }
                 }
+                // Vikhor: the wind he has gathered rides every one of his blows
+                if let Some(w) = flags.get("gale") {
+                    d += *w;
+                }
             }
             if src.is_some_and(|s| self.s.status(s, S::Weak) > 0) {
                 d = d * 3 / 4;
@@ -553,7 +572,10 @@ impl<'a> Exec<'a> {
                 if dodged {
                     self.ev.push(Event::Missed { unit: dst });
                 }
+                // Gore: while anyone still holds a Gore card, blows reach him at half
+                let woeful = self.s.heroes.iter().any(|h| h.hand.iter().any(|c| c.def == "gore"));
                 let e = &mut self.s.enemies[idx];
+                let d = if woeful && e.flags.contains_key("woe") { d / 2 } else { d };
                 // a thing of straw: no one blow does it more than so much harm
                 let d = if e.flags.contains_key("hollow") { d.min(HOLLOW_MOST) } else { d };
                 // Tugarin's paper wings: the first blows of a round glance off at half
@@ -1019,6 +1041,18 @@ impl<'a> Exec<'a> {
             *h.flags.entry("free_rune".into()).or_insert(1) -= 1;
         }
         self.add_status(UnitRef::Hero(p), S::Drowse, -drowse);
+        // Vikhor's wind: every skill played lulls it a little
+        if view.kind == CardType::Skill {
+            for e in self.s.enemies.iter_mut().filter(|e| e.alive) {
+                if let Some(w) = e.flags.get_mut("gale") {
+                    *w = (*w - 1).max(0);
+                }
+            }
+        }
+        // the Domovoy's house rule: a card of the kind forbidden this round costs blood
+        if self.s.living_enemies().filter_map(|e| e.flags.get("house_rule")).any(|r| house_rule_kind(*r) == view.kind) {
+            self.lose_hp(UnitRef::Hero(p), HOUSE_RULE_COST);
+        }
         self.resolve(p, card, view, target, cost, charmed && target.is_none());
         Ok(())
     }
@@ -1990,6 +2024,18 @@ impl<'a> Exec<'a> {
             self.ev.push(Event::Intent { enemy, mv, target });
         }
 
+        // the Domovoy changes his rule each round; Vikhor's wind rises by one for each hero standing
+        // against him, twice as fast once he is wounded
+        let rising = if self.s.round > 1 { standing.len() as i32 } else { 0 };
+        for e in self.s.enemies.iter_mut().filter(|e| e.alive) {
+            if let Some(r) = e.flags.get_mut("house_rule") {
+                *r = *r % 3 + 1;
+            }
+            let storm = if e.flags.contains_key("phase2") { 2 } else { 1 };
+            if let Some(w) = e.flags.get_mut("gale") {
+                *w = (*w + storm * rising).min(GALE_MOST);
+            }
+        }
         let furrow = self.s.living_enemies().any(|e| e.flags.contains_key("furrow"));
         for slot in standing {
             let round = self.s.round;
@@ -2061,6 +2107,14 @@ impl<'a> Exec<'a> {
             let gloom = self.s.status(UnitRef::Hero(slot), S::Gloom);
             if gloom > 0 {
                 self.lose_hp(UnitRef::Hero(slot), gloom);
+            }
+            // the Idolishche: whatever is still held as the turn ends goes into his belly
+            let left = self.s.heroes[slot as usize].hand.len() as i32;
+            if left > 0 {
+                let gluttons: Vec<u32> = self.s.living_enemies().filter(|e| e.flags.contains_key("glutton")).map(|e| e.uid).collect();
+                for uid in gluttons {
+                    self.heal(UnitRef::Enemy(uid), GLUTTON_HEAL * left);
+                }
             }
             let hand = std::mem::take(&mut self.hero(slot).hand);
             let mut keep = Vec::new();
