@@ -184,7 +184,7 @@ fn rewards_offer_three_cards_of_your_own_hero() {
         let a = run_bot(&c, &run, 0).unwrap();
         run.apply(&c, 0, &a).unwrap();
     }
-    let Stage::Reward { rewards } = &run.stage else { panic!("expected rewards, got {:?}", run.stage) };
+    let Stage::Reward { rewards } = &run.stage else { panic!("expected rewards, got {:?} against {:?}", run.stage, run.last_foes) };
     let r = &rewards[0];
     assert_eq!(r.cards.len(), 3);
     assert!((10..=20).contains(&r.gold));
@@ -636,7 +636,9 @@ fn two_hundred_and_ten_relics_fifteen_for_each_hero() {
         assert_eq!(c.relics.values().filter(|r| r.hero == hero).count(), 17, "{hero}");
     }
     assert_eq!(c.relics.values().filter(|r| r.pool == RelicPool::Shop).count(), 10);
-    assert_eq!(c.relics.values().filter(|r| r.pool == RelicPool::Boss).count(), 12);
+    // nine with a price, and seven plain ones (relics/fifth.ron): four draw a card a turn, three
+    // give an energy a turn
+    assert_eq!(c.relics.values().filter(|r| r.pool == RelicPool::Boss).count(), 19);
 }
 
 #[test]
@@ -722,8 +724,8 @@ fn the_card_pool_matches_the_design_document() {
     let count = |f: &dyn Fn(&CardDef) -> bool| real.iter().filter(|d| f(d)).count();
     assert_eq!(count(&|d| d.hero.is_empty() && !matches!(d.kind, CardType::Curse | CardType::Status) && d.rarity != Rarity::Special), 30, "neutral");
     assert_eq!(count(&|d| d.kind == CardType::Curse), 13, "curses");
-    assert_eq!(count(&|d| d.kind == CardType::Status), 9, "statuses");
-    assert_eq!(count(&|d| !d.hero.is_empty()), 564 + 9, "hero cards, the jester's fifth set among them");
+    assert_eq!(count(&|d| d.kind == CardType::Status), 9 + 2, "statuses, the new wave's foundling and silk among them");
+    assert_eq!(count(&|d| !d.hero.is_empty()), 564 + 9 + 60, "hero cards, the jester's fifth set and the sixth set among them");
 }
 
 #[test]
@@ -1162,11 +1164,14 @@ fn an_omen_may_be_the_pedlar_or_a_fight() {
             other => panic!("seed {seed}: an omen led to {other:?}"),
         }
     }
-    assert!(tales > shops + fights + elites, "most omens are still tales");
-    assert!(shops > 0 && fights > 0 && elites > 0, "{shops} pedlars, {fights} fights, {elites} elites");
-    // the pedlar is as likely as a fight of either kind, and one fight in five is an elite
-    assert!(shops * 2 > fights + elites && shops < (fights + elites) * 2, "{shops} pedlars against {} fights", fights + elites);
-    assert!(elites * 2 < fights, "{elites} elites against {fights} plain fights");
+    // of a hundred: 15 pedlars, 15 fights (a third of them elites), 15 hollows, 55 omens
+    let total = (tales + shops + fights + elites) as f32;
+    let share = |n: i32| n as f32 / total;
+    assert!((0.12..0.18).contains(&share(shops)), "{shops} pedlars of {total}");
+    assert!((0.12..0.18).contains(&share(fights + elites)), "{} fights of {total}", fights + elites);
+    assert!((0.65..0.75).contains(&share(tales)), "{tales} tales and hollows of {total}");
+    let elite_share = elites as f32 / (fights + elites) as f32;
+    assert!((0.25..0.42).contains(&elite_share), "{elites} elites against {fights} plain fights");
 }
 
 #[test]
@@ -1434,8 +1439,10 @@ fn no_two_relics_do_the_same() {
         }
         s
     };
+    // the plain boss trophies are alike on purpose, told apart only by their pictures
+    const TWINS: [&str; 7] = ["owl_eye", "spindle_whorl", "birchbark_letter", "raven_quill", "hearth_ember", "perun_flint", "kupala_wheel"];
     let mut by: std::collections::BTreeMap<String, Vec<&str>> = Default::default();
-    for r in c.relics.values().filter(|r| !r.passives.is_empty()) {
+    for r in c.relics.values().filter(|r| !r.passives.is_empty() && !TWINS.contains(&r.id.as_str())) {
         by.entry(key(r)).or_default().push(&r.id);
     }
     let twins: Vec<_> = by.values().filter(|v| v.len() > 1).collect();

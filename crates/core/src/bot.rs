@@ -10,14 +10,18 @@ pub fn intent_damage(c: &Content, s: &Combat, e: &Enemy) -> Option<(i32, i32)> {
     let mv = c.enemies.get(&e.def)?.moves.get(intent.mv)?;
     let me = UnitRef::Enemy(e.uid);
     mv.effects.iter().find_map(|fx| {
-        let (a, hits) = match fx {
-            Effect::Damage(a, _) => (a, 1),
-            Effect::Hits(a, k, _) => (a, *k),
-            _ => return None,
-        };
-        let base = match a {
-            Amount::N(base) => *base,
-            Amount::Pack(base, each) => base + (s.living_enemies().count() as i32 - 1) * each,
+        let (base, hits) = match fx {
+            Effect::Damage(a, _) | Effect::Hits(a, _, _) => {
+                let hits = if let Effect::Hits(_, k, _) = fx { *k } else { 1 };
+                let base = match a {
+                    Amount::N(base) => *base,
+                    Amount::Pack(base, each) => base + (s.living_enemies().count() as i32 - 1) * each,
+                    _ => return None,
+                };
+                (base, hits)
+            }
+            // a blow worked out by a hook of the enemy's own
+            Effect::Hook(name) => (crate::hooks::hook_damage(c, s, me, name, intent.target.or(if s.heroes.len() == 1 { Some(0) } else { None }))?, 1),
             _ => return None,
         };
         let mut d = base + s.status(me, StatusKind::Strength) + s.status(me, StatusKind::TempStrength);

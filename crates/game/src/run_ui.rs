@@ -28,7 +28,7 @@ pub fn plugin(app: &mut App) {
     }
     app.init_resource::<UpgradePick>()
         .add_systems(Update, (draw_map, beckon).run_if(in_state(AppState::Map)))
-        .add_systems(Update, peek_map.run_if(in_state(AppState::Battle)))
+        .add_systems(Update, peek_map.run_if(|state: Res<State<AppState>>| PEEK_STATES.contains(state.get())))
         .add_systems(Update, draw_reward.run_if(in_state(AppState::Reward)))
         .add_systems(Update, draw_rest.run_if(in_state(AppState::Rest)))
         .add_systems(Update, draw_shop.run_if(in_state(AppState::Shop)))
@@ -56,15 +56,22 @@ pub struct CardHints {
     /// The panel opens under the thing hovered, not beside it: for wide lines of text, whose
     /// right side is near the screen's edge.
     pub below: bool,
+    /// The panel opens over the thing hovered, its foot at the thing's top: for what sits at the
+    /// screen's foot.
+    pub above: bool,
 }
 
 impl CardHints {
     pub fn new(lines: Vec<(String, String)>) -> CardHints {
-        CardHints { lines, open: None, below: false }
+        CardHints { lines, open: None, below: false, above: false }
     }
 
     pub fn below(lines: Vec<(String, String)>) -> CardHints {
-        CardHints { lines, open: None, below: true }
+        CardHints { lines, open: None, below: true, above: false }
+    }
+
+    pub fn above(lines: Vec<(String, String)>) -> CardHints {
+        CardHints { lines, open: None, below: true, above: true }
     }
 }
 
@@ -80,8 +87,9 @@ fn explain_cards(mut commands: Commands, mut cards: Query<(Entity, &mut CardHint
                         theme::panel(Node {
                             position_type: PositionType::Absolute,
                             left: if hints.below { px(0) } else { percent(100) },
-                            top: if hints.below { percent(100) } else { px(0) },
-                            margin: if hints.below { UiRect::top(px(10.0 * k)) } else { UiRect::left(px(14.0 * k)) },
+                            top: if hints.above { auto() } else if hints.below { percent(100) } else { px(0) },
+                            bottom: if hints.above { percent(100) } else { auto() },
+                            margin: if hints.above { UiRect::bottom(px(10.0 * k)) } else if hints.below { UiRect::top(px(10.0 * k)) } else { UiRect::left(px(14.0 * k)) },
                             width: px(if hints.below { 560.0 } else { 320.0 } * k),
                             padding: UiRect::all(px(12.0 * k)),
                             border: UiRect::all(px(2.0 * k)),
@@ -242,7 +250,8 @@ pub(crate) fn token_node(size: f32) -> Node {
 /// in on the map, with their hero's little figure (`assets/map/hero_<id>`) on it where one has
 /// been painted.
 pub(crate) fn hero_token(token: &mut EntityCommands, hero: &str, seat: u8, art: &Art, assets: &AssetServer) {
-    let color = theme::marker_color(seat);
+    let _ = seat;
+    let color = theme::marker_color(hero);
     token.insert((BackgroundColor(color.lighter(0.12)), BorderColor::all(color.mix(&INK, 0.45)), Pickable::IGNORE));
     if let Some(face) = art.image(assets, &format!("map/hero_{hero}")) {
         token.insert(ImageNode::new(face));
@@ -293,6 +302,9 @@ fn draw_map(
 #[derive(Component)]
 pub struct MapPeek;
 
+/// The screens the map can be unrolled over with M: a fight, the end of one, the pedlar's.
+pub const PEEK_STATES: [AppState; 3] = [AppState::Battle, AppState::Reward, AppState::Shop];
+
 /// Where the map looked at in a fight lies among everything drawn: over the whole fight, under
 /// the pause menu.
 pub const PEEK_Z: i32 = 700;
@@ -311,6 +323,7 @@ fn peek_map(
     art: Res<Art>,
     assets: Res<AssetServer>,
     mut scroll: ResMut<crate::map_party::MapScroll>,
+    state: Res<State<AppState>>,
 ) {
     // the pause menu lies over the map and takes the keys first
     if !paused.is_empty() {
@@ -336,7 +349,7 @@ fn peek_map(
     let root = commands
         .spawn((
             MapPeek,
-            DespawnOnExit(AppState::Battle),
+            DespawnOnExit(*state.get()),
             // not passed through: nothing of the fight under the map is pressed by mistake
             Node { position_type: PositionType::Absolute, width: px(STAGE_W), height: px(STAGE_H), ..default() },
             BackgroundColor(theme::SOOT),
@@ -559,12 +572,14 @@ fn paint_map(
                 Pickable::IGNORE,
             ));
             if standing {
-                // the party stands here: a token for each of them under the mark
+                // the party stands here: a token for each of them under the mark. A player who has
+                // voted already stands at the node voted for instead, so no one shows twice
                 e.with_children(|t| {
-                    let n = run.players.len() as f32;
+                    let here: Vec<(usize, &nav_core::Player)> = run.players.iter().enumerate().filter(|(k, _)| voted(*k as u8).is_none()).collect();
+                    let n = here.len() as f32;
                     let step = TOKEN - 4.0;
-                    for (k, pl) in run.players.iter().enumerate() {
-                        let mut token = t.spawn(Node { position_type: PositionType::Absolute, left: px(side / 2.0 - (n * step + 4.0) / 2.0 + k as f32 * step), bottom: px(-TOKEN + 6.0), ..token_node(TOKEN) });
+                    for (i, (k, pl)) in here.into_iter().enumerate() {
+                        let mut token = t.spawn(Node { position_type: PositionType::Absolute, left: px(side / 2.0 - (n * step + 4.0) / 2.0 + i as f32 * step), bottom: px(-TOKEN + 6.0), ..token_node(TOKEN) });
                         hero_token(&mut token, &pl.hero, k as u8, art, assets);
                     }
                 });

@@ -131,10 +131,18 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
                 for flag in [
                     "dodge", "flying", "hiding", "enrage", "lifesteal", "piercing", "rises", "hunter", "pack", "spores", "vengeful",
                     "burning", "greedy", "hollow", "growing", "kinetic_moss", "bayun_perch", "spell_mirror", "flicker", "gorynych_head", "yaga_mortar", "overheat",
+                    "lone", "changeling", "furrow", "paper_wings", "withering", "blood_scent", "twin_soul",
                 ] {
                     if real.flags.contains_key(flag) && !(flag == "dodge" && real.flags.contains_key("turn_dodged")) {
                         let key = format!("trait-{flag}");
                         out.push(Chip { icon: format!("status/{flag}"), n: None, shown: None, good: Some(true), name: l10n.t(&key), help: help(l10n, &key) });
+                    }
+                }
+                // counts a fighter keeps: the black volhv's runes, Chernobog's sun, what a changeling took
+                for flag in ["black_runes", "eclipse", "stolen"] {
+                    if let Some(n) = real.flags.get(flag) {
+                        let key = format!("trait-{flag}");
+                        out.push(Chip { icon: format!("status/{flag}"), n: Some(*n), shown: None, good: Some(true), name: l10n.t(&key), help: help(l10n, &key) });
                     }
                 }
                 if let Some(n) = real.flags.get("kinetic_charge") {

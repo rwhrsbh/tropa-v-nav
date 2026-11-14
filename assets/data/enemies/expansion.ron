@@ -1,11 +1,11 @@
 // Новые враги (Акты 1-4). HP для 1 игрока, масштабируется правилами круга.
 [
     (
-        id: "kot_bayun", hp: (85, 95), flags: ["bayun_perch"],
+        id: "kot_bayun", hp: (52, 58), flags: ["bayun_perch"],
         moves: [
             (id: "purr", intent: Debuff, effects: [Hook("bayun_eyelids")]),
             (id: "claws", intent: Attack, targeted: true, effects: [Hook("bayun_claws")]),
-            (id: "pounce", intent: Attack, targeted: true, effects: [Damage(N(12), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "pounce", intent: Attack, targeted: true, effects: [Damage(N(9), Target), Apply(Vulnerable, N(1), Target)]),
         ],
         pattern: [0, 1, 2],
     ),
@@ -70,7 +70,7 @@
         pattern: [0, 1, 2],
     ),
     (
-        id: "ogneya", hp: (68, 76), flags: ["overheat"],
+        id: "ogneya", hp: (68, 76), flags: ["burning"],
         moves: [
             (id: "fire_whip", intent: Attack, targeted: true, effects: [Damage(N(13), Target), AddCard(card: "burn", pile: Discard, to: Target)]),
             (id: "blaze_barrier", intent: Defend, effects: [Block(N(12), Me), Apply(Thorns, N(2), Me)]),
@@ -137,10 +137,10 @@
     (
         id: "korochun", hp: (270, 290),
         moves: [
-            (id: "rime_curse", intent: Special, effects: [Hook("korochun_chill"), Apply(Hex, N(2), Target)]),
-            (id: "ice_scythe", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "rime_curse", intent: Special, targeted: true, effects: [Hook("korochun_chill"), Apply(Hex, N(2), Target)]),
+            (id: "korochun_scythe", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
             (id: "permafrost", intent: Defend, effects: [Block(N(20), Me), Apply(Fortitude, N(2), Me)]),
-            (id: "blizzard", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "korochun_blizzard", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Weak, N(1), AllFoes)]),
             (id: "winter_solstice", intent: AttackAll, effects: [Damage(N(14), AllFoes), Apply(Hex, N(2), AllFoes)]),
             (id: "permafrost_cleave", intent: Attack, targeted: true, effects: [Damage(N(22), Target)]),
         ],
@@ -155,7 +155,7 @@
             (id: "whirlpool", intent: Special, effects: [Hook("tsar_whirlpool"), Damage(N(12), AllFoes)]),
             (id: "abyssal_trident", intent: Attack, targeted: true, effects: [Damage(N(22), Target), Apply(Bleed, N(3), Target)]),
             (id: "deep_surge", intent: Defend, effects: [Block(N(25), Me), Heal(N(12), Me)]),
-            (id: "drown_curse", intent: Attack, targeted: true, effects: [Damage(N(15), Target), Apply(Drowse, N(2), Target)]),
+            (id: "drown_curse", intent: Attack, targeted: true, effects: [Damage(N(15), Target), Apply(Weak, N(2), Target)]),
             (id: "deluge", intent: AttackAll, effects: [Damage(N(18), AllFoes)]),
             (id: "drown_in_depths", intent: Attack, targeted: true, effects: [Hits(N(9), 3, Target)]),
         ],

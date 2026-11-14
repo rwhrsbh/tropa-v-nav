@@ -22,7 +22,7 @@
     ),
     (
         // урон 3 x вся Порча на цели; метки снимаются
-        id: "vor_lift", hero: "vorozheya", kind: Attack, rarity: Rare, cost: 2, target: Enemy,
+        id: "vor_lift", hero: "vorozheya", kind: Attack, rarity: Rare, cost: 2, target: Enemy, keywords: [Retain],
         effects: [ConsumeCurses(Target), Damage(Consumed(3), Target)],
         up: (effects: [ConsumeCurses(Target), Damage(Consumed(4), Target)]),
     ),

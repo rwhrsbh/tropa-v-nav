@@ -644,3 +644,15 @@ library-title = Book of Cards
 library-count = { $open } of { $all } opened · hero level { $level }
 library-locked = Opens at{ "
 " }level { $n }
+lobby-circle-help-title = Circle of Nav
+lobby-circle-help = The run's difficulty. The host picks any circle opened so far; a new one opens with a win on the highest. Rules stack: each circle keeps all the ones before it.
+lobby-circle-1 = More elites on the map.
+lobby-circle-2 = Ordinary enemies hit 10% harder.
+lobby-circle-3 = No new rule: a breather before the 4th.
+lobby-circle-4 = Bosses hit 15% harder.
+lobby-circle-5 = Resting at a fire heals 20% of health instead of 30%.
+lobby-circle-6 = Everyone starts with a Toska card in the deck.
+lobby-circle-7 = A quarter less gold from fights.
+lobby-circle-8 = Enemies have 10% more health.
+lobby-circle-9 = Raising a fallen ally costs 3 energy instead of 2.
+lobby-circle-10 = When Koschei's needle snaps, his shadow rises and fights beside him.

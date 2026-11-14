@@ -286,6 +286,9 @@ pub enum Event {
     /// A blow found only air: the unit dodged it, or it was wasted on nobody.
     Missed { unit: UnitRef },
     CardAdded { player: u8, card: Id, pile: Pile },
+    /// The pike took the top card of this player's draw pile to play it by itself; what it does
+    /// (or its going to the discard, if it cannot be played) follows.
+    PikeDrew { player: u8, card: Id, upgraded: bool },
     Exhausted { player: u8, card: Id },
     /// Thrown out of the hand by a card or a power.
     Discarded { player: u8, card: Id },

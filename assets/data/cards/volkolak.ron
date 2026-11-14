@@ -39,7 +39,7 @@
         up: (effects: [Apply(HuntMark, N(6), Target)]),
     ),
     (
-        id: "wolf_devour", hero: "volkolak", kind: Attack, rarity: Rare, cost: 1, target: Enemy,
+        id: "wolf_devour", hero: "volkolak", kind: Attack, rarity: Rare, cost: 1, target: Enemy, keywords: [Retain],
         effects: [Damage(N(10), Target), If(Fatal, [Heal(N(8), Me), MaxHp(N(1), Me)])],
         up: (effects: [Damage(N(14), Target), If(Fatal, [Heal(N(8), Me), MaxHp(N(1), Me)])]),
     ),

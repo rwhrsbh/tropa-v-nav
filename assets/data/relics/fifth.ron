@@ -1,0 +1,14 @@
+// Пятая партия: трофеи босса, что дают руке и силе больше каждый ход.
+// Четыре — +1 карта в начале хода, три — +1 энергия в начале хода.
+[
+    // ---- +1 карта ----
+    (id: "owl_eye", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Draw(N(1))])]),
+    (id: "spindle_whorl", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Draw(N(1))])]),
+    (id: "birchbark_letter", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Draw(N(1))])]),
+    (id: "raven_quill", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Draw(N(1))])]),
+
+    // ---- +1 энергия ----
+    (id: "hearth_ember", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Energy(N(1), Me)])]),
+    (id: "perun_flint", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Energy(N(1), Me)])]),
+    (id: "kupala_wheel", rarity: Rare, pool: Boss, passives: [(on: TurnStart, effects: [Energy(N(1), Me)])]),
+]

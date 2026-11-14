@@ -663,6 +663,22 @@ fn draw_lobby(
                     step(row, "−", (circle > 0).then(|| circle - 1));
                 }
                 row.spawn(theme::text(l10n.n("lobby-circle", circle as i32), &fonts.title, 24.0, if circle > 0 { theme::FRESH_BLOOD } else { theme::BONE }));
+                // what the circles do, told on hover of a little "i"
+                {
+                    let mut help = l10n.t("lobby-circle-help");
+                    for k in 1..=10 {
+                        help.push_str(&format!("
+{k}. {}", l10n.t(&format!("lobby-circle-{k}"))));
+                    }
+                    row.spawn((
+                        Hovered::default(),
+                        crate::run_ui::CardHints::above(vec![(l10n.t("lobby-circle-help-title"), help)]),
+                        Node { width: px(32), height: px(32), border: UiRect::all(px(2)), border_radius: BorderRadius::MAX, align_items: AlignItems::Center, justify_content: JustifyContent::Center, ..default() },
+                        BackgroundColor(theme::SOOT),
+                        BorderColor::all(theme::CANDLE),
+                        children![theme::text("i", &fonts.title, 22.0, theme::CANDLE)],
+                    ));
+                }
                 if is_host {
                     step(row, "+", (circle < max).then(|| circle + 1));
                 }

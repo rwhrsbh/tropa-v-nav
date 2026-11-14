@@ -1,0 +1,245 @@
+// Новая волна: 10 обычных врагов, 10 элит и два босса третьего акта (Чернобог; Жля и Карна).
+// Особые свойства (flags) и хуки описаны в crates/core/src/combat.rs и hooks.rs.
+[
+    // ================ Акт I: обычные ================
+    (
+        // Бирюк: одиночка, без своих бьёт в полтора раза сильнее
+        id: "biryuk", hp: (32, 36), flags: ["lone"],
+        moves: [
+            (id: "biryuk_bite", intent: Attack, targeted: true, effects: [Damage(N(7), Target)]),
+            (id: "biryuk_snarl", intent: Buff, effects: [Apply(Strength, N(1), Me), Block(N(5), Me)]),
+            (id: "biryuk_lunge", intent: Attack, targeted: true, effects: [Damage(N(10), Target)]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        // Подменыш: уносит верхнюю карту колоды и кладёт Подкидыша; убит — всё возвращает
+        id: "podmenysh", hp: (24, 28), flags: ["changeling"],
+        moves: [
+            (id: "podmenysh_swap", intent: Debuff, targeted: true, effects: [Hook("swap_top")]),
+            (id: "podmenysh_bite", intent: Attack, targeted: true, effects: [Damage(N(6), Target)]),
+        ],
+        opening: [0],
+        pattern: [1, 0, 1],
+        on_death: [Hook("give_back")],
+    ),
+    (
+        // Полевик: пока жив, первая карта каждого хода стоит на 1 больше
+        id: "polevik", hp: (30, 34), flags: ["furrow"],
+        moves: [
+            (id: "polevik_sickle", intent: Attack, targeted: true, effects: [Damage(N(8), Target)]),
+            (id: "polevik_boundary", intent: Defend, effects: [Block(N(7), Me), Apply(Weak, N(1), RandomFoe)]),
+        ],
+        pattern: [0, 1, 0],
+    ),
+
+    // ================ Акт I: элиты ================
+    (
+        // Змей Тугарин: бумажные крылья гасят первые удары раунда; пожирает атаки из сброса
+        id: "tugarin", hp: (120, 130), flags: ["paper_wings"],
+        moves: [
+            (id: "tugarin_devour", intent: Debuff, targeted: true, effects: [Hook("devour_attacks"), Damage(N(6), Target)]),
+            (id: "tugarin_flame", intent: AttackAll, effects: [Damage(N(7), AllFoes), AddCard(card: "burn", pile: Discard, to: AllFoes)]),
+            (id: "tugarin_lance", intent: Attack, targeted: true, effects: [Damage(N(15), Target)]),
+        ],
+        pattern: [2, 0, 1],
+    ),
+    (
+        // Чёрный волхв: режет на себе резы и разом их изрекает; сильный удар (10+) раскалывает резу
+        id: "black_volhv", hp: (110, 120), flags: ["black_runes"],
+        moves: [
+            (id: "black_carve", intent: Buff, effects: [Hook("carve_black"), Block(N(8), Me)]),
+            (id: "black_staff", intent: Attack, targeted: true, effects: [Damage(N(10), Target)]),
+            (id: "black_invoke", intent: AttackAll, effects: [Hook("invoke_black")]),
+        ],
+        pattern: [0, 1, 0, 2],
+    ),
+    (
+        // Ведьмак-оборотень: через ход меняет облик; зверем бьёт сильно, но сам открыт
+        id: "vedmak", hp: (125, 135),
+        moves: [
+            (id: "vedmak_man", intent: Defend, targeted: true, effects: [Block(N(14), Me), Apply(Weak, N(1), Target)]),
+            (id: "vedmak_beast", intent: Attack, targeted: true, effects: [Hits(N(9), 2, Target), Apply(Vulnerable, N(2), Me)]),
+        ],
+        pattern: [0, 1],
+    ),
+    (
+        // Волчий пастырь: свистом зовёт волков и науськивает стаю
+        id: "wolf_herder", hp: (100, 110),
+        moves: [
+            (id: "herder_whistle", intent: Summon, effects: [Summon("grey_wolf", 1), Block(N(6), Me)]),
+            (id: "herder_staff", intent: Attack, targeted: true, effects: [Damage(N(12), Target)]),
+            (id: "herder_sic", intent: Buff, effects: [Apply(Strength, N(2), AllFriends)]),
+        ],
+        pattern: [1, 0, 2, 1],
+    ),
+
+    // ================ Акт II: обычные ================
+    (
+        // Живоглот: глотает щит героя и отрыгивает половину всего, что набрал, на весь отряд
+        id: "zhivoglot", hp: (44, 48),
+        moves: [
+            (id: "zhivoglot_gulp", intent: Debuff, targeted: true, effects: [Hook("eat_block"), Damage(N(6), Target)]),
+            (id: "zhivoglot_belch", intent: AttackAll, effects: [Hook("belch")]),
+        ],
+        pattern: [0, 0, 1],
+    ),
+    (
+        // Могильщик: поднимает павших, а нет павших — откапывает упыря
+        id: "gravedigger", hp: (40, 44),
+        moves: [
+            (id: "grave_spade", intent: Attack, targeted: true, effects: [Damage(N(9), Target), AddCard(card: "dread", pile: Draw, to: Target)]),
+            (id: "grave_raise", intent: Summon, effects: [Hook("raise_dead")]),
+        ],
+        pattern: [0, 1, 0],
+    ),
+    (
+        // Пугач: летает (достают лишь удары по всем и резы), сглазом надламывает отряд
+        id: "pugach", hp: (26, 30), flags: ["flying"],
+        moves: [
+            (id: "pugach_hoot", intent: Debuff, effects: [Apply(Vulnerable, N(1), AllFoes)]),
+            (id: "pugach_talons", intent: Attack, targeted: true, effects: [Hits(N(5), 2, Target)]),
+        ],
+        pattern: [0, 1, 1],
+    ),
+    (
+        // Болотница: пьёт кровь и лечит всех своих
+        id: "bolotnitsa", hp: (38, 42),
+        moves: [
+            (id: "bolotnitsa_drink", intent: Attack, targeted: true, effects: [Damage(N(9), Target), Heal(N(6), AllFriends)]),
+            (id: "bolotnitsa_mire", intent: Debuff, targeted: true, effects: [Apply(Weak, N(2), Target), Block(N(6), Me)]),
+        ],
+        pattern: [0, 1],
+    ),
+
+    // ================ Акт II: элиты ================
+    (
+        // Паучиха-пряха: замешивает нити в колоды и кормится каждой, что не порвали
+        id: "spinner", hp: (140, 150),
+        moves: [
+            (id: "spinner_weave", intent: Debuff, effects: [AddCard(card: "silk", pile: Draw, to: AllFoes, count: 2), Block(N(10), Me)]),
+            (id: "spinner_feed", intent: Buff, effects: [Hook("feed_webs")]),
+            (id: "spinner_fangs", intent: Attack, targeted: true, effects: [Damage(N(14), Target), Apply(Weak, N(1), Target)]),
+        ],
+        pattern: [0, 2, 1],
+    ),
+    (
+        // Упырь-князь: кровопийца, зовёт свиту и пирует на всех
+        id: "upyr_knyaz", hp: (150, 160), flags: ["lifesteal"],
+        moves: [
+            (id: "knyaz_call", intent: Summon, effects: [Summon("upyr", 1)]),
+            (id: "knyaz_feast", intent: AttackAll, effects: [Damage(N(9), AllFoes)]),
+            (id: "knyaz_bite", intent: Attack, targeted: true, effects: [Damage(N(18), Target)]),
+        ],
+        opening: [0],
+        pattern: [2, 1, 2, 0],
+    ),
+    (
+        // Водяной-мельник: вешает жернов на руку и с каждым оборотом колеса бьёт сильнее
+        id: "miller", hp: (145, 155),
+        moves: [
+            (id: "miller_stone", intent: Debuff, targeted: true, effects: [AddCard(card: "millstone", pile: Hand, to: Target), Damage(N(8), Target)]),
+            (id: "miller_wheel", intent: Buff, effects: [Apply(Strength, N(2), Me), Block(N(12), Me)]),
+            (id: "miller_flood", intent: AttackAll, effects: [Damage(N(10), AllFoes)]),
+        ],
+        pattern: [0, 1, 2, 1, 2],
+    ),
+    (
+        // Обдериха: сдирает щит со всего отряда и сразу хлещет
+        id: "obderikha", hp: (135, 145),
+        moves: [
+            (id: "obderikha_flay", intent: AttackAll, effects: [Hook("strip_block"), Damage(N(9), AllFoes)]),
+            (id: "obderikha_steam", intent: Defend, effects: [Block(N(16), Me), Apply(Mist, N(1), Me)]),
+            (id: "obderikha_lash", intent: Attack, targeted: true, effects: [Hits(N(6), 3, Target)]),
+        ],
+        pattern: [1, 0, 2],
+    ),
+
+    // ================ Акт III: обычные ================
+    (
+        // Тень предка: пока она здесь, герои лечатся вдвое слабее
+        id: "ancestor_shade", hp: (50, 54), flags: ["withering"],
+        moves: [
+            (id: "shade_reproach", intent: Attack, targeted: true, effects: [Damage(N(12), Target)]),
+            (id: "shade_mourn", intent: Debuff, effects: [Apply(Weak, N(1), AllFoes), Block(N(10), Me)]),
+        ],
+        pattern: [0, 1, 0],
+    ),
+    (
+        // Навий пёс: чует кровь — по раненому вдвое (половине здоровья и ниже) бьёт в полтора раза
+        id: "nav_hound", hp: (46, 50), flags: ["blood_scent"],
+        moves: [
+            (id: "hound_bite", intent: Attack, targeted: true, effects: [Damage(N(11), Target)]),
+            (id: "hound_rend", intent: Attack, targeted: true, effects: [Damage(N(7), Target), Apply(Bleed, N(2), Target)]),
+        ],
+        pattern: [0, 1],
+    ),
+    (
+        // Огненный змей: летает и очаровывает — следующая атака героя бьёт по своему
+        id: "fire_serpent", hp: (42, 46), flags: ["flying"],
+        moves: [
+            (id: "charm", intent: Special, targeted: true, effects: [Hook("charm"), Block(N(6), Me)]),
+            (id: "serpent_flame", intent: AttackAll, effects: [Damage(N(8), AllFoes)]),
+        ],
+        pattern: [0, 1, 1],
+    ),
+
+    // ================ Акт III: элиты ================
+    (
+        // Жрец Чернобога: каждый третий ход приносит в жертву самого слабого из своих
+        id: "chernobog_priest", hp: (170, 180),
+        moves: [
+            (id: "priest_knife", intent: Attack, targeted: true, effects: [Damage(N(16), Target)]),
+            (id: "priest_curse", intent: Debuff, effects: [Apply(Vulnerable, N(2), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "priest_sacrifice", intent: Special, effects: [Hook("sacrifice")]),
+        ],
+        pattern: [0, 1, 2],
+    ),
+    (
+        // Алконост: колыбельная усыпляет всех, кроме одного; спящего будит карта союзника
+        id: "alkonost", hp: (175, 185),
+        moves: [
+            (id: "alkonost_lullaby", intent: Debuff, effects: [Hook("lullaby")]),
+            (id: "alkonost_talons", intent: Attack, targeted: true, effects: [Hits(N(10), 2, Target)]),
+            (id: "alkonost_wing", intent: AttackAll, effects: [Damage(N(12), AllFoes)]),
+        ],
+        pattern: [1, 0, 2, 1],
+    ),
+
+    // ================ Акт III: боссы ================
+    (
+        // Чернобог: чёрное солнце восходит каждый его ход, если отряд не нанёс ему 30 урона
+        // с прошлого хода; полное затмение ослепляет всех и даёт ему Силу
+        id: "chernobog", hp: (500, 500), flags: ["eclipse"],
+        moves: [
+            (id: "chernobog_sun", intent: Special, effects: [Hook("eclipse_rise"), Block(N(15), Me)]),
+            (id: "chernobog_crush", intent: Attack, targeted: true, effects: [Damage(N(24), Target), Hook("eclipse_rise")]),
+            (id: "chernobog_night", intent: AttackAll, effects: [Damage(N(13), AllFoes), Hook("eclipse_rise")]),
+            (id: "chernobog_shades", intent: Summon, effects: [Summon("nav_soul", 1), Hook("eclipse_rise")]),
+        ],
+        opening: [0],
+        pattern: [1, 2, 1, 0],
+        phase2_at: 50,
+        phase2: [3, 2, 1, 2, 1],
+    ),
+    (
+        // Жля — плач: насылает тоску и бьёт по всем; пала — сестра встаёт сильнее и поднимает её
+        id: "zhlya", hp: (230, 230), flags: ["twin_soul"],
+        moves: [
+            (id: "zhlya_wail", intent: AttackAll, effects: [Damage(N(10), AllFoes), AddCard(card: "grief", pile: Discard, to: AllFoes)]),
+            (id: "zhlya_ash", intent: Debuff, effects: [Apply(Weak, N(2), AllFoes), Block(N(14), Me)]),
+            (id: "zhlya_embrace", intent: Attack, targeted: true, effects: [Damage(N(16), Target)]),
+        ],
+        pattern: [0, 2, 1],
+    ),
+    (
+        // Карна — кара: бьёт тяжело и надламывает
+        id: "karna", hp: (230, 230), flags: ["twin_soul"],
+        moves: [
+            (id: "karna_scourge", intent: Attack, targeted: true, effects: [Damage(N(22), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "karna_vigil", intent: Defend, effects: [Block(N(18), Me), Apply(Strength, N(1), Me)]),
+            (id: "karna_judgement", intent: Attack, targeted: true, effects: [Hits(N(8), 3, Target)]),
+        ],
+        pattern: [1, 0, 2],
+    ),
+]

@@ -19,13 +19,13 @@ pub fn plugin(app: &mut App) {
         .add_systems(Update, sync_ink)
         .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Map)))
         // the map looked at in a fight (see `run_ui::MapPeek`) is drawn on as well
-        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(in_state(AppState::Battle)));
+        .add_systems(Update, (redraw_ink, tray, light_tray, draw_ink).chain().after(sync_ink).run_if(|state: Res<State<AppState>>| crate::run_ui::PEEK_STATES.contains(state.get())));
 }
 
 /// How far everything of the pencil is lifted: in a fight the map is laid over the whole fight,
 /// and its marks and tray with it.
 fn lift(state: &Option<Res<State<AppState>>>) -> i32 {
-    if state.as_ref().is_some_and(|s| *s.get() == AppState::Battle) { crate::run_ui::PEEK_Z } else { 0 }
+    if state.as_ref().is_some_and(|s| crate::run_ui::PEEK_STATES.contains(s.get())) { crate::run_ui::PEEK_Z } else { 0 }
 }
 
 /// What the right button does on the map.
@@ -52,12 +52,19 @@ pub struct MapInk {
     pub tool: Tool,
     /// This player's seat: their marks are drawn in its colour (see `theme::marker_color`).
     seat: Option<u8>,
+    /// The hero in each seat: a player's marks are drawn in their hero's colour.
+    heroes: Vec<String>,
 }
 
 impl MapInk {
-    /// The colour this player's own marks are drawn in: their seat's, as everyone else sees them.
+    /// The colour the marks of the player in `seat` are drawn in: their hero's.
+    fn seat_color(&self, seat: u8) -> Color {
+        self.heroes.get(seat as usize).map_or(PENCIL, |h| theme::marker_color(h))
+    }
+
+    /// The colour this player's own marks are drawn in: their hero's, as everyone else sees them.
     fn own_color(&self) -> Color {
-        self.seat.map_or(PENCIL, theme::marker_color)
+        self.seat.map_or(PENCIL, |s| self.seat_color(s))
     }
 }
 
@@ -189,7 +196,7 @@ fn redraw_ink(mut commands: Commands, mut ink: ResMut<MapInk>, sheets: Query<(En
             for (seat, strokes) in &ink.others {
                 for stroke in strokes {
                     for (a, b) in stroke.first().map(|p| (*p, *p)).into_iter().chain(stroke.windows(2).map(|w| (w[0], w[1]))) {
-                        let e = piece(&mut commands, sheet, a, b, z, theme::marker_color(*seat));
+                        let e = piece(&mut commands, sheet, a, b, z, ink.seat_color(*seat));
                         commands.entity(e).insert(RemoteInk);
                     }
                 }
@@ -234,6 +241,9 @@ fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMu
     }
     if ink.seat != me {
         ink.seat = me;
+    }
+    if ink.heroes.len() != run.players.len() || ink.heroes.iter().zip(&run.players).any(|(h, p)| *h != p.hero) {
+        ink.heroes = run.players.iter().map(|p| p.hero.clone()).collect();
     }
     // Flush earlier edits before answering a snapshot request so reliable ordering cannot
     // append those same points again after the snapshot.

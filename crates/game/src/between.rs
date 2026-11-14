@@ -495,22 +495,41 @@ pub fn open_player(
             ChildOf(bar),
         ));
     }
-    commands.spawn((theme::text(l10n.t("deck-hint"), &fonts.body, 18.0, theme::DIM), Node { margin: UiRect::left(auto()), flex_shrink: 0.0, ..default() }, ChildOf(bar)));
-    // the way out, at the end of the same line
+    commands.spawn((theme::text(l10n.t("deck-hint"), &fonts.body, 18.0, theme::DIM), Node { margin: UiRect::left(auto()), flex_shrink: 1.0, min_width: px(0), ..default() }, TextLayout::justify(Justify::Right), ChildOf(bar)));
+    // the way out: a cross in the window's top right corner, in the margin beside the cards, so
+    // however long the line of sorts runs it never pushes it off the window
+    const CLOSE: f32 = 40.0;
+    let cross_bar = |deg: f32| {
+        (
+            Node { position_type: PositionType::Absolute, left: px(CLOSE / 2.0 - 13.0 - 2.0), top: px(CLOSE / 2.0 - 1.5 - 2.0), width: px(26), height: px(3), border_radius: BorderRadius::all(px(2)), ..default() },
+            BackgroundColor(theme::BONE),
+            UiTransform { rotation: Rot2::degrees(deg), ..default() },
+            Pickable::IGNORE,
+        )
+    };
     commands.spawn((
         Button,
         Hovered::default(),
         Btn(theme::PEAT),
-        Node { padding: UiRect::axes(px(20), px(7)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), margin: UiRect::left(px(8)), flex_shrink: 0.0, ..default() },
+        Node {
+            position_type: PositionType::Absolute,
+            right: px((STAGE_W - DECK_WINDOW_W) / 2.0 + 8.0),
+            top: px(DECK_EDGE + (DECK_HEAD_H - CLOSE) / 2.0),
+            width: px(CLOSE),
+            height: px(CLOSE),
+            border: UiRect::all(px(2)),
+            border_radius: BorderRadius::all(px(8)),
+            ..default()
+        },
         BackgroundColor(theme::PEAT),
         BorderColor::all(theme::BONE.with_alpha(0.6)),
-        children![theme::text(l10n.t("deck-close"), &fonts.title, 20.0, theme::BONE)],
+        children![cross_bar(45.0), cross_bar(-45.0)],
         observe(|_: On<Activate>, mut commands: Commands, open: Query<Entity, With<DeckView>>| {
             for e in &open {
                 commands.entity(e).despawn();
             }
         }),
-        ChildOf(bar),
+        ChildOf(view),
     ));
     // the cards: an even grid, rolled by the wheel when it is taller than the screen. As wide as
     // the screen, so what a card tells beside itself is not cut off at the grid's edge

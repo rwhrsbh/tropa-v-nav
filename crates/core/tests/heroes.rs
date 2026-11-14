@@ -339,7 +339,8 @@ fn every_hero_has_ninety_four_cards_five_of_them_for_company() {
     for hero in ["bogatyr", "vorozheya", "volhv", "volkolak", "znaharka", "skomoroh", "emelya"] {
         let mine: Vec<&CardDef> = c.cards.values().filter(|d| d.hero == hero).collect();
         // the jester has nine more: the fifth set, his discards; Yemelya has three to start with, not four
-        assert_eq!(mine.len(), match hero { "skomoroh" => 103, "emelya" => 93, _ => 94 }, "{hero}");
+        // the sixth set gave every hero ten more: three that stay in the hand, seven talents
+        assert_eq!(mine.len(), match hero { "skomoroh" => 113, "emelya" => 103, _ => 104 }, "{hero}");
         // Yemelya keeps to himself: none of his cards is for company
         assert!(hero == "emelya" || mine.iter().filter(|d| d.keywords.contains(&Keyword::Coop)).count() >= 5, "{hero}");
         // what is paid for in sleep is not free

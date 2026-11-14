@@ -1,0 +1,28 @@
+// Новая волна врагов: отряды для них.
+[
+    // ---- Акт I ----
+    (id: "a1_biryuk", act: 1, kind: Normal, enemies: ["biryuk"], extra4: ["grey_wolf"]),
+    (id: "a1_podmenysh", act: 1, kind: Normal, enemies: ["podmenysh", "kikimora"], solo: ["podmenysh", "grey_wolf"]),
+    (id: "a1_polevik", act: 1, kind: Normal, enemies: ["polevik", "lesavka"], extra4: ["lesavka"]),
+    (id: "a1_tugarin", act: 1, kind: Elite, enemies: ["tugarin"]),
+    (id: "a1_black_volhv", act: 1, kind: Elite, enemies: ["black_volhv"], extra4: ["raven"]),
+    (id: "a1_vedmak", act: 1, kind: Elite, enemies: ["vedmak"]),
+    (id: "a1_wolf_herder", act: 1, kind: Elite, enemies: ["wolf_herder", "grey_wolf", "grey_wolf"], solo: ["wolf_herder", "grey_wolf"]),
+    // ---- Акт II ----
+    (id: "a2_zhivoglot", act: 2, kind: Normal, enemies: ["zhivoglot"], extra4: ["anchutka"]),
+    (id: "a2_gravedigger", act: 2, kind: Normal, enemies: ["gravedigger", "upyr"], solo: ["gravedigger"]),
+    (id: "a2_pugach", act: 2, kind: Normal, enemies: ["pugach", "pugach", "tinyak"], solo: ["pugach", "tinyak"]),
+    (id: "a2_bolotnitsa", act: 2, kind: Normal, enemies: ["bolotnitsa", "drowned_maiden"], extra4: ["bolotnitsa"]),
+    (id: "a2_spinner", act: 2, kind: Elite, enemies: ["spinner"], extra4: ["anchutka"]),
+    (id: "a2_upyr_knyaz", act: 2, kind: Elite, enemies: ["upyr_knyaz"]),
+    (id: "a2_miller", act: 2, kind: Elite, enemies: ["miller", "drowned_maiden"], solo: ["miller"]),
+    (id: "a2_obderikha", act: 2, kind: Elite, enemies: ["obderikha"], extra4: ["bannik"]),
+    // ---- Акт III ----
+    (id: "a3_ancestor_shade", act: 3, kind: Normal, enemies: ["ancestor_shade", "nav_soul"], solo: ["ancestor_shade", "weeper"]),
+    (id: "a3_nav_hound", act: 3, kind: Normal, enemies: ["nav_hound", "nav_hound"], extra4: ["nav_hound"]),
+    (id: "a3_fire_serpent", act: 3, kind: Normal, enemies: ["fire_serpent", "kostomakha"], solo: ["fire_serpent"]),
+    (id: "a3_chernobog_priest", act: 3, kind: Elite, enemies: ["chernobog_priest", "nav_soul", "nav_soul"], solo: ["chernobog_priest", "nav_soul"]),
+    (id: "a3_alkonost", act: 3, kind: Elite, enemies: ["alkonost"]),
+    (id: "a3_chernobog", act: 3, kind: Boss, enemies: ["chernobog"]),
+    (id: "a3_zhlya_karna", act: 3, kind: Boss, enemies: ["zhlya", "karna"]),
+]

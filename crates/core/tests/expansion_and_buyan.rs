@@ -143,3 +143,31 @@ fn test_act3_to_act4_heal() {
     let expected_delta = ((max_hp - 20) * 80 + 99) / 100;
     assert_eq!(run.players[0].hp, 20 + expected_delta);
 }
+
+/// Kot Bayun's claws count the statuses that end up in the discard pile (the hand is thrown away
+/// before he moves), and his intent shows that blow before it lands.
+#[test]
+fn bayun_claws_count_the_eyelids_left_unplayed() {
+    let (c, mut s) = solo(&["t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block", "t_block"], &["kot_bayun"]);
+    let hp = s.heroes[0].hp;
+    // round 1: the purr slips two Heavy Eyelids into the hand
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].hand.iter().filter(|x| x.def == "heavy_eyelids").count(), 2);
+    assert_eq!(s.heroes[0].hp, hp);
+    // round 2: the claws are coming, for 10 and 4 for each of the two left unplayed
+    let bayun = s.enemies[0].clone();
+    assert_eq!(bot::intent_damage(&c, &s, &bayun), Some((18, 1)));
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].hp, hp - 18);
+}
+
+/// The pike's card is announced before it plays, so the screen can show it leaving the pile.
+#[test]
+fn the_pike_says_which_card_it_took() {
+    let c = content();
+    let h = hero("emelya", &["em_pike_fetch", "em_pike_fetch", "em_pike_fetch", "em_pike_fetch", "em_pike_fetch", "t_block", "t_block", "t_block"]);
+    let (mut s, _) = start(&c, &[h], &ids(&["dummy"]), 7);
+    let ev = play(&c, &mut s, 0, "em_pike_fetch", None);
+    let at = ev.iter().position(|e| matches!(e, Event::PikeDrew { player: 0, .. })).expect("pike drew");
+    assert!(ev[at..].iter().any(|e| matches!(e, Event::CardPlayed { .. })), "{ev:?}");
+}
