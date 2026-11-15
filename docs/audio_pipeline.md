@@ -13,6 +13,65 @@ accent into ru-old: the ru-old style says the speaker is a native Russian with n
 (`STYLE` in `tools/tts_api.py`). Before any mass run with a new voice, model or style, record 2–3
 clips and let the user listen.
 
+The language styles, word for word (added after the speaker's persona from
+`docs/prompts/voice/barks.voices.txt`):
+
+- **ru-old:** "The line is in Old Russian, read in the solemn old manner: every vowel as written,
+  unstressed O stays a round O, E never read as YO; a capital letter inside a word marks its
+  stressed vowel. The speaker is a native Russian: Russian pronunciation through and through, with
+  no English or other foreign accent at all."
+- **ru:** "The line is in plain modern Russian: ordinary present-day pronunciation and natural
+  stress, nothing archaic or churchly."
+- **en:** "The line is in English, spoken by a Slav: a clear, noticeable Russian accent, rolled R,
+  heavy consonants."
+
+### Who speaks: voice and persona of every character
+
+(The same as `docs/prompts/voice/barks.voices.txt`, which the tools read; change both together.)
+
+| who | voice | persona |
+|---|---|---|
+| bogatyr | Alnilam | A huge Slavic warrior knight in battle. Deep, strong, booming chest voice of a man of forty; calm, scornful confidence; short soldier's phrases spoken firmly and loudly. Not theatrical. |
+| vorozheya | Gacrux | A woman: a middle-aged village witch who reads fate in bones and cards. Strictly a female voice, never male. Low, husky, knowing woman's voice; cold and mocking; she speaks in a quiet hiss full of contempt. Not a whisper: every word clear. |
+| volhv | Orus | An old pagan priest of the thunder god in battle. Grave, resonant, commanding elder's voice, slow and solemn as a prayer, with iron under it. |
+| volkolak | Fenrir | A man half turned into a wolf, mid-fight. Rough, hungry, growling voice through bared teeth, panting between words, barely holding back the beast. Every word still understandable. |
+| znaharka | Sulafat | A woman: a kindly but grim old village healer, about seventy. Strictly a female voice, never male. Warm, cracked, folksy grandmother's voice; dry black humour; brisk and practical. |
+| skomoroh | Puck | A wandering Slavic jester and buffoon performing even in battle. Quick, nasal, mocking, theatrical showman's voice; he laughs at death; loud and bright. |
+| emelya | Umbriel | A lazy, sleepy young village fool lying on a warm stove. Slow, drawling, yawning, good-natured voice, thick with sleep; he mumbles and never hurries; even in pain he sounds mostly put out, not afraid. |
+| leshy | Algieba | The ancient forest spirit Leshy. Enormous, slow, creaking, deep voice like an old tree groaning in the wind; inhuman and patient. |
+| bolotnik | Enceladus | The swamp master Bolotnik. Thick, wet, gurgling, drawling voice rising from under black water; slow and hungry. |
+| mara | Kore | A woman: Mara, the goddess of winter and death. Strictly a female voice, never male. Cold, flat, clear, icy woman's voice; utterly calm and merciless; every word like frost. |
+| koschei | Charon | Koschei the Deathless, an ancient skeletal king. Dry, rasping, aristocratic old voice, amused and bored, slow; a voice that has not breathed for a thousand years. |
+
+### How a line was asked, and why two takes of one line can sound different
+
+The full prompt is always **persona + language style + the line**. Two ways were used:
+
+- **Through the API** (`tools/tts_api.py`, most of the takes): one text,
+  `<persona> <style> Say only this line, once, in character: <line>`; the 3.8 models get
+  `## Style:
+<persona> <style>
+
+## Transcript:
+<line>` instead.
+- **On the AI Studio page** (`tools/barkpage.py`, the bogatyr's first takes): the Style box holds
+  `<persona> <style> Speak only the line, once.` (the ru style there adds "The capital letters are
+  only the start of sentences."), the line goes in the speech block alone, model
+  `gemini-3.1-flash-tts-preview`.
+
+The script takes the first model with quota left (`MODELS` in `tools/tts_api.py`:
+gemini-3.1-flash-tts-preview, gemini-3.8-flash-tts, gemini-2.5-pro-preview-tts,
+gemini-2.5-flash-preview-tts, gemini-3.8-flash-lite-tts), so the takes of one speaker were made by
+different models on different days, and each model makes the same voice sound a little different.
+The ru-old style got its last sentence ("The speaker is a native Russian… no foreign accent") on
+2026-11-09; takes made before that lack it. When one take is missing, record it with the model its
+siblings came from and let the user hear it beside them before it goes in.
+
+A battle line is asked as `<persona> <style> Say only this line, once, in character: <line>`; the
+3.8 models take it laid out as `## Style:` / `## Transcript:`. The narrator's scene for each
+language is the comment block at the top of `docs/prompts/voice/story.<lang>.txt`; a page is asked
+as `<scene>` + `Read this aloud, once, exactly as written:` + the text.
+
 ## Narrator (story pages, book secrets, omens)
 
 - Model `gemini-3.1-flash-tts-preview`, speaker **Algenib**, the scene prompt approved by the user

@@ -209,3 +209,16 @@ Single full-body creature, three-quarter view facing left, feet on the ground ne
 
 Боссы первого и второго актов (Идолище Поганое, Вихорь, Горе-Злосчастье, Злой Домовой), их значки и карта Горе —
 `docs/prompts/plots/bosses2.json`. Соловей, Корочун, Баба-Яга и Водяной царь с тех пор — элиты.
+
+## Kot Bayun off his post (`kot_bayun_ground*`)
+
+While `bayun_perch` is set he is drawn on his post (`kot_bayun`, `_strike`, `_hurt`, `_guard`);
+once he leaps down the game swaps in the `_ground` set. Each was painted in Flow from the resting
+picture attached as the look only (an edit of the perched picture kept the floating perch pose:
+ask for a completely new picture). Keyed with `tools/key_flood.py`, taken in with
+`tools/pose_in.py`.
+
+- `kot_bayun_ground`: Use the attached picture ONLY for what the cat looks like (huge black scarred cat, orange eyes, bristling fur, painted style, lighting). Draw a completely new picture, square 1:1, one single image, no text: the cat STANDING on the ground on all four straight legs, full side view, body horizontal, facing left, back arched and fur raised, head low and snarling at the viewer's left, tail raised high in a curve ABOVE his back. All four paws touch one flat ground line at the bottom of the picture; nothing hangs below the paws. No post, no stump, no rock. The whole cat inside the frame with a margin on every side. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
+- `kot_bayun_ground_strike`: Use the attached picture for what the cat looks like (the SAME huge black scarred cat, orange eyes, same fur, painted style, lighting and size). New pose, square 1:1, one single image, no text: he LUNGES forward to the left, striking with one front paw raised high, claws fully out, mouth wide open in a hiss, hind legs pushing off the ground, body stretched low. No post, no stump. Whole cat inside the frame with a margin on every side, his hind paws near the bottom. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
+- `kot_bayun_ground_hurt`: Use the attached picture for what the cat looks like (the SAME huge black scarred cat, orange eyes, same fur, painted style, lighting and size). New pose, square 1:1, one single image, no text: he has just been struck hard and REELS BACK to the right, away from the blow, head thrown back with eyes squeezed shut and mouth open in a yowl, front paws lifted off the ground, hind legs braced, fur flattened, a little dark blood on his shoulder. No post, no stump. Whole cat inside the frame with a margin on every side, his hind paws near the bottom. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
+- `kot_bayun_ground_guard`: Use the attached picture for what the cat looks like (the SAME huge black scarred cat, orange eyes, same fur, painted style, lighting and size). New pose, square 1:1, one single image, no text: he crouches low and defensive on the ground, facing left, body pressed down and coiled, ears flattened back, fur bristling, one front paw raised before his face to ward off a blow, tail wrapped around his flank. No post, no stump. Whole cat inside the frame with a margin on every side, his paws near the bottom. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
