@@ -75,7 +75,17 @@ paint them:
    exactly the same…"
 6. `python -X utf8 tools/rig_in.py <id> <mask> <body> <dead> <dead_headless>` writes head, body
    and both corpses and prints the `FIGURES` line; check `target/rig_<id>.png`, then put the line
-   in `rig.rs`.
+   in `rig.rs`. The printed head joint sits three quarters down the head's box, which is the chin
+   on a short head but lands on the chest under a long beard or long hair (bolotnitsa, karna,
+   miller, domovoy): then read the joint off the neck stump in the preview (x, y as fractions of
+   the picture) and write that instead. The joint is the pivot the head nods and flies off
+   around. Small specks Flow leaves in the background are dropped from the parts and corpses.
+
+`tools/flow_rig_cmds.py <id> "<who>" "<head>" [his|her|its]` prints the whole Browser MCP command
+block for steps 1 to 5 (about four minutes in Flow), with exactly the prompts above; it expects the
+resting picture on a green square at `_inbox/flow_up/rig_<id>.png` and saves
+`_inbox/flow_up/<id>_{mask,body,dead,deadhl}.png`. Keep the old files before step 6 overwrites
+them.
 
 `tools/rigparts.py` is the part cutter under `rig_in.py` (`PARTS=head,arm` limits the parts,
 `GROW=` widens the seam). Describe wings, claws and paws per creature, never generic "arms".

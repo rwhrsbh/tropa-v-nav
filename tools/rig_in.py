@@ -15,7 +15,9 @@ import os
 import subprocess
 import sys
 
+import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from key_flood import key_flood  # noqa: E402
@@ -31,11 +33,28 @@ def figure(path):
     return im.crop(im.getchannel("A").point(lambda v: 255 if v > 24 else 0).getbbox())
 
 
+def despeckle(path):
+    """Drops specks Flow leaves in the background: bits of picture far smaller than the figure
+    (under 0.2% of its largest piece). Props lying apart, a dropped knife or bowl, are kept."""
+    im = Image.open(path).convert("RGBA")
+    a = np.array(im)
+    lab, n = ndimage.label(a[..., 3] > 24)
+    if n < 2:
+        return
+    sizes = ndimage.sum(np.ones(lab.shape), lab, range(1, n + 1))
+    small = [i + 1 for i, s in enumerate(sizes) if s < max(60, sizes.max() * 0.002)]
+    if small:
+        a[np.isin(lab, small), 3] = 0
+        Image.fromarray(a).save(path)
+
+
 def main():
     foe, mask, body, dead, headless = sys.argv[1:6]
     env = dict(os.environ, PARTS="head")
     preview = os.path.join(ROOT, "target", f"rig_{foe}.png")
     subprocess.run([sys.executable, "-X", "utf8", os.path.join(ROOT, "tools", "rigparts.py"), os.path.join(ENEMIES, f"{foe}-gemini.png"), body, mask, ENEMIES, foe, preview], env=env, check=True)
+    for part in ("body", "head"):
+        despeckle(os.path.join(ENEMIES, f"{foe}_{part}-gemini.png"))
     h = Image.open(os.path.join(ENEMIES, f"{foe}-gemini.png")).size[1]
     w = h * 3 // 2
     d = figure(dead)
@@ -46,6 +65,7 @@ def main():
         sheet = Image.new("RGBA", (w, h))
         sheet.alpha_composite(fig, ((w - fig.width) // 2, int(h * FOOT) - fig.height))
         sheet.save(os.path.join(ENEMIES, f"{name}-gemini.png"))
+        despeckle(os.path.join(ENEMIES, f"{name}-gemini.png"))
         out.append(sheet)
     # the corpses under the rig preview, on grey, to look at
     rp = Image.open(preview).convert("RGBA")
