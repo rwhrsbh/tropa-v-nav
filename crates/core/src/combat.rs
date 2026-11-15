@@ -1074,7 +1074,6 @@ impl<'a> Exec<'a> {
             self.ev.push(Event::Shuffled { player: p });
         }
         let Some(card) = self.hero(p).draw.pop() else { return };
-        self.ev.push(Event::PikeDrew { player: p, card: card.def.clone(), upgraded: card.upgraded });
         let h = &self.s.heroes[p as usize];
         let view = self.c.cards.get(&card.def).map(|d| d.view(card.upgraded, h.form));
         let barred = match &view {
@@ -1096,8 +1095,10 @@ impl<'a> Exec<'a> {
             CardTarget::Downed => self.s.heroes.iter().find(|a| a.downed).map(|a| UnitRef::Hero(a.slot)),
         };
         let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed) && target.is_none();
+        let played = view.is_some() && !barred && !nobody;
+        self.ev.push(Event::PikeDrew { player: p, card: card.def.clone(), upgraded: card.upgraded, played });
         match view {
-            Some(view) if !barred && !nobody => self.resolve(p, card, view, target, 0, false),
+            Some(view) if played => self.resolve(p, card, view, target, 0, false),
             // shown going there by the pike's own flight (`Event::PikeDrew`)
             _ => self.hero(p).discard.push(card),
         }
@@ -1509,8 +1510,9 @@ impl<'a> Exec<'a> {
                     ctx.fatal = false;
                     for _ in 0..times {
                         for u in self.targets(ctx, *t) {
-                            // the duck is on the wing: only blows that sweep everyone, and runes, reach it
-                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying"))) {
+                            // the duck is on the wing, the cat up his post: only blows that sweep
+                            // everyone, and runes, reach them
+                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch"))) {
                                 continue;
                             }
                             if self.strike(Some(ctx.src), u, n, ctx.attack) {
@@ -2270,6 +2272,10 @@ impl<'a> Exec<'a> {
                     bled: false,
                 };
                 self.run(&mv.effects, &mut ctx);
+                // Ogneya runs hotter with every lash of fire she throws
+                if attacks && self.s.enemy(uid).is_some_and(|e| e.alive && e.flags.contains_key("overheat")) {
+                    self.add_status(me, S::Strength, 1);
+                }
             }
             self.rot_tick(me);
             if self.s.standing_heroes().next().is_none() {

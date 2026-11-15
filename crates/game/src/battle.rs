@@ -1129,7 +1129,7 @@ fn swap_form_art(
     let mut skins = skins;
     // every picture a unit may change into is loaded before it is needed, so a first blow
     // is not drawn in the resting pose
-    let stems = session.shown.heroes.iter().flat_map(|h| [format!("heroes/{}", h.def), format!("heroes/{}_beast", h.def)]).chain(session.shown.enemies.iter().map(|e| format!("enemies/{}", e.def)));
+    let stems = session.shown.heroes.iter().flat_map(|h| [format!("heroes/{}", h.def), format!("heroes/{}_beast", h.def)]).chain(session.shown.enemies.iter().flat_map(|e| [format!("enemies/{}", e.def), format!("enemies/{}_ground", e.def)]));
     for stem in stems {
         if preloaded.seen.insert(stem.clone()) {
             for mark in ["", "_headless", "_noweapon", "_noshield", "_noarms", "_headless_noweapon", "_headless_noshield", "_headless_noarms"] {
@@ -1153,7 +1153,14 @@ fn swap_form_art(
             UnitRef::Enemy(uid) => {
                 // a foe falling keeps the picture it fell in
                 let Some(e) = session.shown.enemy(uid).filter(|e| e.alive && !s.vanish) else { continue };
-                (format!("enemies/{}", e.def), false)
+                // Kot Bayun down off his post is drawn on the ground, with no post under him
+                let off_post = session.truth.enemy(uid).is_some_and(|r| !r.flags.contains_key("bayun_perch"));
+                let ground = format!("enemies/{}_ground", e.def);
+                if off_post && art.image(&assets, &ground).is_some() {
+                    (ground, false)
+                } else {
+                    (format!("enemies/{}", e.def), false)
+                }
             }
         };
         // through the heart of a lunge the unit is drawn mid-blow, through a skill or power

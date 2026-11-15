@@ -252,7 +252,7 @@ pub(crate) fn token_node(size: f32) -> Node {
 pub(crate) fn hero_token(token: &mut EntityCommands, hero: &str, seat: u8, art: &Art, assets: &AssetServer) {
     let _ = seat;
     let color = theme::marker_color(hero);
-    token.insert((BackgroundColor(color.lighter(0.12)), BorderColor::all(color.mix(&INK, 0.45)), Pickable::IGNORE));
+    token.insert((BackgroundColor(color.lighter(0.15)), BorderColor::all(color), Pickable::IGNORE));
     if let Some(face) = art.image(assets, &format!("map/hero_{hero}")) {
         token.insert(ImageNode::new(face));
     }

@@ -191,3 +191,40 @@ fn the_pike_says_which_card_it_took() {
     let at = ev.iter().position(|e| matches!(e, Event::PikeDrew { player: 0, .. })).expect("pike drew");
     assert!(ev[at..].iter().any(|e| matches!(e, Event::CardPlayed { .. })), "{ev:?}");
 }
+
+#[test]
+fn ogneya_runs_hotter_with_every_attack() {
+    let (c, mut s) = solo(&["t_block"], &["ogneya"]);
+    let lash = c.enemies["ogneya"].moves.iter().position(|m| m.id == "fire_whip").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: lash, target: Some(0) });
+    end_round(&c, &mut s);
+    assert_eq!(s.enemies[0].statuses.get(&StatusKind::Strength).copied().unwrap_or(0), 1);
+}
+
+#[test]
+fn bayun_up_his_post_is_out_of_reach_of_an_aimed_blow() {
+    let (c, mut s) = solo(&["t_hit", "t_hit_all"], &["kot_bayun"]);
+    let t = foe(&s, 0);
+    let start_hp = s.enemies[0].hp;
+    assert!(s.enemies[0].flags.contains_key("bayun_perch"));
+    play(&c, &mut s, 0, "t_hit", Some(t));
+    assert_eq!(s.enemies[0].hp, start_hp, "an aimed blow cannot reach him");
+    play(&c, &mut s, 0, "t_hit_all", None);
+    assert!(s.enemies[0].hp < start_hp, "a sweeping blow does");
+}
+
+#[test]
+fn bayun_leaps_down_to_pounce_and_climbs_back_to_purr() {
+    let (c, mut s) = solo(&["t_block"], &["kot_bayun"]);
+    s.heroes[0].max_hp = 999;
+    s.heroes[0].hp = 999;
+    let moves = &c.enemies["kot_bayun"].moves;
+    let pounce = moves.iter().position(|m| m.id == "pounce").unwrap();
+    let purr = moves.iter().position(|m| m.id == "purr").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: pounce, target: Some(0) });
+    end_round(&c, &mut s);
+    assert!(!s.enemies[0].flags.contains_key("bayun_perch"), "down off his post, in reach");
+    s.enemies[0].intent = Some(Intent { mv: purr, target: None });
+    end_round(&c, &mut s);
+    assert!(s.enemies[0].flags.contains_key("bayun_perch"), "back up again");
+}

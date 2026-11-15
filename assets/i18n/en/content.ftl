@@ -1107,9 +1107,9 @@ move-deafening_screech = Deafening Tempest Screech
 move-hurricane_volley = Hurricane Volley
 
 move-rime_curse = Rime Curse
-move-korochun_scythe = Scythe of Frost
+move-rime_scythe = Scythe of Frost
 move-permafrost = Permafrost
-move-korochun_blizzard = Bitter Blizzard
+move-bitter_blizzard = Bitter Blizzard
 move-winter_solstice = Solstice into Darkness
 move-permafrost_cleave = Frost Cleave
 
@@ -1126,7 +1126,7 @@ move-hut_trample = Hut Trample
 move-bone_crusher = Bone Crusher
 
 move-purr = Lulling Purr
-move-purr-desc = Slips two Heavy Eyelids into every hero's hand.
+move-purr-desc = Climbs his post and slips two Heavy Eyelids into every hero's hand.
 move-claws = Iron Claws
 move-claws-desc = Deals 10, plus 4 for every status or curse card in your discard pile. Heavy Eyelids played are exhausted and do not count.
 move-pounce = Perch Pounce
@@ -1224,7 +1224,7 @@ relic-perun_flint = Perun's Flint
 relic-perun_flint-desc = At the start of each turn: gain 1 Energy.
 relic-kupala_wheel = Kupala Wheel
 relic-kupala_wheel-desc = At the start of each turn: gain 1 Energy.
-move-pounce-desc = Deals 9 and applies 1 Sundered.
+move-pounce-desc = Leaps down off his post, deals 9 and applies 1 Sundered: any blow reaches him until he purrs again.
 move-snip-desc = Deals 6 and slips a Dread into the discard pile.
 move-witch_cauldron-desc = All heroes gain 2 Rot; Yaga heals 15 and gains 15 Block.
 move-brew_steal-desc = Takes the target's last potion. With no potions, the target gains 3 Rot instead.

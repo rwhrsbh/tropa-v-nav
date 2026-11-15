@@ -1107,9 +1107,9 @@ move-deafening_screech = Оглушающий рёв бури
 move-hurricane_volley = Ураганный залп
 
 move-rime_curse = Леденящее проклятье
-move-korochun_scythe = Коса мерзлоты
+move-rime_scythe = Коса мерзлоты
 move-permafrost = Вечная мерзлота
-move-korochun_blizzard = Лютая пурга
+move-bitter_blizzard = Лютая пурга
 move-winter_solstice = Солнцеворот во тьму
 move-permafrost_cleave = Рассечение хлада
 
@@ -1126,7 +1126,7 @@ move-hut_trample = Топот избушки
 move-bone_crusher = Костеломный удар
 
 move-purr = Усыпляющее мурлыканье
-move-purr-desc = Кладёт каждому герою в руку две «Тяжёлые веки».
+move-purr-desc = Забирается на столб и кладёт каждому герою в руку две «Тяжёлые веки».
 move-claws = Железные когти
 move-claws-desc = Бьёт на 10 и ещё на 4 за каждую карту статуса или проклятия в вашей стопке сброса. Разыгранные «Тяжёлые веки» истощаются и не считаются.
 move-pounce = Прыжок со столба
@@ -1224,7 +1224,7 @@ relic-perun_flint = Перунов кремень
 relic-perun_flint-desc = В начале каждого хода: +1 энергия.
 relic-kupala_wheel = Купальское колесо
 relic-kupala_wheel-desc = В начале каждого хода: +1 энергия.
-move-pounce-desc = Бьёт на 9 и накладывает Надлом 1.
+move-pounce-desc = Спрыгивает со столба, бьёт на 9 и накладывает Надлом 1: до следующего мурлыканья его достаёт любой удар.
 move-snip-desc = Бьёт на 6 и подкладывает «Жуть» в стопку сброса.
 move-witch_cauldron-desc = Все герои получают 2 Гнили; Яга лечится на 15 и получает 15 щита.
 move-brew_steal-desc = Отбирает у цели последнее зелье. Если зелий нет — цель получает 3 Гнили.

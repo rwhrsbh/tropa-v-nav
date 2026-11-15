@@ -3,9 +3,9 @@
     (
         id: "kot_bayun", hp: (52, 58), flags: ["bayun_perch"],
         moves: [
-            (id: "purr", intent: Debuff, effects: [Hook("bayun_eyelids")]),
-            (id: "claws", intent: Attack, targeted: true, effects: [Hook("bayun_claws")]),
-            (id: "pounce", intent: Attack, targeted: true, effects: [Damage(N(9), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "purr", intent: Debuff, effects: [Hook("bayun_climb"), Hook("bayun_eyelids")]),
+            (id: "claws", intent: Attack, targeted: true, effects: [Hook("bayun_leap"), Hook("bayun_claws")]),
+            (id: "pounce", intent: Attack, targeted: true, effects: [Hook("bayun_leap"), Damage(N(9), Target), Apply(Vulnerable, N(1), Target)]),
         ],
         pattern: [0, 1, 2],
     ),
@@ -70,7 +70,7 @@
         pattern: [0, 1, 2],
     ),
     (
-        id: "ogneya", hp: (68, 76), flags: ["burning"],
+        id: "ogneya", hp: (68, 76), flags: ["overheat"],
         moves: [
             (id: "fire_whip", intent: Attack, targeted: true, effects: [Damage(N(13), Target), AddCard(card: "burn", pile: Discard, to: Target)]),
             (id: "blaze_barrier", intent: Defend, effects: [Block(N(12), Me), Apply(Thorns, N(2), Me)]),
@@ -135,14 +135,14 @@
         phase2: [4, 5, 2, 1],
     ),
     (
-        id: "korochun", hp: (120, 130),
+        id: "korochun", hp: (270, 290),
         moves: [
             (id: "rime_curse", intent: Special, targeted: true, effects: [Hook("korochun_chill"), Apply(Hex, N(2), Target)]),
-            (id: "korochun_scythe", intent: Attack, targeted: true, effects: [Damage(N(11), Target), Apply(Vulnerable, N(1), Target)]),
-            (id: "permafrost", intent: Defend, effects: [Block(N(14), Me), Apply(Fortitude, N(1), Me)]),
-            (id: "korochun_blizzard", intent: AttackAll, effects: [Damage(N(6), AllFoes), Apply(Weak, N(1), AllFoes)]),
-            (id: "winter_solstice", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Hex, N(1), AllFoes)]),
-            (id: "permafrost_cleave", intent: Attack, targeted: true, effects: [Damage(N(15), Target)]),
+            (id: "rime_scythe", intent: Attack, targeted: true, effects: [Damage(N(16), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "permafrost", intent: Defend, effects: [Block(N(20), Me), Apply(Fortitude, N(2), Me)]),
+            (id: "bitter_blizzard", intent: AttackAll, effects: [Damage(N(9), AllFoes), Apply(Weak, N(1), AllFoes)]),
+            (id: "winter_solstice", intent: AttackAll, effects: [Damage(N(14), AllFoes), Apply(Hex, N(2), AllFoes)]),
+            (id: "permafrost_cleave", intent: Attack, targeted: true, effects: [Damage(N(22), Target)]),
         ],
         opening: [0],
         pattern: [1, 2, 3, 1, 3],

@@ -157,7 +157,7 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
 
     // no point striking what cannot die, or what a single blow cannot reach
     let others_out = s.living_enemies().any(|e| !e.flags.contains_key("hiding"));
-    let reachable = |e: &&Enemy| !e.flags.contains_key("immortal") && !e.flags.contains_key("flying") && !(others_out && e.flags.contains_key("hiding"));
+    let reachable = |e: &&Enemy| !e.flags.contains_key("immortal") && !e.flags.contains_key("flying") && !e.flags.contains_key("bayun_perch") && !(others_out && e.flags.contains_key("hiding"));
     let weakest = s
         .living_enemies()
         .filter(reachable)
@@ -165,6 +165,9 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
         .or_else(|| s.living_enemies().filter(|e| !e.flags.contains_key("immortal") && !(others_out && e.flags.contains_key("hiding"))).min_by_key(|e| e.hp + e.block))
         .or_else(|| s.living_enemies().filter(|e| !(others_out && e.flags.contains_key("hiding"))).min_by_key(|e| e.hp + e.block))
         .map(|e| UnitRef::Enemy(e.uid));
+    // an aimed blow only at what it can reach: one on the wing or up a post is left to sweeping
+    // blows, and the card waits rather than be thrown away on it
+    let weakest_hit = s.living_enemies().filter(reachable).min_by_key(|e| e.hp + e.block).map(|e| UnitRef::Enemy(e.uid));
     // a draught is for a bad hour: when half the blood is gone, or the foe is a big one
     let hard_fight = s.enemies.iter().map(|e| e.max_hp).sum::<i32>() >= 100 * s.heroes.len() as i32;
     if h.hp * 2 <= h.max_hp || hard_fight {
@@ -185,8 +188,8 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
     if let Some((card, _)) = playable.iter().find(|(c, _)| c.def == "koschei_needle") {
         return CombatAction::Play { card: card.uid, target: None };
     }
-    // something on the wing: sweeping blows first
-    if s.living_enemies().any(|e| e.flags.contains_key("flying")) {
+    // something on the wing or up a post: sweeping blows first
+    if s.living_enemies().any(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch")) {
         let sweep = playable.iter().find(|(_, v)| v.target == CardTarget::None && v.effects.iter().any(|e| matches!(e, Effect::Damage(_, Tgt::AllFoes) | Effect::Hits(_, _, Tgt::AllFoes))));
         if let Some((card, _)) = sweep {
             return CombatAction::Play { card: card.uid, target: None };
@@ -196,6 +199,7 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
     let target_for = |v: &CardView| -> Option<Option<UnitRef>> {
         match v.target {
             CardTarget::None => Some(None),
+            CardTarget::Enemy if v.kind == CardType::Attack => weakest_hit.map(Some),
             CardTarget::Enemy => weakest.map(Some),
             CardTarget::Ally => Some(other),
             CardTarget::AnyHero => Some(Some(other.unwrap_or(UnitRef::Hero(slot)))),

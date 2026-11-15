@@ -57,6 +57,10 @@ struct PikeShow {
     face: bool,
     card: Card,
     form: Form,
+    /// Where it comes up from: the owner's draw pile, or the hero of another player.
+    from: Vec2,
+    /// Where it goes: the owner's discard pile; another player's card fades where it was held.
+    to: Option<Vec2>,
 }
 
 /// The stages of a pike's flight, in seconds: up from the pile, held out, down to the discard.
@@ -314,15 +318,23 @@ fn cue_flights(
                 }
                 sfx.play(&mut commands, "card_shuffle", &mixer, 1.0);
             }
-            Event::PikeDrew { player, card, upgraded } if *player == me => {
+            // the owner sees every card the pike takes; the others see one that it plays, rising
+            // from that hero
+            Event::PikeDrew { player, card, upgraded, played } if *player == me || *played => {
                 // the back of a card, with the deck's lozenge, comes up off the draw pile
                 let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: *upgraded, free: false };
+                let (from, to, form) = if *player == me {
+                    (DRAW_AT, Some(DISCARD_AT), session.my_hero().form)
+                } else {
+                    let at = unit_place(&session.shown, UnitRef::Hero(*player)).map_or(PIKE_SHOW_AT, |(foot, sz)| foot - Vec2::Y * sz.y * 0.6);
+                    (at, None, session.shown.hero(*player).map_or(session.my_hero().form, |h| h.form))
+                };
                 commands.spawn((
-                    PikeShow { t: 0.0, face: false, card: shown, form: session.my_hero().form },
+                    PikeShow { t: 0.0, face: false, card: shown, form, from, to },
                     Node {
                         position_type: PositionType::Absolute,
-                        left: px(DRAW_AT.x - CARD_W / 2.0),
-                        top: px(DRAW_AT.y - CARD_H / 2.0),
+                        left: px(from.x - CARD_W / 2.0),
+                        top: px(from.y - CARD_H / 2.0),
                         width: px(CARD_W),
                         height: px(CARD_H),
                         border: UiRect::all(px(4)),
@@ -428,7 +440,7 @@ fn pike_flight(
             // up off the pile along an arc, growing, turning over about its upright
             let p = t / PIKE_UP;
             let ease = 1.0 - (1.0 - p).powi(3);
-            let at = DRAW_AT.lerp(PIKE_SHOW_AT, ease) - Vec2::Y * 120.0 * (ease * std::f32::consts::PI).sin();
+            let at = show.from.lerp(PIKE_SHOW_AT, ease) - Vec2::Y * 120.0 * (ease * std::f32::consts::PI).sin();
             (at, 0.3 + (PIKE_SHOW_K - 0.3) * ease, p)
         } else if t < PIKE_UP + PIKE_HOLD {
             // held out, breathing a little
@@ -438,8 +450,14 @@ fn pike_flight(
             // slow to leave, fast to land, shrinking into the discard
             let p = (t - PIKE_UP - PIKE_HOLD) / PIKE_DOWN;
             let ease = p * p;
-            let at = PIKE_SHOW_AT.lerp(DISCARD_AT, ease) - Vec2::Y * 90.0 * (ease * std::f32::consts::PI).sin();
-            (at, PIKE_SHOW_K + (0.12 - PIKE_SHOW_K) * ease, 1.0)
+            match show.to {
+                Some(to) => {
+                    let at = PIKE_SHOW_AT.lerp(to, ease) - Vec2::Y * 90.0 * (ease * std::f32::consts::PI).sin();
+                    (at, PIKE_SHOW_K + (0.12 - PIKE_SHOW_K) * ease, 1.0)
+                }
+                // played by another: it rises a little and dwindles away where it was held
+                None => (PIKE_SHOW_AT - Vec2::Y * 60.0 * ease, PIKE_SHOW_K * (1.0 - ease), 1.0),
+            }
         };
         // the turn: the back narrows to an edge, and the face widens out of it
         let width = (turn * std::f32::consts::PI).cos().abs().max(0.02);
