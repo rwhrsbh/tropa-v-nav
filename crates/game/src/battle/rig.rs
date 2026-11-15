@@ -149,7 +149,7 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/biryuk", &[(Part::Head, Vec2::new(0.44, 0.27), 1.0)]),
     ("enemies/podmenysh", &[(Part::Head, Vec2::new(0.5, 0.17), 1.0)]),
     ("enemies/polevik", &[(Part::Head, Vec2::new(0.456, 0.2), 1.0)]),
-    ("enemies/zhivoglot", &[(Part::Head, Vec2::new(0.566, 0.355), 1.0)]),
+    ("enemies/zhivoglot", &[(Part::Head, Vec2::new(0.52, 0.2), 1.0)]),
     ("enemies/gravedigger", &[(Part::Head, Vec2::new(0.44, 0.17), 1.0)]),
     ("enemies/pugach", &[(Part::Head, Vec2::new(0.33, 0.55), 0.8)]),
     ("enemies/bolotnitsa", &[(Part::Head, Vec2::new(0.467, 0.17), 1.0)]),
