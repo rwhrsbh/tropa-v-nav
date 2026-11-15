@@ -657,3 +657,10 @@ lobby-circle-7 = Золота за бои на четверть меньше.
 lobby-circle-8 = У врагов на 10% больше здоровья.
 lobby-circle-9 = Поднять павшего союзника стоит 3 энергии вместо 2.
 lobby-circle-10 = Когда игла Кощея ломается, его тень встаёт и бьётся рядом с ним.
+
+analytics-title = Летопись баланса
+analytics-summary = Забегов: { $runs }, побед: { $won } ({ $pct }%)
+analytics-cards = Карты, что предлагают, но не берут
+analytics-card = { $name }: предложена { $offered }, взята { $taken }%, побед с ней { $won }%
+analytics-builds = Сборки
+analytics-build = { $hero }, { $build }: забегов { $runs }, побед { $won }%

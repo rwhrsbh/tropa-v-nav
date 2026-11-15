@@ -385,6 +385,9 @@ pub struct Run {
     /// The foes of the last fight, by kind: the next one brings none of them back if it can.
     #[serde(default)]
     pub last_foes: Vec<Id>,
+    /// What has happened in the run so far, for the balance analytics (`stats.rs`).
+    #[serde(default)]
+    pub stats: crate::stats::Stats,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -756,6 +759,7 @@ impl Run {
             secrets: vec![],
             omens_seen: vec![],
             last_foes: vec![],
+            stats: Default::default(),
         })
     }
 
@@ -864,6 +868,13 @@ impl Run {
     }
 
     fn apply_one(&mut self, c: &Content, player: u8, action: &RunAction) -> Result<Vec<RunEvent>, RunError> {
+        let before = self.stats_before(player, action);
+        let ev = self.apply_inner(c, player, action)?;
+        self.stats_after(c, player, action, before, &ev);
+        Ok(ev)
+    }
+
+    fn apply_inner(&mut self, c: &Content, player: u8, action: &RunAction) -> Result<Vec<RunEvent>, RunError> {
         let p = player as usize;
         if p >= self.players.len() {
             return Err(RunError::NoSuchPlayer);
