@@ -45,7 +45,8 @@ def main():
     dead = (f"Use the attached picture for what the {who} looks like (same clothes, colours, painted style and lighting). New picture, "
             f"square 1:1, one single image, no text: lying dead flat on the ground on {its} back or side, seen from the side, head to the "
             "LEFT, limbs sprawled loosely, the whole body lying along the bottom third of the picture, nothing standing up. Everything "
-            "inside the frame with a margin on every side. Flat solid pure green #00FF00 background, no ground, no shadow, no blood pool.")
+            "inside the frame with a margin on every side. Flat solid pure green #00FF00 background, no ground, no shadow, no blood pool. "
+            'Correct anatomy: exactly as many arms, legs, heads, wings and tails as in the attached picture, each attached once to the body in the right place, five fingers on a hand; every held thing whole and single: one weapon with one shaft and one head, held by the hands that hold it, nothing doubled, crossed through itself, floating, bent or cut off; no extra or missing limbs, no third arm, no merged, melted or twisted shapes.')
     headless = (f"DECAPITATE the attached lying body. Keep the picture exactly the same: same pose, same place, size, colours and plain green "
                 f"background, square 1:1, one single image, no text. Only {head} is gone, cut off and absent; at the neck, a raw bloody neck "
                 "stump with a little dark blood under it. Plain green where the head was. Nothing else changes.")

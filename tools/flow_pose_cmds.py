@@ -23,17 +23,44 @@ UP = "D:/grok-test/slaythespireclone/_inbox/flow_up"
 ADD = "eval \"() => { const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Добавить в запрос'); if(b){b.click(); return 'added'} return 'direct' }\""
 
 POSES = {
-    "strike": "{He} ATTACKS: lunging forward to the LEFT, striking hard with {his} weapon, claws or fists, body leaning into the blow, face fierce.",
-    "hurt": "{He} has just been struck hard and REELS BACK to the right, away from the blow, head thrown back, face twisted in pain, arms flung out, a little dark blood on {his} shoulder.",
-    "guard": "{He} braces in a tight DEFENSIVE stance, body turned half away and crouched, weapon, arms or wings raised across the front to ward off a blow.",
-    "cast": "{He} CASTS a curse: standing tall, one arm or claw raised high and the other thrust forward to the LEFT, fingers spread, mouth open in a chant. No glow, no sparks, no magic effects at all, the pose alone.",
+    # every pose keeps what the figure holds in the same hand as at rest: a pose that frees a busy
+    # hand makes the model paint a third arm to hold the weapon, a weapon held "crosswise" comes
+    # out with two shafts
+    "strike": "{He} ATTACKS in mid-blow: a big step forward to the LEFT, body thrown forward, swinging whatever {he_l} holds in the SAME hand as in the attached picture far out to the left at full reach (with no weapon, claws or fists). Clearly a different pose from the attached picture.",
+    "hurt": "{He} has just been struck hard and REELS BACK to the right, away from the blow, head thrown back, face twisted in pain, still gripping whatever {he_l} holds in the SAME hand as in the attached picture, a little dark blood on {his} shoulder.",
+    "guard": "{He} pulls back into a DEFENSIVE crouch, body turned half away to the right, head ducked, holding whatever {he_l} holds in the SAME hands as in the attached picture upright close in front of {his} body to catch a blow (with no weapon, both forearms raised before the face).",
+    "cast": "{He} CASTS a curse: standing tall, mouth open in a chant, still holding whatever {he_l} holds in the SAME hand as in the attached picture; only a hand that is empty in the attached picture is raised high with the fingers spread (if both hands are busy, both lift what they hold up high). No glow, no sparks, no magic effects at all, the pose alone.",
 }
-TAIL = ("Whole figure inside the frame with a margin on every side, the feet near the bottom, the same size as in the attached picture. "
+# four-legged beasts: "casting" or "reeling" with lifted paws gets them painted on two legs or with
+# five; they keep all four paws on the ground
+BEAST_POSES = {
+    "strike": "{He} LUNGES to the LEFT to bite and claw: body stretched low and long, jaws wide open, one front paw reaching forward, hind legs pushing off. Clearly a different pose from the attached picture.",
+    "hurt": "{He} FLINCHES away to the right from a blow: body crouched low and twisted, head turned back with a yelp, ears flat, all four paws still on the ground, a little dark blood on {his} shoulder.",
+    "guard": "{He} crouches low and DEFENSIVE, body pressed down and turned half away, head lowered, teeth bared, fur bristling, all four paws on the ground.",
+    "cast": "{He} HOWLS: standing on all four paws, head thrown up high with the muzzle pointing at the sky, mouth open, fur bristling along the back. No glow, no sparks, no magic effects.",
+}
+BEAST = re.compile(r"\b(wolf|hound|dog|cat|boar|bear|beast|elk|fox|toad|lynx|stag)\b", re.I)
+NEG = ("Exactly as many arms, hands, legs and heads as in the attached picture; every held thing is one whole object.")
+TAIL = (NEG + " " +
+        "Whole figure inside the frame with a margin on every side, the feet near the bottom, the same size as in the attached picture. "
         "Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the figure.")
 
 
+# foes painted before their rig prompts were written down and missing from 01_enemies.md
+LOOKS = {
+    "korochun": ("gaunt frost-rimed skeletal old man in a hooded fur cloak with a rune-carved ice scythe", "his"),
+    "solovey": ("hunched ragged robber with wild grey hair, two fingers at his lips ready to whistle", "his"),
+    "vodyanoy_tsar": ("bloated toad-faced water king with a crown, a weedy beard, a red mantle and a trident", "his"),
+    "nav_hound": ("gaunt black hound of the dead with an iron collar", "its"),
+    "miller": ("huge green-skinned drowned miller carrying a millstone on his back", "his"),
+    "obderikha": ("hunched hairy bathhouse hag holding a birch broom and a bloody rag", "her"),
+}
+
+
 def who_of(foe):
-    cmd = os.path.join(ROOT, "_inbox", "flow_up", f"cmd_{foe}.txt")
+    if foe in LOOKS:
+        return LOOKS[foe]
+    cmd =os.path.join(ROOT, "_inbox", "flow_up", f"cmd_{foe}.txt")
     if os.path.exists(cmd):
         m = re.search(r"Keep the SAME (.*?), (his|her|its) pose", open(cmd, encoding="utf-8").read())
         if m:
@@ -70,24 +97,60 @@ def green_square(foe):
         bg.convert("RGB").save(out)
 
 
-def main():
-    foe = sys.argv[1]
-    poses = sys.argv[2:] or missing(foe)
+def jobs_of(foe, poses):
+    """(foe, pose, prompt) for each pose to paint."""
     who, its = who_of(foe)
     he = {"his": "He", "her": "She", "its": "It"}[its]
     green_square(foe)
-    out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200",
-           f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/rig_{foe}.png", "wait 9000"]
-    for i, pose in enumerate(poses):
-        if i:
-            out += ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]
-        out += [f"click getByText('rig_{foe}.png').last()", "wait 1000", ADD, "wait 800"]
-        what = POSES[pose].format(He=he, his=its)
+    out = []
+    for pose in poses:
+        table = BEAST_POSES if BEAST.search(who) else POSES
+        what = table[pose].format(He=he, he_l=he.lower(), his=its)
         prompt = (f"Use the attached picture only for what the {who} looks like (same body, clothes, colours, painted style, lighting and size). "
                   f"Paint {'him' if its == 'his' else 'her' if its == 'her' else 'it'} in a NEW pose, square 1:1, one single image, no text: {what} {TAIL}")
-        out += ["click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{prompt}"',
-                "click getByRole('button', { name: 'Начать генерацию' })", "wait 45000",
-                f'download "[role=group] img >> nth=0" --path {UP}/{foe}_{pose}.png']
+        out.append((foe, pose, prompt))
+    return out
+
+
+def ask(foe, prompt, upload):
+    out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]
+    if upload:
+        out += [f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/rig_{foe}.png", "wait 9000"]
+    out += [f"click getByText('rig_{foe}.png').last()", "wait 1000", ADD, "wait 800",
+            "click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{prompt}"',
+            "click getByRole('button', { name: 'Начать генерацию' })"]
+    return out
+
+
+def main():
+    # --batch <id> <id> ...: every missing pose of these foes asked one after another without
+    # waiting (Flow paints them side by side), then one wait and every tile saved. The newest tile
+    # comes first, so the files are numbered back to front: `_inbox/flow_up/batch/<n>.png` with
+    # the list in batch.txt; check them by eye before taking them in.
+    if sys.argv[1] == "--batch":
+        jobs = [j for foe in sys.argv[2:] for j in jobs_of(foe, missing(foe))]
+        out, seen, tiles = [], set(), []
+        for foe, pose, prompt in jobs:
+            # an uploaded picture takes a tile of its own, before the poses asked from it
+            if foe not in seen:
+                tiles.append((foe, "upload"))
+            out += ask(foe, prompt, foe not in seen) + ["wait 3000"]
+            tiles.append((foe, pose))
+            seen.add(foe)
+        out += ["wait 70000"]
+        n = len(tiles)
+        os.makedirs(os.path.join(ROOT, "_inbox", "flow_up", "batch"), exist_ok=True)
+        with open(os.path.join(ROOT, "_inbox", "flow_up", "batch", "batch.txt"), "w", encoding="utf-8") as f:
+            for k, (foe, pose) in enumerate(tiles):
+                f.write(f"{n - 1 - k} {foe} {pose}\n")
+        out += [f'download "[role=group] img >> nth={k}" --path {UP}/batch/{k}.png' for k in range(n)]
+        print("\n".join(out))
+        return
+    foe = sys.argv[1]
+    poses = sys.argv[2:] or missing(foe)
+    out = []
+    for i, (foe, pose, prompt) in enumerate(jobs_of(foe, poses)):
+        out += ask(foe, prompt, i == 0) + ["wait 60000", f'download "[role=group] img >> nth=0" --path {UP}/{foe}_{pose}.png']
     print("\n".join(out))
 
 

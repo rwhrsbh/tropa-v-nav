@@ -3,6 +3,7 @@
 Rust/Bevy 0.20 co-op deckbuilder. This file only points the way: the rules and recipes live in
 `docs/`, read the one you need when you need it.
 
+- **Open work:** [`docs/todo.md`](docs/todo.md) — agreed and not done yet.
 - **Start here:** [`docs/README.md`](docs/README.md) — how we work: language, commits, git, builds,
   testing, what never to touch.
 - **Pictures** (Flow, Gemini, keying, rig parts, corpses, poses, icons, backdrops):

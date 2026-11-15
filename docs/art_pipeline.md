@@ -55,6 +55,26 @@ height). `tools/pose_in.py <flow pic> <rest stem> <out stem>` takes a pose in at
 picture's scale and foot line. Kot Bayun has a second set `kot_bayun_ground*` used while he is off
 his post (`bayun_perch` flag gone).
 
+Painting the missing poses of a foe in Flow:
+
+- `python tools/flow_pose_cmds.py <id> [strike hurt guard cast]` prints the Browser MCP block for
+  one foe, one pose at a time (about a minute each). With no poses named it paints what the foe
+  lacks for its moves: `_hurt` always, `_strike` for attacks, `_guard` for defending, `_cast` for
+  buffs, curses, summons and specials. The foe is described by its rig prompt or its line in
+  `prompts/01_enemies.md`; the resting picture on a green square (`_inbox/flow_up/rig_<id>.png`)
+  is attached as the look only.
+- `python tools/flow_pose_cmds.py --batch <id> <id> ...` asks every missing pose of several foes
+  one after another without waiting (Flow paints them side by side), waits once and saves every
+  tile as `_inbox/flow_up/batch/<n>.png`, with `batch.txt` naming each tile. An uploaded picture
+  takes a tile of its own; tiles come newest first.
+- `python tools/pose_batch_in.py --look` lays the batch out in `target/batch.png`;
+  `python tools/pose_batch_in.py [<n> ...]` takes every pose in, skipping the tile numbers given
+  (the bad ones, to be asked again).
+- Look at every pose. What goes wrong: a third arm, a weapon with two shafts, a pose that is the
+  resting one again. A long list of "no extra limbs" does not help; what helps is never asking for
+  a hand to be free that holds something at rest: every pose keeps what the figure holds in the
+  same hand (`POSES` in the script says so in each prompt).
+
 ## Rig parts and corpses (the dismemberment)
 
 Each foe is cut into a body and a head (some also arm/shield) for the rig in
