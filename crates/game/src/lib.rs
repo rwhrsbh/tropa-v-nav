@@ -16,6 +16,7 @@ mod card_flip;
 mod deck_fx;
 #[cfg(feature = "dev")]
 mod dev;
+mod foe_audit;
 mod lan;
 mod library;
 mod logfile;

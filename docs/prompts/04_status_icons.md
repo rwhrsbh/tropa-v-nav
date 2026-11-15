@@ -51,3 +51,22 @@ Each Flow message asks for six, numbered; the request opens with:
 | downed | a fallen sword lying on dark earth, its light gone out |
 | last | (spare) |
 | last | (spare) |
+
+### Hero boons set by cards and hooks (2026-11-15)
+
+Painted one per request in the Flow prompt box (no agent), each opening with: "Square 1:1 emblem
+icon for a dark Slavic folk-horror card game, one single image, no text: one carved and painted
+emblem of old wood, iron, bone and cloth, lit with a faint inner glow, centred on a flat pure black
+background, bold silhouette readable when tiny. No letters, no frame, no border, no plaque, no
+scenery. The emblem: …"
+
+| key | what it shows |
+|---|---|
+| free_rune | a small carved rune stone glowing cold blue, floating weightless above an open palm, a broken iron price tag string falling away |
+| foresight | an open eye inside a round old silver scrying mirror, three faint ghostly silhouettes of coming blows reflected one behind another, pale violet glow |
+| storm | a carved thunder-god wheel sign on a stone with three jagged bright lightning bolts forking out of it in every direction, blue-white glow |
+| no_hunger | a wolf's head with closed sated jaws resting over a gnawed clean bone, calm, warm amber glow |
+| mor | a pestilence sign: a cracked bone-white skull breathing out a cloud of sickly green-black plague miasma, small sores on the bone, a sickly green glow |
+| brew_all | a big black iron cauldron boiling over, glowing green brew spilling down all its sides in several streams, herbs sticking out, steam rising |
+
+`crates/game/src/foe_audit.rs` fails when a mark the status row can show has no picture.
