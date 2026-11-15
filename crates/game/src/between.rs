@@ -437,10 +437,9 @@ pub fn open_player(
             ChildOf(view),
         ))
         .id();
-    // another player's sheet has a head: whose it is and how they are, and what they carry. One's
-    // own has none: all of that is on the bar along the top already
-    let others = net.node.my_slot() != Some(seat.0);
-    if others {
+    // the sheet's head: whose it is and how they are, and what they carry, for one's own sheet as
+    // for another's
+    {
     let head = commands
         .spawn((
             theme::panel_edged(
@@ -517,7 +516,7 @@ pub fn open_player(
     const CLOSE: f32 = 40.0;
     let cross_bar = |deg: f32| {
         (
-            Node { position_type: PositionType::Absolute, left: px(CLOSE / 2.0 - 13.0 - 2.0), top: px(CLOSE / 2.0 - 1.5 - 2.0), width: px(26), height: px(3), border_radius: BorderRadius::all(px(2)), ..default() },
+            Node { position_type: PositionType::Absolute, left: px(CLOSE / 2.0 - 10.0 - 1.5), top: px(CLOSE / 2.0 - 1.25 - 1.5), width: px(20), height: px(2.5), border_radius: BorderRadius::all(px(2)), ..default() },
             BackgroundColor(theme::BONE),
             UiTransform { rotation: Rot2::degrees(deg), ..default() },
             Pickable::IGNORE,
@@ -534,12 +533,14 @@ pub fn open_player(
             top: px(10),
             width: px(CLOSE),
             height: px(CLOSE),
-            border: UiRect::all(px(2)),
-            border_radius: BorderRadius::all(px(8)),
+            border: UiRect::all(px(1.5)),
+            border_radius: BorderRadius::MAX,
             ..default()
         },
+        // a round seal with a thin gilt ring, as the game's other round marks
         BackgroundColor(theme::PEAT),
-        BorderColor::all(theme::BONE.with_alpha(0.6)),
+        BorderColor::all(theme::CANDLE.with_alpha(0.75)),
+        BoxShadow::new(Color::BLACK.with_alpha(0.6), px(0), px(2), px(0), px(6)),
         children![cross_bar(45.0), cross_bar(-45.0)],
         observe(|_: On<Activate>, mut commands: Commands, open: Query<Entity, With<DeckView>>| {
             for e in &open {
