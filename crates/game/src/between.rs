@@ -416,13 +416,27 @@ pub fn open_player(
         BoxShadow::new(Color::BLACK.with_alpha(0.8), px(0), px(8), px(0), px(30)),
         Pickable::IGNORE,
         ChildOf(view),
-        children![(
-            Node { width: percent(100), height: px(DECK_HEAD_H), border: UiRect::bottom(px(2)), ..default() },
+    ));
+    // the window's head: a darker strip as tall as what it holds (another player's panel and
+    // the line of sorts), so nothing in it spills out over its edge
+    let top = commands
+        .spawn((
+            Node {
+                width: px(DECK_WINDOW_W - 4.0),
+                margin: UiRect::top(px(2)),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                border: UiRect::bottom(px(2)),
+                border_radius: BorderRadius::top(px(10)),
+                flex_shrink: 0.0,
+                ..default()
+            },
             BackgroundColor(theme::SOOT),
             BorderColor::all(SORT_EDGE),
             Pickable::IGNORE,
-        )],
-    ));
+            ChildOf(view),
+        ))
+        .id();
     // another player's sheet has a head: whose it is and how they are, and what they carry. One's
     // own has none: all of that is on the bar along the top already
     let others = net.node.my_slot() != Some(seat.0);
@@ -430,12 +444,12 @@ pub fn open_player(
     let head = commands
         .spawn((
             theme::panel_edged(
-                // short of the window's right corner, where the way out is
-                Node { width: px(DECK_W - DECK_CLOSE_ROOM), padding: UiRect::axes(px(24), px(14)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), align_items: AlignItems::Center, column_gap: px(28), margin: UiRect { top: px(14), right: px(DECK_CLOSE_ROOM), ..default() }, flex_shrink: 0.0, ..default() },
+
+                Node { width: px(DECK_W), padding: UiRect::axes(px(24), px(14)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), align_items: AlignItems::Center, column_gap: px(28), margin: UiRect::top(px(14)), flex_shrink: 0.0, ..default() },
                 hue.with_alpha(0.7),
             ),
             Pickable::IGNORE,
-            ChildOf(view),
+            ChildOf(top),
         ))
         .id();
     commands.spawn((
@@ -462,7 +476,7 @@ pub fn open_player(
     }
     // how the cards are laid out: one way at a time, and the same way pressed again turns it round
     let bar = commands
-        .spawn((Node { width: px(DECK_W), height: px(DECK_HEAD_H), flex_shrink: 0.0, align_items: AlignItems::Center, column_gap: px(12), ..default() }, Pickable::IGNORE, ChildOf(view)))
+        .spawn((Node { width: px(DECK_W), height: px(DECK_HEAD_H), flex_shrink: 0.0, align_items: AlignItems::Center, column_gap: px(12), ..default() }, Pickable::IGNORE, ChildOf(top)))
         .id();
     commands.spawn((theme::text(l10n.tf("bar-deck", &[("n", (pl.deck.len() as i32).into())]), &fonts.title, 26.0, theme::BONE), Node { margin: UiRect::right(px(24)), flex_shrink: 0.0, ..default() }, ChildOf(bar)));
     commands.spawn((theme::text(l10n.t("deck-sort"), &fonts.body, 20.0, theme::DIM), Node { flex_shrink: 0.0, ..default() }, ChildOf(bar)));
@@ -513,10 +527,11 @@ pub fn open_player(
         Button,
         Hovered::default(),
         Btn(theme::PEAT),
+        // in the head's own right corner, inside the window's frame
         Node {
             position_type: PositionType::Absolute,
-            right: px((STAGE_W - DECK_WINDOW_W) / 2.0 + 8.0),
-            top: px(DECK_EDGE + (DECK_HEAD_H - CLOSE) / 2.0),
+            right: px(10),
+            top: px(10),
             width: px(CLOSE),
             height: px(CLOSE),
             border: UiRect::all(px(2)),
@@ -531,7 +546,7 @@ pub fn open_player(
                 commands.entity(e).despawn();
             }
         }),
-        ChildOf(view),
+        ChildOf(top),
     ));
     // the cards: an even grid, rolled by the wheel when it is taller than the screen. As wide as
     // the screen, so what a card tells beside itself is not cut off at the grid's edge
@@ -594,8 +609,6 @@ const SORT_EDGE: Color = Color::srgb(0.42, 0.33, 0.22);
 const DECK_EDGE: f32 = 14.0;
 const DECK_WINDOW_W: f32 = DECK_W + 112.0;
 const DECK_HEAD_H: f32 = 76.0;
-/// Room left at the right of another player's head panel for the close button.
-const DECK_CLOSE_ROOM: f32 = 56.0;
 /// Room above the first row of cards: a card under the cursor grows, and its top is not to be cut.
 const DECK_GRID_TOP: f32 = 30.0;
 
