@@ -144,8 +144,15 @@ def main():
         with open(os.path.join(ROOT, "_inbox", "flow_up", "batch", "batch.txt"), "w", encoding="utf-8") as f:
             for k, (foe, pose) in enumerate(tiles):
                 f.write(f"{n - 1 - k} {foe} {pose}\n")
-        out += [f'download "[role=group] img >> nth={k}" --path {UP}/batch/{k}.png' for k in range(n)]
-        print("\n".join(out))
+        fetch = [f'download "[role=group] img >> nth={k}" --path {UP}/batch/{k}.png' for k in range(n)]
+        # one browser call may run five minutes at most: the asking and the saving are also
+        # written apart, to be sent as two calls a minute or so from each other
+        bdir = os.path.join(ROOT, "_inbox", "flow_up", "batch")
+        with open(os.path.join(bdir, "submit.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(out[:-1]) + "\n")
+        with open(os.path.join(bdir, "fetch.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(fetch) + "\n")
+        print("\n".join(out + fetch))
         return
     foe = sys.argv[1]
     poses = sys.argv[2:] or missing(foe)

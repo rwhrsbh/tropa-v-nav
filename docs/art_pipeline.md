@@ -66,7 +66,12 @@ Painting the missing poses of a foe in Flow:
 - `python tools/flow_pose_cmds.py --batch <id> <id> ...` asks every missing pose of several foes
   one after another without waiting (Flow paints them side by side), waits once and saves every
   tile as `_inbox/flow_up/batch/<n>.png`, with `batch.txt` naming each tile. An uploaded picture
-  takes a tile of its own; tiles come newest first.
+  takes a tile of its own; tiles come newest first. One browser call may run five minutes at most,
+  so the batch is also written as `submit.txt` (the asking) and `fetch.txt` (the saving): send
+  them as two calls, the second a minute after the first ends.
+- A foe that gains block (any `Block` in its moves) needs a `_guard` too: the game shows the
+  guard pose whenever block is gained. Four-legged beasts get their own poses (all paws on the
+  ground; the cast is a howl), or the model paints them on two legs or with five.
 - `python tools/pose_batch_in.py --look` lays the batch out in `target/batch.png`;
   `python tools/pose_batch_in.py [<n> ...]` takes every pose in, skipping the tile numbers given
   (the bad ones, to be asked again).
