@@ -98,3 +98,14 @@ Gemini эти файлы не получает: поле своё, после р
 `assets/bg/at_<враг>-gemini.png`, место выбирает первый враг встречи.
 Скачивать только через редактор картинки (значок загрузки → 1K, стрелка вправо — следующая);
 сохранять файлы скриптом со страницы нельзя — Chrome после этого блокирует все загрузки вкладки.
+
+### heavy_eyelids (Kot Bayun's status card), repainted 2026-11-15
+
+It had another card's picture (the healer blowing on a wolf). Asked in the Flow prompt box, cut
+to 4:3 and saved at 1000×750:
+
+> Card illustration for a dark Slavic folk-horror card game, landscape 4:3, one single image: a
+> weary peasant warrior in a dim forest at night, his eyelids drooping shut against his will, head
+> sagging, hand slipping from his axe, while out of the dark behind him two huge glowing yellow cat
+> eyes watch and a faint drifting purr-like haze of grey sleep curls around his head like heavy
+> smoke. (+ the style paragraph above)
