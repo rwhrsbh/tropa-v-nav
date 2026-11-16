@@ -30,8 +30,13 @@ impl Ctx {
 /// A blow taking this share (percent) of the health a hero had before it may take a limb too.
 const MAIM_FROM: i32 = 30;
 const MOST_LIMBS: u8 = 2;
-/// A killing blow with this much (percent of whole health) still to spend takes the head.
+/// A killing blow with this much (percent of whole health) still to spend always takes the head.
 const BEHEAD_PAST: i32 = 40;
+/// A killing blow that takes at least this share (percent) of the health the hero had before it
+/// may take the head: a chance of `BEHEAD_CHANCE`, growing by two for every percent of whole
+/// health the blow had left over, up to certain at `BEHEAD_PAST`.
+const BEHEAD_FROM: i32 = 50;
+const BEHEAD_CHANCE: i32 = 20;
 
 /// Rounds a fight may run before the dark gathers on the heroes (see `StatusKind::Gloom`); an
 /// elite and a boss take longer to bring down, so they are given more.
@@ -747,7 +752,12 @@ impl<'a> Exec<'a> {
             }
         }
         if fell && !self.unfound(i) {
-            if attack && past * 100 >= max_hp.max(1) * BEHEAD_PAST {
+            let over = past * 100 / max_hp.max(1);
+            let heavy = (lost + past) * 100 >= hp_before.max(1) * BEHEAD_FROM;
+            let headed = attack
+                && !self.s.foretelling
+                && (over >= BEHEAD_PAST || heavy && self.s.rng.chance((BEHEAD_CHANCE + over * 2).min(100)));
+            if headed {
                 // a head already gone is not lost twice
                 let first = !self.hero(i).walks_headless;
                 self.hero(i).beheaded = true;

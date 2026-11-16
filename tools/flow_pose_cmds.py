@@ -80,7 +80,8 @@ def missing(foe):
     need = ["hurt"]
     if intents & {"Attack", "AttackAll"}:
         need.append("strike")
-    if "Defend" in intents:
+    # the guard pose shows whenever the foe gains block, whatever its move is called
+    if "Defend" in intents or "Block(" in m.group(0):
         need.append("guard")
     if intents & {"Buff", "Debuff", "Special", "Summon", "Unknown"}:
         need.append("cast")
@@ -116,7 +117,7 @@ def ask(foe, prompt, upload):
     out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]
     if upload:
         out += [f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/rig_{foe}.png", "wait 9000"]
-    out += [f"click getByText('rig_{foe}.png').last()", "wait 1000", ADD, "wait 800",
+    out += [f'click "text=rig_{foe}.png >> visible=true >> nth=0"', "wait 1000", ADD, "wait 800",
             "click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{prompt}"',
             "click getByRole('button', { name: 'Начать генерацию' })"]
     return out

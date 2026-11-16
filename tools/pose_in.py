@@ -33,6 +33,11 @@ def main():
     # how much the resting picture's source was shrunk on its way in
     k = (rb[2] - rb[0]) / figure(scale_src).width
     fig = figure(src)
+    # Flow often paints the pose a little larger than the figure it was shown: never taller than
+    # the room above the foot line, nor much taller than the resting figure, or its top is cut off
+    room = min(rb[3] - 2, round((rb[3] - rb[1]) * 1.08))
+    if fig.height * k > room:
+        k = room / fig.height
     fig = fig.resize((max(1, round(fig.width * k)), max(1, round(fig.height * k))), Image.LANCZOS)
     w, h = rest_pic.size
     w = max(w, fig.width + 40)

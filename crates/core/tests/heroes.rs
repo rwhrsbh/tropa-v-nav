@@ -497,12 +497,15 @@ fn a_light_blow_takes_no_limb_and_a_heavy_one_may() {
 
 #[test]
 fn a_blow_far_past_what_is_left_takes_the_head_and_nothing_raises_him() {
-    let (_, s, ev) = struck(10, 0, 12, 1);
-    assert!(s.heroes[0].downed && !s.heroes[0].beheaded, "barely past: only down");
-    assert!(ev.iter().all(|e| !matches!(e, Event::Beheaded { .. })));
+    // far past: always
     let (_, s, ev) = struck(10, 0, 70, 1);
     assert!(s.heroes[0].downed && s.heroes[0].beheaded);
     assert!(ev.iter().any(|e| matches!(e, Event::Beheaded { player: 0 })));
+    // a killing blow taking at least half of what was left: a chance, not a certainty
+    let off = (0..80).filter(|seed| struck(10, 0, 12, *seed).1.heroes[0].beheaded).count();
+    assert!(off > 5 && off < 40, "{off} of 80");
+    // a blow that does not fell him never takes the head
+    assert!((0..80).all(|seed| !struck(10, 6, 10, seed).1.heroes[0].beheaded));
 }
 
 #[test]

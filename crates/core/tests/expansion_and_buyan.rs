@@ -214,14 +214,14 @@ fn bayun_up_his_post_is_out_of_reach_of_an_aimed_blow() {
 }
 
 #[test]
-fn bayun_leaps_down_to_pounce_and_climbs_back_to_purr() {
+fn bayun_leaps_down_to_claw_and_climbs_back_to_purr() {
     let (c, mut s) = solo(&["t_block"], &["kot_bayun"]);
     s.heroes[0].max_hp = 999;
     s.heroes[0].hp = 999;
     let moves = &c.enemies["kot_bayun"].moves;
-    let pounce = moves.iter().position(|m| m.id == "pounce").unwrap();
+    let claws = moves.iter().position(|m| m.id == "claws").unwrap();
     let purr = moves.iter().position(|m| m.id == "purr").unwrap();
-    s.enemies[0].intent = Some(Intent { mv: pounce, target: Some(0) });
+    s.enemies[0].intent = Some(Intent { mv: claws, target: Some(0) });
     end_round(&c, &mut s);
     assert!(!s.enemies[0].flags.contains_key("bayun_perch"), "down off his post, in reach");
     s.enemies[0].intent = Some(Intent { mv: purr, target: None });

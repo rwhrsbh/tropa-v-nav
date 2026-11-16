@@ -5,7 +5,7 @@
         moves: [
             (id: "purr", intent: Debuff, effects: [Hook("bayun_climb"), Hook("bayun_eyelids")]),
             (id: "claws", intent: Attack, targeted: true, effects: [Hook("bayun_leap"), Hook("bayun_claws")]),
-            (id: "pounce", intent: Attack, targeted: true, effects: [Hook("bayun_leap"), Damage(N(9), Target), Apply(Vulnerable, N(1), Target)]),
+            (id: "pounce", intent: Attack, targeted: true, effects: [Damage(N(9), Target), Apply(Vulnerable, N(1), Target)]),
         ],
         pattern: [0, 1, 2],
     ),
