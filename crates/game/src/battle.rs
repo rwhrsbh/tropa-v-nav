@@ -808,7 +808,7 @@ fn enter(
                 Tooltip,
                 theme::panel(Node {
                     position_type: PositionType::Absolute,
-                    width: px(330),
+                    width: px(TIP_W),
                     padding: UiRect::all(px(12)),
                     border: UiRect::all(px(2)),
                     ..default()
@@ -2483,6 +2483,12 @@ fn on_drop(
 #[derive(Resource, Default)]
 pub struct TooltipText(String);
 
+/// The tooltip's width, its distance from the stage's edges, and how high it may rise: to just
+/// under the bar along the top (health, gold, relics).
+const TIP_W: f32 = 330.0;
+const TIP_EDGE: f32 = 8.0;
+const TIP_TOP: f32 = 70.0;
+
 fn update_tooltip(
     session: Res<Session>,
     db: Res<Db>,
@@ -2492,7 +2498,7 @@ fn update_tooltip(
     units: Query<(&UnitWidget, &Hovered)>,
     relics: Query<(&RelicChip, &Hovered)>,
     mut tip: ResMut<TooltipText>,
-    mut panel: Single<(&mut Node, &mut Visibility), With<Tooltip>>,
+    mut panel: Single<(&mut Node, &mut Visibility, &ComputedNode), With<Tooltip>>,
 ) {
     let mut lines: Vec<(String, String)> = Vec::new();
     let mut at = Vec2::ZERO;
@@ -2534,14 +2540,24 @@ fn update_tooltip(
         at = Vec2::new((w.pos.x + UNIT_W + 6.0).min(STAGE_W - 350.0), w.pos.y + 80.0);
     }
     let body = lines.iter().map(|(k, v)| if v.is_empty() { k.clone() } else { format!("{k} — {v}") }).collect::<Vec<_>>().join("\n\n");
-    let (node, vis) = &mut *panel;
+    let (node, vis, shape) = &mut *panel;
     let want = if body.is_empty() { Visibility::Hidden } else { Visibility::Inherited };
     if **vis != want {
         **vis = want;
     }
     if !body.is_empty() {
-        node.left = px(at.x);
-        node.top = px(at.y);
+        // a long read grows wide rather than off the bottom of the screen: by its length, so the
+        // width does not flicker with the height it gives
+        let chars = body.chars().count();
+        let w = if chars < 1100 { TIP_W } else if chars < 2200 { TIP_W * 1.6 } else { TIP_W * 2.2 };
+        node.width = px(w);
+        // it stays on the stage: never past either side, and never below the bottom, rising as
+        // far as the bar at the top if it must
+        let h = shape.size().y * shape.inverse_scale_factor();
+        let x = at.x.min(STAGE_W - w - TIP_EDGE).max(TIP_EDGE);
+        let y = at.y.min(STAGE_H - h - TIP_EDGE).max(TIP_TOP);
+        node.left = px(x);
+        node.top = px(y);
     }
     if tip.0 != body {
         tip.0 = body;
