@@ -7,6 +7,9 @@
 use super::*;
 
 const CHIP: f32 = 34.0;
+/// At most this many marks side by side: more go on to a second row, so a unit loaded with them
+/// does not spread under its neighbours.
+const ROW_CHIPS: f32 = 5.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, sync_rows.after(sync_units).run_if(in_state(AppState::Battle)).run_if(resource_exists::<Session>));
@@ -22,7 +25,7 @@ pub(super) struct StatusRow {
 pub(super) fn status_row(unit: UnitRef) -> impl Bundle {
     (
         StatusRow { unit, shown: Vec::new() },
-        Node { flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(4), row_gap: px(4), margin: UiRect::top(px(4)), max_width: px(UNIT_W), ..default() },
+        Node { flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(4), row_gap: px(4), margin: UiRect::top(px(4)), max_width: px(ROW_CHIPS * CHIP + (ROW_CHIPS - 1.0) * 4.0), ..default() },
         GlobalZIndex(20),
         Pickable::IGNORE,
     )

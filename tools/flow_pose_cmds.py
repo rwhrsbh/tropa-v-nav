@@ -39,7 +39,8 @@ BEAST_POSES = {
     "guard": "{He} crouches low and DEFENSIVE, body pressed down and turned half away, head lowered, teeth bared, fur bristling, all four paws on the ground.",
     "cast": "{He} HOWLS: standing on all four paws, head thrown up high with the muzzle pointing at the sky, mouth open, fur bristling along the back. No glow, no sparks, no magic effects.",
 }
-BEAST = re.compile(r"\b(wolf|hound|dog|cat|boar|bear|beast|elk|fox|toad|lynx|stag)\b", re.I)
+# by id: words in a description mislead ("a wolf-pelt hood", "toad-like" on a foe who stands upright)
+BEASTS = {"biryuk", "nav_hound", "grey_wolf", "kot_bayun", "kot_bayun_ground", "shatun", "death_hare"}
 NEG = ("Exactly as many arms, hands, legs and heads as in the attached picture; every held thing is one whole object.")
 TAIL = (NEG + " " +
         "Whole figure inside the frame with a margin on every side, the feet near the bottom, the same size as in the attached picture. "
@@ -105,7 +106,7 @@ def jobs_of(foe, poses):
     green_square(foe)
     out = []
     for pose in poses:
-        table = BEAST_POSES if BEAST.search(who) else POSES
+        table = BEAST_POSES if foe in BEASTS else POSES
         what = table[pose].format(He=he, he_l=he.lower(), his=its)
         prompt = (f"Use the attached picture only for what the {who} looks like (same body, clothes, colours, painted style, lighting and size). "
                   f"Paint {'him' if its == 'his' else 'her' if its == 'her' else 'it'} in a NEW pose, square 1:1, one single image, no text: {what} {TAIL}")
