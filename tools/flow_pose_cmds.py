@@ -39,6 +39,12 @@ BEAST_POSES = {
     "guard": "{He} crouches low and DEFENSIVE, body pressed down and turned half away, head lowered, teeth bared, fur bristling, all four paws on the ground.",
     "cast": "{He} HOWLS: standing on all four paws, head thrown up high with the muzzle pointing at the sky, mouth open, fur bristling along the back. No glow, no sparks, no magic effects.",
 }
+# poses of a foe that none of the tables above fits
+OWN_POSES = {
+    ("kot_bayun", "cast"): "It hisses a spell: still crouched on top of the SAME wooden post as in the attached picture, back arched, fur bristling, ears flat, mouth wide open in a yowl. No glow, no sparks, no magic effects.",
+    ("death_duck", "cast"): "It screams a curse in flight: wings thrown wide and high, neck stretched up, beak wide open. No glow, no sparks, no magic effects.",
+    ("gagana", "cast"): "It screeches a curse: wings thrown wide and high, head raised, iron beak wide open, talons spread. No glow, no sparks, no magic effects.",
+}
 # by id: words in a description mislead ("a wolf-pelt hood", "toad-like" on a foe who stands upright)
 BEASTS = {"biryuk", "nav_hound", "grey_wolf", "kot_bayun", "kot_bayun_ground", "shatun", "death_hare"}
 NEG = ("Exactly as many arms, hands, legs and heads as in the attached picture; every held thing is one whole object.")
@@ -107,7 +113,7 @@ def jobs_of(foe, poses):
     out = []
     for pose in poses:
         table = BEAST_POSES if foe in BEASTS else POSES
-        what = table[pose].format(He=he, he_l=he.lower(), his=its)
+        what = OWN_POSES.get((foe, pose)) or table[pose].format(He=he, he_l=he.lower(), his=its)
         prompt = (f"Use the attached picture only for what the {who} looks like (same body, clothes, colours, painted style, lighting and size). "
                   f"Paint {'him' if its == 'his' else 'her' if its == 'her' else 'it'} in a NEW pose, square 1:1, one single image, no text: {what} {TAIL}")
         out.append((foe, pose, prompt))
