@@ -66,6 +66,10 @@ pub struct NetStatus {
     pub dirty: bool,
     /// The run changed; map, reward and rest screens should redraw.
     pub run_dirty: bool,
+    /// A lot is being drawn on the map or over an omen: the party does not set off until it has
+    /// landed. Set the moment the lot is heard (a resource inserted for it only exists from the
+    /// next frame, and the screen would have changed by then), cleared when it is over.
+    pub lot_playing: bool,
     /// Pings not yet shown: `(player slot, kind, unit)`.
     pub pings: Vec<(u8, u8, nav_core::UnitRef)>,
     /// Story votes not yet counted: `(player slot, page text key, skip)`.
@@ -776,11 +780,11 @@ fn follow_stage(
     // a lot drawn on the map is watched to its end before the party sets off
     // (or about to be: the map screen has not yet taken up the lot heard of this frame)
     let drawn = status.map.iter().any(|e| matches!(e, RunEvent::Lot { tied, .. } if !tied.is_empty()));
-    if now == AppState::Map && (lot.is_some() || drawn) {
+    if now == AppState::Map && (lot.is_some() || drawn || status.lot_playing) {
         return;
     }
     // so is one drawn over an omen's tied options, on the omen's own window
-    if now == AppState::Omen && (omen_lot.is_some() || drawn) {
+    if now == AppState::Omen && (omen_lot.is_some() || drawn || status.lot_playing) {
         return;
     }
     if now == AppState::Battle {

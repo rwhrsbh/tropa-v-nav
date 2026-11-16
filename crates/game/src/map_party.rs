@@ -250,6 +250,7 @@ fn show_votes(
                 let last = tied.iter().rposition(|t| *t == chosen).unwrap_or(0);
                 let stops: Vec<usize> = (0..n * 3 + last + 1).map(|k| k % n).collect();
                 commands.insert_resource(MapLot { tickets: tied, stops, step: 0, wait: 0.0, after: 1.0, at: None });
+                status.lot_playing = true;
                 commands.spawn((
                     MapOverlay,
                     LotRing,
@@ -286,6 +287,7 @@ fn play_lot(
     mut rings: Query<(&mut Node, &mut Visibility), With<LotRing>>,
     sfx: Res<Sfx>,
     mixer: Res<Mixer>,
+    mut status: ResMut<NetStatus>,
 ) {
     let Some(mut lot) = lot else { return };
     let dt = time.delta_secs();
@@ -300,6 +302,7 @@ fn play_lot(
         lot.after -= dt;
         if lot.after <= 0.0 {
             commands.remove_resource::<MapLot>();
+            status.lot_playing = false;
         }
         return;
     }
@@ -311,6 +314,7 @@ fn play_lot(
     let choice = lot.tickets[ticket];
     let Some(at) = spots.0.get(choice as usize).copied() else {
         commands.remove_resource::<MapLot>();
+            status.lot_playing = false;
         return;
     };
     lot.at = Some(at);

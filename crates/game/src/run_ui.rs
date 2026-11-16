@@ -1383,6 +1383,7 @@ fn draw_omen_lot(
                 let last = tied.iter().rposition(|t| *t == chosen).unwrap_or(0);
                 let stops: Vec<usize> = (0..n * 3 + last + 1).map(|k| k % n).collect();
                 commands.insert_resource(OmenLot { tickets: tied, stops, step: 0, wait: 0.3, after: 1.4 });
+                status.lot_playing = true;
             }
         }
     }
@@ -1392,6 +1393,7 @@ fn draw_omen_lot(
         lot.after -= dt;
         if lot.after <= 0.0 {
             commands.remove_resource::<OmenLot>();
+            status.lot_playing = false;
         }
         return;
     }
