@@ -290,6 +290,16 @@ pub(super) fn pose(materials: &mut Assets<RigMaterial>, handle: &MaterialNode<Ri
     m.rig.sight = Vec4::new(if p.outline { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0);
 }
 
+/// Sets a part's joint and the shape of the picture it turns in, for a part put on a figure of
+/// another form (the beast's arm turns about the beast's shoulder, in a square picture).
+pub(super) fn rejoint(materials: &mut Assets<RigMaterial>, handle: &MaterialNode<RigMaterial>, joint: Vec2, aspect: f32) {
+    if let Some(mut m) = materials.get_mut(&handle.0) {
+        m.rig.limb.x = joint.x;
+        m.rig.limb.y = joint.y;
+        m.rig.limb.w = aspect;
+    }
+}
+
 /// Puts a new picture on a skin (a change of form).
 pub(super) fn repaint(materials: &mut Assets<RigMaterial>, handle: &MaterialNode<RigMaterial>, picture: Handle<Image>) {
     if let Some(mut m) = materials.get_mut(&handle.0) {

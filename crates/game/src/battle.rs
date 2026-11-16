@@ -1123,7 +1123,7 @@ fn swap_form_art(
     assets: Res<AssetServer>,
     mut preloaded: Local<Preloaded>,
     mut sprites: Query<(&mut UnitSprite, &Children)>,
-    skins: Query<(&MaterialNode<rig::RigMaterial>, &rig::RigSkin, &mut Visibility, &mut Node)>,
+    skins: Query<(&MaterialNode<rig::RigMaterial>, &mut rig::RigSkin, &mut Visibility, &mut Node)>,
     mut rigs: ResMut<Assets<rig::RigMaterial>>,
 ) {
     let mut skins = skins;
@@ -1202,7 +1202,7 @@ fn swap_form_art(
             // a whole picture is drawn at its own shape: a pose may be wider than the rest
             let shape = art.aspect(&want);
             let mut iter = skins.iter_many_mut(children);
-            while let Some(Ok((skin, part, mut vis, mut node))) = iter.fetch_next() {
+            while let Some(Ok((skin, mut part, mut vis, mut node))) = iter.fetch_next() {
                 match (&parts, part.part) {
                     (Some((body, _)), None) => {
                         rig::repaint(&mut rigs, skin, body.clone());
@@ -1212,8 +1212,16 @@ fn swap_form_art(
                         }
                     }
                     (Some((_, parts)), Some(p)) => match parts.iter().find(|(cut, _)| cut.0 == p) {
-                        Some((_, picture)) => {
+                        Some((cut, picture)) => {
                             rig::repaint(&mut rigs, skin, picture.clone());
+                            // a part lies on the same picture as its body: the same shape, and the
+                            // joint and give of this form (a beast's square picture is not the
+                            // man's narrow one, nor its shoulder where his is)
+                            if let Some(a) = shape {
+                                rig::fit(&mut node, s.draw, a);
+                                rig::rejoint(&mut rigs, skin, cut.1, a);
+                            }
+                            part.gain = cut.2;
                             *vis = Visibility::Inherited;
                         }
                         None => *vis = Visibility::Hidden,
