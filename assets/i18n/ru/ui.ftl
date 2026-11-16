@@ -664,3 +664,5 @@ analytics-cards = Карты, что предлагают, но не берут
 analytics-card = { $name }: предложена { $offered }, взята { $taken }%, побед с ней { $won }%
 analytics-builds = Сборки
 analytics-build = { $hero }, { $build }: забегов { $runs }, побед { $won }%
+
+battle-foresight = Звериное чутьё, дальше

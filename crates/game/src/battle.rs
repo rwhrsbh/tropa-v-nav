@@ -2526,6 +2526,15 @@ fn update_tooltip(
                     // a hand-written line where there is one, else what the move does, read off it
                     let text = if l10n.has(&desc) { l10n.t(&desc) } else { l10n.move_text(&mv.effects) };
                     lines.push((format!("{kind} · {}", l10n.t(&key)), text));
+                    // the Werewolf's Beast Scent: the moves of the rounds after this one
+                    let ahead = session.my_hero().flags.get("foresight").copied().unwrap_or(0).clamp(0, 3) as usize;
+                    if ahead > 0 {
+                        let moves = &db.0.enemies[&e.def].moves;
+                        let next: Vec<String> = nav_core::combat::upcoming(&db.0, e, ahead).iter().filter_map(|m| moves.get(*m)).map(|m| l10n.t(&format!("move-{}", m.id))).collect();
+                        if !next.is_empty() {
+                            lines.push((l10n.t("battle-foresight"), next.join(" → ")));
+                        }
+                    }
                 }
             }
         }

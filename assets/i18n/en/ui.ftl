@@ -662,3 +662,5 @@ analytics-cards = Cards offered but passed over
 analytics-card = { $name }: offered { $offered }, taken { $taken }%, won with it { $won }%
 analytics-builds = Builds
 analytics-build = { $hero }, { $build }: runs { $runs }, won { $won }%
+
+battle-foresight = Beast Scent, then

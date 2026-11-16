@@ -93,6 +93,24 @@ pub fn bonus_ready(c: &Content, s: &Combat, slot: u8, effects: &[Effect]) -> boo
 
 /// One blow from no one in particular, for tests.
 #[doc(hidden)]
+/// The moves a foe will make in the rounds after the one it shows now, `n` of them, read off its
+/// pattern as the round start reads it (the Werewolf's Beast Scent sees them). A boss not yet in
+/// its second phase is foreseen as it is: the turn is not foretold.
+pub fn upcoming(c: &Content, e: &Enemy, n: usize) -> Vec<usize> {
+    let Some(d) = c.enemies.get(&e.def) else { return Vec::new() };
+    (1..=n)
+        .filter_map(|k| {
+            let step = e.step + k;
+            match e.flags.get("phase2") {
+                Some(since) if !d.phase2.is_empty() => d.phase2.get((step - (*since as usize).min(step)) % d.phase2.len()).copied(),
+                _ if step < d.opening.len() => d.opening.get(step).copied(),
+                _ if !d.pattern.is_empty() => d.pattern.get((step - d.opening.len()) % d.pattern.len()).copied(),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
 pub fn test_hit_hero(c: &Content, s: &mut Combat, slot: u8, n: i32) -> Vec<Event> {
     let mut ex = Exec { s, c, ev: Vec::new(), depth: 0 };
     let foe = ex.s.enemies.first().map(|e| UnitRef::Enemy(e.uid));

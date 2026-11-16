@@ -228,3 +228,14 @@ fn bayun_leaps_down_to_claw_and_climbs_back_to_purr() {
     end_round(&c, &mut s);
     assert!(s.enemies[0].flags.contains_key("bayun_perch"), "back up again");
 }
+
+#[test]
+fn beast_scent_foresees_the_next_moves_of_the_pattern() {
+    let (c, s) = solo(&["t_block"], &["kot_bayun"]);
+    let e = &s.enemies[0];
+    let d = &c.enemies["kot_bayun"];
+    let now = e.intent.as_ref().unwrap().mv;
+    let ahead = nav_core::combat::upcoming(&c, e, 2);
+    let at = d.pattern.iter().position(|m| *m == now).unwrap();
+    assert_eq!(ahead, vec![d.pattern[(at + 1) % d.pattern.len()], d.pattern[(at + 2) % d.pattern.len()]]);
+}
