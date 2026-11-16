@@ -118,8 +118,11 @@ def ask(foe, prompt, upload):
     out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]
     if upload:
         out += [f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/rig_{foe}.png", "wait 9000"]
-    out += [f'click "text=rig_{foe}.png >> visible=true >> nth=0"', "wait 1000", ADD, "wait 800",
-            "click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{prompt}"',
+    out += [f'click "text=rig_{foe}.png >> visible=true >> nth=0"', "wait 1000", ADD, "wait 800"]
+    # after an upload the ingredients panel's backdrop sometimes stays over the prompt box
+    if upload:
+        out += ["press Escape", "wait 500"]
+    out += ["click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{prompt}"',
             "click getByRole('button', { name: 'Начать генерацию' })"]
     return out
 
@@ -145,7 +148,11 @@ def main():
         with open(os.path.join(ROOT, "_inbox", "flow_up", "batch", "batch.txt"), "w", encoding="utf-8") as f:
             for k, (foe, pose) in enumerate(tiles):
                 f.write(f"{n - 1 - k} {foe} {pose}\n")
-        fetch = [f'download "[role=group] img >> nth={k}" --path {UP}/batch/{k}.png' for k in range(n)]
+        # the tiles' order is the order they finished in, not the order they were asked: the
+        # fetch first prints every tile's own title (`titles.txt`, for tools/pose_batch_in.py)
+        titles = "() => [...document.querySelectorAll('[role=group]')].slice(0,%d).map(g=>g.getAttribute('aria-label')).join(' | ')" % n
+        fetch = [f'eval "{titles}"']
+        fetch += [f'download "[role=group] img >> nth={k}" --path {UP}/batch/{k}.png' for k in range(n)]
         # one browser call may run five minutes at most: the asking and the saving are also
         # written apart, to be sent as two calls a minute or so from each other
         bdir = os.path.join(ROOT, "_inbox", "flow_up", "batch")
