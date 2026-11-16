@@ -1477,8 +1477,14 @@ fn dying(
                 match sprites.get(c) {
                     Ok((s, skin_children)) => {
                         draw = s.draw;
-                        // a foe struck down mid-pose falls as itself
+                        // a foe struck down mid-pose falls as itself; Kot Bayun down off his post
+                        // lies as the same cat
                         stem = pose_base(&s.stem).to_string();
+                        if let Some(rest) = stem.strip_suffix("_ground") {
+                            if art.image(&assets, &format!("{stem}_dead")).is_none() {
+                                stem = rest.to_string();
+                            }
+                        }
                         let cuts = rig::cuts_of(&stem);
                         for (skin, part, material) in skins.iter_many(skin_children).flatten() {
                             let (Some(part), Some(m)) = (part.part, rigs.get(&material.0)) else { continue };
