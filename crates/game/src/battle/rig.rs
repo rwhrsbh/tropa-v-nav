@@ -132,6 +132,7 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/mara", &[(Part::Head, Vec2::new(0.54, 0.22), 1.0), (Part::Shield, Vec2::new(0.58, 0.45), 0.8), (Part::Arm, Vec2::new(0.32, 0.42), -0.5)]),
     ("enemies/poludnitsa", &[(Part::Head, Vec2::new(0.464, 0.219), 1.0), (Part::Shield, Vec2::new(0.387, 0.406), 0.8), (Part::Arm, Vec2::new(0.545, 0.406), 1.0)]),
     ("enemies/kot_bayun", &[(Part::Head, Vec2::new(0.34, 0.26), 1.0)]),
+    ("enemies/kot_bayun_ground", &[(Part::Head, Vec2::new(0.28, 0.5), 1.0)]),
     ("enemies/mokhovik", &[(Part::Head, Vec2::new(0.419, 0.301), 1.0), (Part::Shield, Vec2::new(0.131, 0.514), 0.8), (Part::Arm, Vec2::new(0.747, 0.408), 1.0)]),
     ("enemies/nochnitsa", &[(Part::Head, Vec2::new(0.617, 0.238), 1.0), (Part::Arm, Vec2::new(0.390, 0.281), 1.0)]),
     ("enemies/baba_yaga", &[(Part::Head, Vec2::new(0.543, 0.275), 1.0), (Part::Arm, Vec2::new(0.186, 0.080), 1.0)]),
