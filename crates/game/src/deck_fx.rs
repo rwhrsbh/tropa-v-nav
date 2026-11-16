@@ -12,7 +12,10 @@ use crate::net::NetStatus;
 use crate::session::Db;
 use crate::theme::{self, Fonts};
 use crate::{Stage as Canvas, STAGE_W};
+use crate::battle::Btn;
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
+use bevy::ui_widgets::{Activate, Button};
 use nav_core::{Card, Form, RunEvent};
 
 /// Where the deck is: the party plate in the top left corner, which counts the cards.
@@ -23,8 +26,13 @@ const SHOW_AT: Vec2 = Vec2::new(STAGE_W / 2.0, 470.0);
 const GAP: f32 = 0.45;
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Update, (cue, play, fly_gains, hide_landing, dim).chain());
+    app.init_resource::<HoldGains>().add_systems(Update, (cue, play, fly_gains, hide_landing, dim).chain());
 }
+
+/// While set, what was gained waits to be shown: the hollow's drums are still turning, and a relic
+/// won must not show itself before the drums say it was won.
+#[derive(Resource, Default, PartialEq)]
+pub struct HoldGains(pub bool);
 
 /// Size of a relic or potion while it shows itself.
 const GAIN_SIZE: f32 = 150.0;
@@ -119,8 +127,9 @@ fn cue(
     sfx: Res<Sfx>,
     mixer: Res<Mixer>,
     mut free_at: Local<f32>,
+    hold: Res<HoldGains>,
 ) {
-    if status.deck.is_empty() {
+    if status.deck.is_empty() || hold.0 {
         return;
     }
     let now = time.elapsed_secs();
@@ -128,7 +137,7 @@ fn cue(
     let k = 0.72;
     let size = Vec2::new(CARD_W, CARD_H);
     let show = |commands: &mut Commands, id: &str, upgraded: bool, at: Vec2, wait: f32, hold: f32, motion: Motion| {
-        let card = Card { uid: u32::MAX, def: id.to_string(), upgraded, free: false };
+        let card = Card { uid: u32::MAX, def: id.to_string(), upgraded, free: false, ..Default::default() };
         if let Some(e) = spawn_card(commands, *canvas, &card, Form::Human, Some(at - size / 2.0), false, (), &db.0, &l10n, &fonts, &art, &assets) {
             commands.entity(e).insert((
                 DeckFx { at, wait, t: 0.0, hold, motion },
@@ -191,6 +200,43 @@ fn cue(
                     ));
                 sfx.play(&mut commands, if relic { "rune" } else { "potion" }, &mixer, 1.0);
                 1.3
+            }
+            // Lisa's stash comes back on a new floor: a window with the fox's tail, what was saved
+            // up, and a button to take it (the gold is already in the purse; the window only tells it)
+            RunEvent::StashPaid { gold, .. } => {
+                let root = commands
+                    .spawn((
+                        Node { position_type: PositionType::Absolute, left: px(0), top: px(0), width: percent(100), height: percent(100), justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() },
+                        BackgroundColor(Color::BLACK.with_alpha(0.6)),
+                        GlobalZIndex(700),
+                        ChildOf(*canvas),
+                    ))
+                    .id();
+                let panel = commands
+                    .spawn((
+                        theme::panel_edged(Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: px(16), padding: UiRect::axes(px(48), px(28)), border: UiRect::all(px(3)), border_radius: BorderRadius::all(px(12)), ..default() }, theme::hero_color("lisa")),
+                        ChildOf(root),
+                    ))
+                    .id();
+                commands.spawn((theme::text(l10n.t("stash-paid-title"), &fonts.title, 52.0, theme::hero_color("lisa").lighter(0.2)), TextShadow { offset: Vec2::splat(3.0), color: Color::BLACK }, ChildOf(panel)));
+                commands.spawn((Node { width: px(170), height: px(170), ..default() }, art.node(&assets, "relics/li_fox_tail", theme::CANDLE), Pickable::IGNORE, ChildOf(panel)));
+                commands.spawn((theme::text(l10n.n("stash-paid-gold", *gold), &fonts.title, 38.0, theme::CANDLE), TextShadow { offset: Vec2::splat(3.0), color: Color::BLACK }, ChildOf(panel)));
+                commands
+                    .spawn((
+                        Button,
+                        Hovered::default(),
+                        Btn(theme::RUST_BLOOD),
+                        Node { width: px(320), height: px(72), margin: UiRect::top(px(6)), border: UiRect::all(px(3)), border_radius: BorderRadius::all(px(10)), justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() },
+                        BackgroundColor(theme::RUST_BLOOD),
+                        BorderColor::all(theme::CANDLE),
+                        ChildOf(panel),
+                        children![theme::text(l10n.t("stash-take"), &fonts.title, 34.0, theme::BONE)],
+                    ))
+                    .observe(move |_: On<Activate>, mut commands: Commands, sfx: Res<Sfx>, mixer: Res<Mixer>| {
+                        sfx.play(&mut commands, "gold", &mixer, 1.0);
+                        commands.entity(root).despawn();
+                    });
+                0.0
             }
             // the throws at a chest are shown first, on the chest's own screen
             RunEvent::Thrown { .. } => 0.8,

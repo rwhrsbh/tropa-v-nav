@@ -282,7 +282,7 @@ pub(crate) fn run(ex: &mut Exec, ctx: &mut Ctx, name: &str) {
                 ex.s.heroes[slot as usize].hand.remove(i);
                 ex.s.next_uid += 1;
                 let uid = ex.s.next_uid;
-                ex.s.heroes[slot as usize].hand.push(Card { uid, def: "web".into(), upgraded: false, free: false });
+                ex.s.heroes[slot as usize].hand.push(Card { uid, def: "web".into(), upgraded: false, free: false, ..Default::default() });
             }
         }
         // an anchutka runs off with a card out of the hand of the hero it aimed at

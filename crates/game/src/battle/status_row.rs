@@ -112,6 +112,11 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
                 };
                 out.push(Chip { icon: "status/lost_limb".into(), n: (h.lost_limbs > 1).then_some(h.lost_limbs as i32), shown: None, good: Some(false), name: l10n.t(&key), help: help(l10n, &key) });
             }
+            // a foe's move Lisa copied, held in her hand until played or the turn ends
+            let copied = real.hand.iter().filter(|c| c.def == nav_core::craft::STOLEN_MOVE).count() as i32;
+            if copied > 0 {
+                out.push(Chip { icon: "status/stolen".into(), n: (copied > 1).then_some(copied), shown: None, good: Some(true), name: l10n.t("trait-copied-move"), help: help(l10n, "trait-copied-move") });
+            }
             for flag in ["marked", "blind", "coiled", "confused", "mired", "asleep", "charmed", "frozen", "winter", "draw_less", "energy_less", "no_intents", "doom"] {
                 if let Some(n) = real.flags.get(flag) {
                     let key = format!("trait-{flag}");

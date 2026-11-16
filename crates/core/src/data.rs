@@ -19,22 +19,22 @@ data_enum!(Rarity { Starter, Common, Uncommon, Rare, Special });
 data_enum!(
     /// `Coop` cards only show up in rewards with 2+ players.
     /// `Passable` cards can be handed to an ally for 1 Energy.
-    Keyword { Exhaust, Retain, Ethereal, Unplayable, Coop, Passable, Armless }
+    Keyword { Exhaust, Retain, Ethereal, Unplayable, Coop, Passable, Armless, Marked }
 );
 data_enum!(
     /// What the player has to point a card at.
-    CardTarget { None, Enemy, Ally, AnyHero, Downed }
+    CardTarget { None, Enemy, Ally, AnyHero, Downed, Anyone }
 );
 data_enum!(
     /// Who an effect lands on, relative to its source.
-    Tgt { Me, Target, AllFoes, RandomFoe, AllFriends, OtherFriends, WeakestFoe }
+    Tgt { Me, Target, AllFoes, RandomFoe, AllFriends, OtherFriends, WeakestFoe, Ally, Allies, RandomAlly, RandomAny }
 );
 data_enum!(Pile { Hand, Draw, Discard });
 data_enum!(RelicPool { Any, Shop, Boss, Book });
 data_enum!(Form { Human, Beast });
 data_enum!(MaskKind { Bear, Goat, Mara });
 data_enum!(RuneKind { Thunder, Frost, Mist, Flame, Zhiva });
-data_enum!(Mechanic { Valor, Curse, Runes, Moon, Brew, Masks, Sloth });
+data_enum!(Mechanic { Valor, Curse, Runes, Moon, Brew, Masks, Sloth, Forge, Luck, Sly });
 data_enum!(EncounterKind { Normal, Elite, Boss });
 data_enum!(IntentKind { Attack, AttackAll, Defend, Buff, Debuff, Summon, Unknown, Special });
 
@@ -58,6 +58,15 @@ data_enum!(StatusKind {
     // the gathering dark of a fight drawn out too long: less block and healing, and HP lost
     // at each turn's end; laid on the heroes by the fight itself, never cleansed
     Gloom,
+    // Kuzma: the forging toward his plate, and the plate's durability once he wears it
+    Forge,
+    Plate,
+    // Ivanushka's luck, gathered by every card of chance he plays
+    Luck,
+    // Lisa: one blow turned aside; a foe charmed into striking its own; a foe flattered
+    Evade,
+    Charm,
+    Flattery,
 });
 
 impl StatusKind {
@@ -71,7 +80,7 @@ impl StatusKind {
     }
     pub fn debuff(self) -> bool {
         use StatusKind::*;
-        matches!(self, Vulnerable | Weak | Rot | Hex | Bleed | Fear | HuntMark | Stun)
+        matches!(self, Vulnerable | Weak | Rot | Hex | Bleed | Fear | HuntMark | Stun | Charm | Flattery)
     }
 }
 
@@ -104,6 +113,20 @@ pub enum Amount {
     ExhaustPile(i32),
     /// `.0` and `.1` percent of the gold the source foe holds: the more it throws, the harder it hits.
     Hoard(i32, i32),
+    /// A number thrown between the two, both ends counted (Ivanushka's cards of chance).
+    Roll(i32, i32),
+    /// A named counter on the source hero, times the multiplier.
+    Flag(String, i32),
+    /// The source's own stacks of a status divided by this, rounded down.
+    Part(StatusKind, i32),
+    /// All of these added up.
+    Sum(Vec<Amount>),
+    /// This, but never less than the number.
+    AtLeast(Box<Amount>, i32),
+    /// Copies of others' cards (Чужие) in the source hero's hand, times the multiplier.
+    AliensInHand(i32),
+    /// The biggest block anyone of the party holds.
+    MaxBlock,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -117,7 +140,26 @@ pub enum Cond {
     Mask(MaskKind),
     Coop,
     Not(Box<Cond>),
+    /// A named counter on the source hero is at least this.
+    Flag(String, i32),
+    /// The source hero wears the plate (Kuzma).
+    InPlate,
+    /// The targeted foe means to strike this round.
+    Attacking,
+    /// The targeted unit holds some block.
+    Shielded,
+    /// The targeted unit has at most this much health.
+    HpAtMost(i32),
+    /// The targeted foe is on the wing.
+    Flying,
+    /// A copy of someone else's card is in the source hero's hand.
+    AlienInHand,
 }
+
+data_enum!(
+    /// What becomes of a card picked out of a pile.
+    PickThen { Alien, Take, TakeMarked, Transmute, Burn }
+);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Effect {
@@ -190,6 +232,33 @@ pub enum Effect {
     PikeWill,
     /// Escape hatch into named Rust code for one-off mechanics.
     Hook(String),
+    /// Kuzma forges toward his plate.
+    Forge(Amount),
+    /// This many random unmarked cards in the hand get the mark of the forge.
+    Mark(Amount),
+    /// The plate is mended (or, negative, spent).
+    Plate(Amount),
+    /// Re-forged strength: `.1` lose this much Strength for the round, `.2` gain it.
+    Reforge(Amount, Tgt, Tgt),
+    /// This many random cards in the hands of these heroes are upgraded for the fight.
+    Upgrade(Amount, Tgt),
+    /// Adds to a named counter on these heroes.
+    Set(String, i32, Tgt),
+    /// These heroes draw.
+    DrawFor(Amount, Tgt),
+    /// Curses and statuses become random cards of their owner: in the hand, or (`.0`) everywhere.
+    Transmute(bool, Tgt),
+    /// The player picks a card out of a pile of a hero (`top` > 0: only the top so many).
+    Pick { pile: Pile, from: Tgt, then: PickThen, #[serde(default)] top: u8 },
+    /// A card of luck: it falls on a random foe or friend and burns the luck. With no `friend`
+    /// side it is an evil one: the `foe` side falls on whoever it finds.
+    Luck { foe: Vec<Effect>, #[serde(default)] friend: Vec<Effect>, #[serde(default)] keep: bool },
+    /// Throws this many random cards out of the hand.
+    DiscardRandom(Amount),
+    /// Copies of random cards from a pile of a hero come to the hand as Чужие.
+    Alien { pile: Pile, from: Tgt, #[serde(default = "one")] count: i32 },
+    /// Gold laid by in Lisa's stash.
+    Stash(i32),
 }
 
 fn one() -> i32 {
@@ -219,6 +288,22 @@ data_enum!(Trigger {
     // a card of yours was thrown away by a card or a power, not by the end of the turn
     Discarded,
     Exhausted,
+    // Kuzma: a card bearing the forge's mark played, the plate put on, the plate knocked off
+    ForgePlayed,
+    PlateOn,
+    PlateOff,
+    // a card of an ally's upgraded
+    Upgraded,
+    // Ivanushka: a card of chance played, a throw at its least, a throw at its most
+    RangePlayed,
+    RollMin,
+    RollMax,
+    LuckHitAlly,
+    // you hurt a friend or yourself
+    HurtFriend,
+    // Lisa: a copy of someone else's card played; a blow dodged
+    AlienPlayed,
+    Dodged,
 });
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -726,6 +811,10 @@ impl Content {
                         walk(b, f);
                     }
                     Effect::Repeat(_, a) | Effect::Once(_, a) | Effect::OncePerTurn(_, a) | Effect::Every(_, _, a) | Effect::EveryThisTurn(_, _, a) => walk(a, f),
+                    Effect::Luck { foe, friend, .. } => {
+                        walk(foe, f);
+                        walk(friend, f);
+                    }
                     _ => {}
                 }
             }

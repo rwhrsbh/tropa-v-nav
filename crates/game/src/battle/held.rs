@@ -113,7 +113,7 @@ fn show_held(
                     }
                 }
                 if slot.is_none() {
-                    let c = Card { uid: u32::MAX, def: def.0.clone(), upgraded: def.1, free: false };
+                    let c = Card { uid: u32::MAX, def: def.0.clone(), upgraded: def.1, free: false, ..Default::default() };
                     let Some(e) = spawn_card(&mut commands, *layer, &c, Form::Human, Some(at), false, (), &db.0, &l10n, &fonts, &art, &assets) else { continue };
                     let color = session.truth.hero(from).map(|h| theme::hero_color(&h.def)).unwrap_or(theme::BONE);
                     commands.entity(e).insert((Pickable::IGNORE, GlobalZIndex(280), Outline::new(px(3), px(0), color), UiTransform::IDENTITY));

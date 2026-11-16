@@ -133,7 +133,7 @@ fn test_act3_to_act4_heal() {
 
     // Simulate rewards taken after Act 3 boss:
     run.stage = Stage::Reward {
-        rewards: vec![Reward { gold: 0, cards: vec![], relic: None, done: false }],
+        rewards: vec![Reward { gold: 0, stashed: 0, cards: vec![], relic: None, done: false }],
     };
     run.apply(&c, 0, &RunAction::TakeCard(None)).unwrap();
 

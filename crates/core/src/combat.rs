@@ -91,7 +91,7 @@ pub fn bonus_ready(c: &Content, s: &Combat, slot: u8, effects: &[Effect]) -> boo
 pub fn test_hit_hero(c: &Content, s: &mut Combat, slot: u8, n: i32) -> Vec<Event> {
     let mut ex = Exec { s, c, ev: Vec::new(), depth: 0 };
     let foe = ex.s.enemies.first().map(|e| UnitRef::Enemy(e.uid));
-    ex.hero_take(foe, slot, n, true);
+    ex.hurt(foe, UnitRef::Hero(slot), n, true);
     ex.ev
 }
 
@@ -102,7 +102,7 @@ pub struct Exec<'a> {
     pub s: &'a mut Combat,
     pub c: &'a Content,
     pub ev: Vec<Event>,
-    depth: u8,
+    pub(crate) depth: u8,
 }
 
 /// Starts a fight. `enemies` are definition ids, left to right.
@@ -175,7 +175,7 @@ pub fn needs_lost_arm(view: &CardView, lost_arms: u8, hero: &str, form: Form) ->
     let weapon_gone = lost_arms & WEAPON_ARM != 0;
     let shield_gone = lost_arms & SHIELD_ARM != 0;
     let any = |test: &dyn Fn(&Effect) -> bool| any_effect(&view.effects, test);
-    if weapon_gone && view.kind == CardType::Attack && form != Form::Beast {
+    if weapon_gone && view.kind == CardType::Attack && !(form == Form::Beast && hero == "volkolak") {
         return true;
     }
     if shield_gone && any(&|e| matches!(e, Effect::Block(..) | Effect::Guard(..))) {
@@ -204,7 +204,7 @@ pub fn start_with(c: &Content, heroes: &[HeroSetup], enemies: &[Id], seed: u64, 
             .iter()
             .map(|(def, upgraded)| {
                 next_uid += 1;
-                Card { uid: next_uid, def: def.clone(), upgraded: *upgraded, free: false }
+                Card { uid: next_uid, def: def.clone(), upgraded: *upgraded, free: false, ..Default::default() }
             })
             .collect();
         rng.shuffle(&mut draw);
@@ -244,6 +244,7 @@ pub fn start_with(c: &Content, heroes: &[HeroSetup], enemies: &[Id], seed: u64, 
             gold: 0,
             flags: BTreeMap::new(),
             choosing: None,
+            picking: None,
         });
     }
     let mut s = Combat {
@@ -286,9 +287,14 @@ pub fn apply(c: &Content, s: &mut Combat, player: u8, action: &CombatAction) -> 
     if choosing != matches!(action, CombatAction::Discard { .. }) {
         return Err(if choosing { ActionError::Choosing } else { ActionError::NotChoosing });
     }
+    let picking = h.picking.is_some();
+    if picking != matches!(action, CombatAction::Pick { .. }) {
+        return Err(if picking { ActionError::Picking } else { ActionError::NotChoosing });
+    }
     let mut ex = Exec { s, c, ev: Vec::new(), depth: 0 };
     match action {
         CombatAction::Discard { card } => ex.pick_discard(player, *card)?,
+        CombatAction::Pick { card } => ex.pick(player, *card)?,
         CombatAction::Play { card, target } => ex.play(player, *card, *target)?,
         CombatAction::Ready(r) => {
             ex.s.heroes[player as usize].ready = *r;
@@ -305,9 +311,24 @@ pub fn apply(c: &Content, s: &mut Combat, player: u8, action: &CombatAction) -> 
             ex.ev.push(Event::PotionDropped { player, potion });
         }
     }
+    ex.drop_stale_picks();
     ex.check_end();
     ex.maybe_close();
-    Ok(ex.ev)
+    let ev = ex.ev;
+    unmark_out_of_hand(s);
+    Ok(ev)
+}
+
+/// The forge's mark lives only in the hand: a card that left it has lost it.
+fn unmark_out_of_hand(s: &mut Combat) {
+    for h in &mut s.heroes {
+        for c in h.draw.iter_mut().chain(h.discard.iter_mut()).chain(h.exhaust.iter_mut()) {
+            c.forged = false;
+            if c.blind.is_none() {
+                c.rolls.clear();
+            }
+        }
+    }
 }
 
 /// Pure form of [`apply`] for callers that want `reduce(state, action) -> state`.
@@ -330,7 +351,7 @@ impl<'a> Exec<'a> {
     pub(crate) fn living(&self) -> Vec<u32> {
         self.s.living_enemies().map(|e| e.uid).collect()
     }
-    fn exists(&self, u: UnitRef) -> bool {
+    pub(crate) fn exists(&self, u: UnitRef) -> bool {
         match u {
             UnitRef::Hero(i) => self.s.hero(i).is_some_and(|h| !h.downed),
             UnitRef::Enemy(i) => self.s.enemy(i).is_some_and(|e| e.alive && !e.flags.contains_key(crate::state::BONES)),
@@ -375,8 +396,13 @@ impl<'a> Exec<'a> {
         let cur = map.get(&st).copied().unwrap_or(0);
         let mut total = cur + n;
         // Strength is the only status that can go below zero (it can be drained)
-        if st != S::Strength {
+        // Strength can be drained, and a round's Strength re-forged away below nothing
+        if st != S::Strength && st != S::TempStrength {
             total = total.max(0);
+        }
+        // Lisa slips one blow at a time, never more
+        if st == S::Evade {
+            total = total.min(1);
         }
         if st == S::Fear {
             total = total.min(FEAR_CAP);
@@ -401,6 +427,12 @@ impl<'a> Exec<'a> {
         let n = self.gloomed(u, n);
         if n <= 0 || !self.exists(u) {
             return;
+        }
+        // in his plate Kuzma takes no shield: the plate is all he has
+        if let UnitRef::Hero(i) = u {
+            if self.in_plate(i) {
+                return;
+            }
         }
         let total = match u {
             UnitRef::Hero(i) => {
@@ -467,10 +499,15 @@ impl<'a> Exec<'a> {
                 d += self.s.status(s, S::Strength) + self.s.status(s, S::TempStrength);
                 if let UnitRef::Hero(i) = s {
                     let h = &self.s.heroes[i as usize];
-                    beast = h.form == Form::Beast;
+                    beast = h.form == Form::Beast && h.mechanic == Mechanic::Moon;
                     mara = h.mask == Some(MaskKind::Mara);
                     if h.mask == Some(MaskKind::Bear) {
                         d += 3;
+                    }
+                    // a blow tempered ahead of time, and Kuzma striking while his plate is hot
+                    d += h.flags.get("this_attack").copied().unwrap_or(0);
+                    if self.in_plate(i) {
+                        d += self.s.heroes[i as usize].flags.get("strike_hot").copied().unwrap_or(0);
                     }
                 }
             }
@@ -510,6 +547,13 @@ impl<'a> Exec<'a> {
             if self.s.status(dst, S::Vulnerable) > 0 {
                 d = d * 3 / 2;
             }
+            // flattered, the foe lays itself open to Lisa's next blow
+            let fox = matches!(src, Some(UnitRef::Hero(i)) if self.s.heroes[i as usize].mechanic == Mechanic::Sly);
+            if fox && matches!(dst, UnitRef::Enemy(_)) && self.s.status(dst, S::Flattery) > 0 {
+                d *= 2;
+                let n = self.s.status(dst, S::Flattery);
+                self.add_status(dst, S::Flattery, -n);
+            }
             if self.s.status(dst, S::Mist) > 0 {
                 d /= 2;
                 self.add_status(dst, S::Mist, -1);
@@ -529,6 +573,15 @@ impl<'a> Exec<'a> {
             UnitRef::Hero(i) => {
                 if self.s.heroes[i as usize].downed {
                     return false;
+                }
+                // Lisa slips a foe's blow
+                if attack && matches!(src, Some(UnitRef::Enemy(_))) && self.dodges(i, src) {
+                    return false;
+                }
+                if let Some(UnitRef::Hero(by)) = src {
+                    if d > 0 {
+                        self.fire(by, Trigger::HurtFriend);
+                    }
                 }
                 let guard = self.s.heroes[i as usize]
                     .guard_by
@@ -684,6 +737,10 @@ impl<'a> Exec<'a> {
         let h = self.hero(i);
         let blocked = if piercing { (d / 2).min(h.block) } else { d.min(h.block) };
         h.block -= blocked;
+        // Kuzma's plate takes what the block let through
+        let plated = self.plate_takes(i, d - blocked);
+        let blocked = blocked + plated;
+        let h = self.hero(i);
         let lost = (d - blocked).min(h.hp);
         // what the blow had left over once there was no more hero to take it
         let past = d - blocked - lost;
@@ -718,7 +775,8 @@ impl<'a> Exec<'a> {
                 }
             }
         }
-        if !fell && attack && !self.s.foretelling && self.hero(i).lost_limbs < MOST_LIMBS {
+        let armed = self.in_plate(i) || self.hero(i).flags.contains_key("bracers");
+        if !fell && attack && !self.s.foretelling && !armed && self.hero(i).lost_limbs < MOST_LIMBS {
             // measured against the health there was, not the whole: worn down, a hero comes apart sooner
             let share = lost * 100 / hp_before.max(1);
             if share >= MAIM_FROM && self.s.rng.chance(((share - MAIM_FROM) * 2 + 25).min(70)) {
@@ -764,6 +822,13 @@ impl<'a> Exec<'a> {
     /// The erased name: the first time in a fight a hero would fall, death, which looks for
     /// them by name, does not find them, and they stand on at 1 HP.
     fn unfound(&mut self, i: u8) -> bool {
+        // the roly-poly: once a fight he stands back up, with a thrown handful of health
+        if self.hero(i).flags.contains_key("vanka") && !self.hero(i).flags.contains_key("vanka_used") {
+            self.hero(i).flags.insert("vanka_used".into(), 1);
+            let hp = self.throw(i, 1, 20);
+            self.hero(i).hp = hp;
+            return true;
+        }
         let h = self.hero(i);
         if !h.relics.iter().any(|r| r == crate::run::SECRET_RELICS[1]) || h.flags.contains_key("erased_name") {
             return false;
@@ -773,7 +838,7 @@ impl<'a> Exec<'a> {
         true
     }
 
-    fn lose_hp(&mut self, u: UnitRef, n: i32) {
+    pub(crate) fn lose_hp(&mut self, u: UnitRef, n: i32) {
         if n <= 0 || !self.exists(u) {
             return;
         }
@@ -898,7 +963,7 @@ impl<'a> Exec<'a> {
         }
         if let Some(UnitRef::Hero(i)) = src {
             // Devour: a kill in Beast form feeds the werewolf
-            if self.s.heroes[i as usize].form == Form::Beast {
+            if self.s.heroes[i as usize].form == Form::Beast && self.s.heroes[i as usize].mechanic == Mechanic::Moon {
                 self.heal(UnitRef::Hero(i), 3);
             }
             self.fire(i, Trigger::Kill);
@@ -930,15 +995,18 @@ impl<'a> Exec<'a> {
         if count > 0 {
             self.ev.push(Event::Drawn { player: slot, count });
         }
+        self.roll_marked(slot);
     }
 
     pub(crate) fn add_card(&mut self, slot: u8, def: &str, pile: Pile) {
         self.s.next_uid += 1;
-        let card = Card { uid: self.s.next_uid, def: def.to_string(), upgraded: false, free: false };
+        let card = Card { uid: self.s.next_uid, def: def.to_string(), upgraded: false, free: false, ..Default::default() };
         let h = self.hero(slot);
         let pile = if pile == Pile::Hand && h.hand.len() >= HAND_LIMIT { Pile::Discard } else { pile };
         match pile {
-            Pile::Hand => h.hand.push(card),
+            Pile::Hand => {
+                h.hand.push(card);
+            }
             Pile::Discard => h.discard.push(card),
             Pile::Draw => {
                 // shuffled in at a random depth
@@ -955,6 +1023,11 @@ impl<'a> Exec<'a> {
         let card = h.hand[pos].clone();
         let def = self.c.cards.get(&card.def).ok_or(ActionError::NoSuchCard)?;
         let mut view = def.view(card.upgraded, h.form);
+        // a copy of another's card plays as a man's card, whatever its owner's form
+        if card.alien {
+            view = def.view(card.upgraded, Form::Human);
+            view.drowse = 0;
+        }
         if view.has(Keyword::Unplayable) {
             // the icy tale: the dead listen to one who speaks so; a curse is told away for 1,
             // burns, and leaves 4 block
@@ -995,7 +1068,7 @@ impl<'a> Exec<'a> {
             return Err(ActionError::NotEnoughEnergy);
         }
         // some of Yemelya's cards are paid for in sleep, not in strength
-        let drowse = if card.free { 0 } else { view.drowse };
+        let drowse = if card.free || card.alien { 0 } else { view.drowse };
         if h.statuses.get(&S::Drowse).copied().unwrap_or(0) < drowse {
             return Err(ActionError::NotEnoughEnergy);
         }
@@ -1007,6 +1080,8 @@ impl<'a> Exec<'a> {
             (CardTarget::Ally, None) if self.standing().len() == 1 => None,
             (CardTarget::AnyHero, Some(t @ UnitRef::Hero(_))) if self.exists(t) => Some(t),
             (CardTarget::Downed, Some(t @ UnitRef::Hero(j))) if self.s.hero(j).is_some_and(|a| a.downed) => Some(t),
+            // a foe, or a friend other than oneself
+            (CardTarget::Anyone, Some(t)) if self.exists(t) && t != UnitRef::Hero(p) => Some(t),
             _ => return Err(ActionError::BadTarget),
         };
 
@@ -1036,6 +1111,9 @@ impl<'a> Exec<'a> {
         let h = self.hero(p);
         h.hand.remove(pos);
         h.energy -= cost;
+        if card.alien {
+            pay_alien(h);
+        }
         h.flags.remove("turn_furrow");
         if free_rune {
             *h.flags.entry("free_rune".into()).or_insert(1) -= 1;
@@ -1052,6 +1130,20 @@ impl<'a> Exec<'a> {
         // the Domovoy's house rule: a card of the kind forbidden this round costs blood
         if self.s.living_enemies().filter_map(|e| e.flags.get("house_rule")).any(|r| house_rule_kind(*r) == view.kind) {
             self.lose_hp(UnitRef::Hero(p), HOUSE_RULE_COST);
+        }
+        // the numbers of a card of chance: thrown when it came to the hand, or now
+        let mut view = view;
+        if def.keywords.contains(&Keyword::Marked) && card.blind.is_none() {
+            let wanted = crate::craft::ranges(&view.effects);
+            let rolls = if card.rolls.len() == wanted.len() { card.rolls.clone() } else { self.throw_all(p, &wanted) };
+            view.effects = crate::craft::settle_rolls(&view.effects, &rolls);
+        } else if let Some(by) = card.blind {
+            view.effects = crate::craft::bump_rolls(&view.effects, by);
+        }
+        if def.keywords.contains(&Keyword::Marked) || card.blind.is_some() || !crate::craft::ranged(&view) {
+            // Avos lifts only the blind ones, played without a number known
+        } else if self.s.heroes[p as usize].flags.contains_key("avos") {
+            view.effects = crate::craft::bump_rolls(&view.effects, self.s.heroes[p as usize].flags["avos"]);
         }
         self.resolve(p, card, view, target, cost, charmed && target.is_none());
         Ok(())
@@ -1094,8 +1186,12 @@ impl<'a> Exec<'a> {
             }
             CardTarget::AnyHero => Some(UnitRef::Hero(p)),
             CardTarget::Downed => self.s.heroes.iter().find(|a| a.downed).map(|a| UnitRef::Hero(a.slot)),
+            CardTarget::Anyone => {
+                let foes = self.living();
+                self.s.rng.pick(&foes).copied().map(UnitRef::Enemy)
+            }
         };
-        let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed) && target.is_none();
+        let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed | CardTarget::Anyone) && target.is_none();
         match view {
             Some(view) if !barred && !nobody => self.resolve(p, card, view, target, 0, false),
             // shown going there by the pike's own flight (`Event::PikeDrew`)
@@ -1107,6 +1203,25 @@ impl<'a> Exec<'a> {
     /// cards go.
     fn resolve(&mut self, p: u8, card: Card, view: CardView, target: Option<UnitRef>, cost: i32, wasted: bool) {
         self.ev.push(Event::CardPlayed { player: p, card: card.def.clone(), upgraded: card.upgraded, target });
+        // what this card is, for the conditions and blows it holds
+        let ranged = crate::craft::ranges(&self.c.cards.get(&card.def).map(|d| d.view(card.upgraded, Form::Human).effects).unwrap_or_default()).len() > 0;
+        {
+            let h = self.hero(p);
+            h.flags.remove("this_forged");
+            h.flags.remove("this_attack");
+            if card.forged {
+                h.flags.insert("this_forged".into(), 1);
+            }
+            if view.kind == CardType::Attack {
+                if let Some(b) = h.flags.remove("next_attack") {
+                    h.flags.insert("this_attack".into(), b);
+                }
+            }
+            if card.def == crate::craft::STOLEN_MOVE && card.rolls.len() == 2 {
+                h.flags.insert("this_move_foe".into(), card.rolls[0]);
+                h.flags.insert("this_move_idx".into(), card.rolls[1]);
+            }
+        }
         // charmed and alone: the blow has no friend to turn on, and is seen to go to waste
         if wasted {
             self.ev.push(Event::Missed { unit: UnitRef::Hero(p) });
@@ -1122,10 +1237,20 @@ impl<'a> Exec<'a> {
             bled: false,
         };
         self.run(&view.effects, &mut ctx);
+        // Lisa's double game: the next copy of another's card goes off twice
+        if card.alien && self.hero(p).flags.remove("double_next").is_some() && !self.s.heroes[p as usize].downed {
+            let mut again = ctx.clone();
+            again.fatal = false;
+            again.bled = false;
+            self.run(&view.effects, &mut again);
+        }
+        self.hero(p).flags.remove("this_attack");
 
         let h = self.hero(p);
         if view.kind == CardType::Power {
             h.powers.extend(view.passives.iter().cloned());
+        } else if card.alien {
+            // a copy of another's card is simply gone
         } else if view.has(Keyword::Exhaust) || card.free {
             self.exhaust_card(p, card.clone());
         } else {
@@ -1137,6 +1262,22 @@ impl<'a> Exec<'a> {
             return;
         }
         self.fire(p, Trigger::CardPlayed);
+        if card.forged && self.s.heroes[p as usize].mechanic == Mechanic::Forge {
+            self.forge_mark(p);
+        }
+        if ranged && self.s.heroes[p as usize].mechanic == Mechanic::Luck {
+            let gain = if self.s.heroes[p as usize].flags.contains_key("kopeck") { 2 } else { 1 };
+            self.add_status(UnitRef::Hero(p), S::Luck, gain);
+            *self.hero(p).flags.entry("turn_ranged".into()).or_insert(0) += 1;
+            self.fire(p, Trigger::RangePlayed);
+        }
+        if card.alien {
+            *self.hero(p).flags.entry("turn_aliens".into()).or_insert(0) += 1;
+            self.fire(p, Trigger::AlienPlayed);
+        }
+        if self.s.heroes[p as usize].downed {
+            return;
+        }
         if view.kind == CardType::Skill {
             self.fire(p, Trigger::SkillPlayed);
         }
@@ -1168,6 +1309,7 @@ impl<'a> Exec<'a> {
             (CardTarget::Ally | CardTarget::AnyHero, Some(t @ UnitRef::Hero(_))) if self.exists(t) => Some(t),
             (CardTarget::Ally | CardTarget::AnyHero, None) => Some(UnitRef::Hero(p)),
             (CardTarget::Downed, Some(t @ UnitRef::Hero(j))) if self.s.hero(j).is_some_and(|a| a.downed) => Some(t),
+            (CardTarget::Anyone, Some(t)) if self.exists(t) => Some(t),
             _ => return Err(ActionError::BadTarget),
         };
         let effects = def.effects.clone();
@@ -1313,7 +1455,7 @@ impl<'a> Exec<'a> {
 
     // ---- effect interpreter ----
 
-    fn targets(&mut self, ctx: &Ctx, t: Tgt) -> Vec<UnitRef> {
+    pub(crate) fn targets(&mut self, ctx: &Ctx, t: Tgt) -> Vec<UnitRef> {
         let hero_side = matches!(ctx.src, UnitRef::Hero(_));
         let heroes = |me: &Self| me.standing().into_iter().map(UnitRef::Hero).collect::<Vec<_>>();
         let enemies = |me: &Self| me.living().into_iter().map(UnitRef::Enemy).collect::<Vec<_>>();
@@ -1345,10 +1487,40 @@ impl<'a> Exec<'a> {
                 all.retain(|u| *u != ctx.src);
                 all
             }
+            // the ally aimed at; with none (alone), the source itself
+            Tgt::Ally => match ctx.target {
+                Some(t @ UnitRef::Hero(_)) if self.exists(t) => vec![t],
+                _ => vec![ctx.src],
+            },
+            Tgt::Allies => {
+                let mut all = heroes(self);
+                all.retain(|u| *u != ctx.src);
+                if all.is_empty() {
+                    vec![ctx.src]
+                } else {
+                    all
+                }
+            }
+            Tgt::RandomAlly if self.s.foretelling => vec![],
+            Tgt::RandomAlly => {
+                let mut all = heroes(self);
+                all.retain(|u| *u != ctx.src);
+                if all.is_empty() {
+                    vec![ctx.src]
+                } else {
+                    self.s.rng.pick(&all).copied().into_iter().collect()
+                }
+            }
+            Tgt::RandomAny if self.s.foretelling => vec![],
+            Tgt::RandomAny => {
+                let mut all = enemies(self);
+                all.extend(heroes(self));
+                self.s.rng.pick(&all).copied().into_iter().collect()
+            }
         }
     }
 
-    fn amount(&mut self, ctx: &Ctx, a: &Amount) -> i32 {
+    pub(crate) fn amount(&mut self, ctx: &Ctx, a: &Amount) -> i32 {
         match a {
             Amount::N(n) => *n,
             Amount::X(m) => ctx.x * m,
@@ -1388,6 +1560,19 @@ impl<'a> Exec<'a> {
                 UnitRef::Enemy(u) => base + self.s.enemy(u).map_or(0, |e| e.stolen.values().sum::<i32>()) * pct / 100,
                 UnitRef::Hero(_) => *base,
             },
+            Amount::Roll(lo, hi) => match ctx.src {
+                UnitRef::Hero(i) => self.throw(i, *lo, *hi),
+                UnitRef::Enemy(_) => self.s.rng.range(*lo, *hi),
+            },
+            Amount::Flag(name, m) => self.hero_flag(ctx.src, name) * m,
+            Amount::Part(st, by) => self.s.status(ctx.src, *st) / (*by).max(1),
+            Amount::Sum(list) => list.iter().map(|a| self.amount(ctx, a)).sum(),
+            Amount::AtLeast(a, n) => self.amount(ctx, a).max(*n),
+            Amount::AliensInHand(m) => match ctx.src {
+                UnitRef::Hero(i) => self.s.heroes[i as usize].hand.iter().filter(|c| c.alien).count() as i32 * m,
+                UnitRef::Enemy(_) => 0,
+            },
+            Amount::MaxBlock => self.s.standing_heroes().map(|h| h.block).max().unwrap_or(0),
         }
     }
 
@@ -1401,6 +1586,8 @@ impl<'a> Exec<'a> {
     /// Throws the card at `pos` of a hero's hand away, and runs what it does when thrown.
     fn discard_at(&mut self, slot: u8, pos: usize) {
         let card = self.hero(slot).hand.remove(pos);
+        self.hero(slot).flags.insert("last_discard_forged".into(), card.forged as i32);
+        self.hero(slot).flags.insert("last_discard_alien".into(), card.alien as i32);
         let on_discard = self.c.cards.get(&card.def).map(|d| d.view(card.upgraded, self.s.heroes[slot as usize].form).on_discard).unwrap_or_default();
         self.ev.push(Event::Discarded { player: slot, card: card.def.clone() });
         self.hero(slot).discard.push(card);
@@ -1450,7 +1637,7 @@ impl<'a> Exec<'a> {
     }
 
     /// Burns a card out of play for this fight and lets the hero's powers know.
-    fn exhaust_card(&mut self, slot: u8, card: Card) {
+    pub(crate) fn exhaust_card(&mut self, slot: u8, card: Card) {
         self.ev.push(Event::Exhausted { player: slot, card: card.def.clone() });
         self.hero(slot).exhaust.push(card);
         self.fire(slot, Trigger::Exhausted);
@@ -1472,6 +1659,28 @@ impl<'a> Exec<'a> {
             Cond::Mask(m) => src_hero.is_some_and(|h| h.mask == Some(*m)),
             Cond::Coop => self.s.is_coop(),
             Cond::Not(inner) => !self.cond(ctx, inner),
+            Cond::Flag(name, n) => self.hero_flag(ctx.src, name) >= *n,
+            Cond::InPlate => matches!(ctx.src, UnitRef::Hero(i) if self.in_plate(i)),
+            Cond::Attacking => match ctx.target {
+                Some(UnitRef::Enemy(uid)) => self.s.enemy(uid).and_then(|e| {
+                    let mv = e.intent.as_ref()?.mv;
+                    let d = self.c.enemies.get(&e.def)?;
+                    Some(matches!(d.moves.get(mv)?.intent, IntentKind::Attack | IntentKind::AttackAll))
+                }) == Some(true),
+                _ => false,
+            },
+            Cond::Shielded => match ctx.target {
+                Some(UnitRef::Enemy(uid)) => self.s.enemy(uid).is_some_and(|e| e.block > 0),
+                Some(UnitRef::Hero(i)) => self.s.heroes[i as usize].block > 0,
+                None => false,
+            },
+            Cond::HpAtMost(n) => match ctx.target {
+                Some(UnitRef::Enemy(uid)) => self.s.enemy(uid).is_some_and(|e| e.hp <= *n),
+                Some(UnitRef::Hero(i)) => self.s.heroes[i as usize].hp <= *n,
+                None => false,
+            },
+            Cond::Flying => matches!(ctx.target, Some(UnitRef::Enemy(uid)) if self.s.enemy(uid).is_some_and(|e| e.flags.contains_key("flying"))),
+            Cond::AlienInHand => matches!(ctx.src, UnitRef::Hero(i) if self.s.heroes[i as usize].hand.iter().any(|c| c.alien)),
         }
     }
 
@@ -1498,14 +1707,26 @@ impl<'a> Exec<'a> {
                     return;
                 }
             }
+            // "pick a card": the player picks it, and the rest of the card waits for that
+            if let Effect::Pick { pile, from, then, top } = e {
+                if self.begin_pick(ctx, *pile, *from, *then, *top, effects[at + 1..].to_vec()) {
+                    return;
+                }
+                continue;
+            }
             match e {
                 Effect::Damage(a, t) | Effect::Hits(a, _, t) => {
                     let times = if let Effect::Hits(_, k, _) = e { *k } else { 1 };
                     self.bleed(ctx);
                     let n = self.amount(ctx, a);
+                    // a blind blow of chance is thrown afresh for every hit and every foe
+                    let fresh = matches!(a, Amount::Roll(..));
                     ctx.fatal = false;
+                    let mut first = true;
                     for _ in 0..times {
                         for u in self.targets(ctx, *t) {
+                            let n = if fresh && !first { self.amount(ctx, a) } else { n };
+                            first = false;
                             // the duck is on the wing: only blows that sweep everyone, and runes, reach it
                             if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying"))) {
                                 continue;
@@ -1522,7 +1743,7 @@ impl<'a> Exec<'a> {
                     if ctx.card {
                         n += self.s.status(ctx.src, S::Fortitude);
                     }
-                    let beast = matches!(ctx.src, UnitRef::Hero(i) if self.s.heroes[i as usize].form == Form::Beast);
+                    let beast = matches!(ctx.src, UnitRef::Hero(i) if self.s.heroes[i as usize].form == Form::Beast && self.s.heroes[i as usize].mechanic == Mechanic::Moon);
                     for u in self.targets(ctx, *t) {
                         // the Beast can't shield itself with its own cards
                         if ctx.card && beast && u == ctx.src {
@@ -1642,6 +1863,7 @@ impl<'a> Exec<'a> {
                         self.run(body, ctx);
                     }
                 }
+                Effect::Rune(..) | Effect::Mask(_) | Effect::Herb(_) | Effect::Brew | Effect::Invoke if self.foreign(ctx.src) => {}
                 Effect::Rune(kind, t) => {
                     for u in self.targets(ctx, *t) {
                         if let UnitRef::Hero(i) = u {
@@ -1786,7 +2008,7 @@ impl<'a> Exec<'a> {
                     for u in self.targets(ctx, *t) {
                         if let UnitRef::Hero(i) = u {
                             self.s.next_uid += 1;
-                            let card = Card { uid: self.s.next_uid, def: def.clone(), upgraded, free: true };
+                            let card = Card { uid: self.s.next_uid, def: def.clone(), upgraded, free: true, ..Default::default() };
                             let h = self.hero(i);
                             if h.hand.len() < HAND_LIMIT {
                                 h.hand.push(card);
@@ -1823,7 +2045,11 @@ impl<'a> Exec<'a> {
                         }
                     }
                 }
-                Effect::Hook(name) => crate::hooks::run(self, ctx, name),
+                Effect::Hook(name) => {
+                    if !self.hook3(ctx, name) {
+                        crate::hooks::run(self, ctx, name)
+                    }
+                }
                 Effect::PikeWill => {
                     if let UnitRef::Hero(me) = ctx.src {
                         self.play_top(me);
@@ -1852,6 +2078,69 @@ impl<'a> Exec<'a> {
                             let card = self.hero(me).hand.remove(pos);
                             self.exhaust_card(me, card);
                         }
+                    }
+                }
+                Effect::Forge(a) => {
+                    let n = self.amount(ctx, a);
+                    if let UnitRef::Hero(me) = ctx.src {
+                        self.forge(me, n);
+                    }
+                }
+                Effect::Mark(a) => {
+                    let n = self.amount(ctx, a);
+                    if let UnitRef::Hero(me) = ctx.src {
+                        self.mark_cards(me, n);
+                    }
+                }
+                Effect::Plate(a) => {
+                    let n = self.amount(ctx, a);
+                    if let UnitRef::Hero(me) = ctx.src {
+                        self.mend_plate(me, n);
+                    }
+                }
+                Effect::Reforge(a, from, to) => {
+                    let c = ctx.clone();
+                    self.reforge(&c, a, *from, *to);
+                }
+                Effect::Upgrade(a, t) => {
+                    let n = self.amount(ctx, a);
+                    let c = ctx.clone();
+                    self.upgrade_hand(&c, n, *t);
+                }
+                Effect::Set(name, n, t) => {
+                    for u in self.targets(ctx, *t) {
+                        if let UnitRef::Hero(i) = u {
+                            *self.hero(i).flags.entry(name.clone()).or_insert(0) += n;
+                        }
+                    }
+                }
+                Effect::DrawFor(a, t) => {
+                    let n = self.amount(ctx, a);
+                    for u in self.targets(ctx, *t) {
+                        if let UnitRef::Hero(i) = u {
+                            self.draw(i, n);
+                        }
+                    }
+                }
+                Effect::Transmute(all, t) => {
+                    let c = ctx.clone();
+                    self.transmute(&c, *all, *t);
+                }
+                Effect::Pick { .. } => {}
+                Effect::Luck { foe, friend, keep } => self.luck(ctx, foe, friend, *keep),
+                Effect::DiscardRandom(a) => {
+                    let n = self.amount(ctx, a);
+                    if let UnitRef::Hero(me) = ctx.src {
+                        self.discard_cards(me, Some(n));
+                    }
+                }
+                Effect::Alien { pile, from, count } => {
+                    let c = ctx.clone();
+                    self.alien_from(&c, *pile, *from, *count);
+                }
+                Effect::Stash(n) => {
+                    if let UnitRef::Hero(me) = ctx.src {
+                        *self.hero(me).flags.entry("stash".into()).or_insert(0) += n;
                     }
                 }
                 Effect::Recall(a) => {
@@ -2044,7 +2333,12 @@ impl<'a> Exec<'a> {
                 h.block = 0;
             }
             // dragged under, shaken by a quake, or caught in Mara's winter
-            let less_energy = h.flags.remove("energy_less").unwrap_or(0);
+            let less_energy = h.flags.remove("energy_less").unwrap_or(0) - h.flags.remove("energy_more").unwrap_or(0);
+            // the bracers held through the foes' turn; what the plate took in it is remembered
+            h.flags.remove("bracers");
+            h.flags.remove("play_dead");
+            let hit = h.flags.remove("plate_hit").unwrap_or(0);
+            h.flags.insert("last_plate_hit".into(), hit);
             // one limb gone, a card less a turn; both, strength less as well
             let maimed = h.lost_limbs as i32;
             let less_energy = less_energy + (maimed >= 2) as i32;
@@ -2055,14 +2349,29 @@ impl<'a> Exec<'a> {
             if furrow {
                 h.flags.insert("turn_furrow".into(), 1);
             }
-            let hungry = h.form == Form::Beast && !h.flags.contains_key("no_hunger");
+            let hungry = h.form == Form::Beast && h.mechanic == Mechanic::Moon && !h.flags.contains_key("no_hunger");
             if hungry {
                 self.lose_hp(UnitRef::Hero(slot), 2);
             }
             if self.s.heroes[slot as usize].downed {
                 continue;
             }
-            self.draw(slot, (BASE_DRAW - less_draw).max(1));
+            // Lisa draws one fewer of her own: someone else's card makes up the hand
+            let lisa = self.s.heroes[slot as usize].mechanic == Mechanic::Sly;
+            let own = if lisa { (crate::craft::LISA_OWN_DRAW - less_draw).max(1) } else { (BASE_DRAW - less_draw).max(1) };
+            self.draw(slot, own);
+            if self.s.heroes[slot as usize].mechanic == Mechanic::Forge {
+                let marks = crate::craft::MARKS_A_TURN + self.s.heroes[slot as usize].flags.get("marks_more").copied().unwrap_or(0);
+                self.mark_cards(slot, marks);
+            }
+        }
+        // the copies Lisa takes come from hands already drawn
+        for slot in self.standing() {
+            if self.s.heroes[slot as usize].mechanic == Mechanic::Sly {
+                self.turn_aliens(slot);
+            }
+        }
+        for slot in self.standing() {
             self.fire(slot, Trigger::TurnStart);
         }
         self.check_end();
@@ -2082,7 +2391,7 @@ impl<'a> Exec<'a> {
             self.lose_hp(UnitRef::Hero(slot), 8);
         }
         for h in &mut self.s.heroes {
-            for flag in ["blind", "confused", "coiled", "mired", "asleep", "frozen", "charmed", "no_intents"] {
+            for flag in ["blind", "confused", "coiled", "mired", "asleep", "frozen", "charmed", "no_intents", "dodged_last"] {
                 h.flags.remove(flag);
             }
         }
@@ -2118,7 +2427,17 @@ impl<'a> Exec<'a> {
             }
             let hand = std::mem::take(&mut self.hero(slot).hand);
             let mut keep = Vec::new();
+            // copies of others' cards are gone as the turn ends, unless the fox remembers one
+            let mut memory = self.s.heroes[slot as usize].flags.get("fox_memory").copied().unwrap_or(0);
+            let own_among = self.s.heroes[slot as usize].flags.contains_key("own_among");
             for card in hand {
+                if card.alien {
+                    if own_among || memory > 0 {
+                        memory -= (!own_among) as i32;
+                        keep.push(card);
+                    }
+                    continue;
+                }
                 let Some(def) = self.c.cards.get(&card.def) else { continue };
                 let view = def.view(card.upgraded, self.s.heroes[slot as usize].form);
                 if !def.in_hand_end.is_empty() {
@@ -2136,6 +2455,7 @@ impl<'a> Exec<'a> {
                 }
             }
             self.hero(slot).hand = keep;
+            self.return_lent(slot);
             self.rot_tick(UnitRef::Hero(slot));
         }
         // Morovitsa Doom countdown: it lifts when she is dead
@@ -2244,6 +2564,16 @@ impl<'a> Exec<'a> {
                 self.ev.push(Event::EnemyMove { enemy: uid, mv: intent.mv });
                 // Switcheroo: the blow meant for a hero lands on another enemy
                 let mut aim = target.map(UnitRef::Hero);
+                // charmed by Lisa: the blow goes to one of its own
+                let mut charmed = false;
+                if aim.is_some() && self.s.status(me, S::Charm) > 0 {
+                    let others: Vec<u32> = self.living().into_iter().filter(|u| *u != uid).collect();
+                    if let Some(o) = self.s.rng.pick(&others).copied() {
+                        self.add_status(me, S::Charm, -1);
+                        aim = Some(UnitRef::Enemy(o));
+                        charmed = true;
+                    }
+                }
                 if let Some(redirect) = self.s.enemies[idx].flags.remove("misdirect") {
                     if aim.is_some() {
                         let others: Vec<u32> = self.living().into_iter().filter(|u| *u != uid).collect();
@@ -2267,6 +2597,12 @@ impl<'a> Exec<'a> {
                     bled: false,
                 };
                 self.run(&mv.effects, &mut ctx);
+                // honey-tongued: the foe a charmed one strikes is hurt the more
+                if charmed && self.s.heroes.iter().any(|h| !h.downed && h.flags.contains_key("honeyed")) {
+                    if let Some(t) = aim.filter(|t| self.exists(*t)) {
+                        self.hurt(None, t, 5, false);
+                    }
+                }
             }
             self.rot_tick(me);
             if self.s.standing_heroes().next().is_none() {
@@ -2339,6 +2675,13 @@ impl<'a> Exec<'a> {
     }
 }
 
+impl<'a> Exec<'a> {
+    /// Lisa plays another's card: its owner's own craft (runes, masks, herbs) does nothing in her hands.
+    fn foreign(&self, src: UnitRef) -> bool {
+        matches!(src, UnitRef::Hero(i) if self.s.heroes[i as usize].mechanic == Mechanic::Sly)
+    }
+}
+
 /// A card that carves a rune while the next rune is promised free.
 fn carves_free(h: &Hero, view: &CardView) -> bool {
     view.effects.iter().any(|e| matches!(e, Effect::Rune(..))) && h.flags.get("free_rune").copied().unwrap_or(0) > 0
@@ -2347,12 +2690,40 @@ fn carves_free(h: &Hero, view: &CardView) -> bool {
 /// What playing this card costs this hero in energy right now: nothing for an echo or a rune
 /// promised free, else what is printed on it (an X card is not priced here).
 pub fn energy_cost(h: &Hero, card: &Card, view: &CardView) -> i32 {
+    let flag = |k: &str| h.flags.get(k).copied().unwrap_or(0);
+    let printed = card.cost_set.unwrap_or(view.cost);
+    let printed = if card.alien { alien_cost(h, printed) } else { printed };
+    // the fox's predatory leap: free once three copies have been played this turn
+    let printed = if card.def == "li_predator" && flag("turn_aliens") >= 3 { 0 } else { printed };
     if card.free || carves_free(h, view) {
         0
-    } else if view.cost > 0 && h.flags.contains_key("turn_furrow") {
+    } else if printed > 0 && h.flags.contains_key("turn_furrow") {
         // the polevik's furrow: the first card of the turn costs one more
-        view.cost + 1
+        printed + 1
     } else {
-        view.cost
+        printed
+    }
+}
+
+/// What a copy of another's card costs Lisa now, with what makes it cheaper.
+fn alien_cost(h: &Hero, printed: i32) -> i32 {
+    let flag = |k: &str| h.flags.get(k).copied().unwrap_or(0);
+    if flag("turn_alien_zero") > 0 || flag("alien_free") > 0 || (flag("plutovka") > 0 && (flag("turn_aliens") + 1) % 3 == 0) {
+        return 0;
+    }
+    let less = (flag("alien_cheap") > 0) as i32 + flag("red_mistress");
+    (printed - less).max(0)
+}
+
+/// Paying for a copy spends the promises of a cheaper one.
+fn pay_alien(h: &mut Hero) {
+    if h.flags.remove("alien_free").is_some() {
+        return;
+    }
+    if let Some(n) = h.flags.get_mut("alien_cheap") {
+        *n -= 1;
+        if *n <= 0 {
+            h.flags.remove("alien_cheap");
+        }
     }
 }

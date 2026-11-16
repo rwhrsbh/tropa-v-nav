@@ -13,3 +13,6 @@ leshy = Algieba | The ancient forest spirit Leshy. Enormous, slow, creaking, dee
 bolotnik = Enceladus | The swamp master Bolotnik. Thick, wet, gurgling, drawling voice rising from under black water; slow and hungry.
 mara = Kore | A woman: Mara, the goddess of winter and death. Strictly a female voice, never male. Cold, flat, clear, icy woman's voice; utterly calm and merciless; every word like frost.
 koschei = Charon | Koschei the Deathless, an ancient skeletal king. Dry, rasping, aristocratic old voice, amused and bored, slow; a voice that has not breathed for a thousand years.
+kuzma = Iapetus | A Slavic village blacksmith of forty in battle. Low, steady, warm baritone with gravel in it; unhurried and plain-spoken, a working man's dry humour; strong, never shouting for show.
+ivan = Achird | Ivanushka the fool, a cheerful lanky village lad of twenty. Bright, open, slightly goofy young man's voice; carefree, laughing easily, surprised by everything; even in pain more startled than afraid.
+lisa = Despina | A woman: Lisa the fox, a sly young red-haired trickster. Strictly a female voice, never male. Silky, purring, teasing woman's voice with a smile in it; flattering and mocking at once; sharp when hurt.

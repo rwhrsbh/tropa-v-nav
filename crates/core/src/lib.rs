@@ -3,6 +3,7 @@
 
 pub mod bot;
 pub mod combat;
+pub mod craft;
 pub mod data;
 mod hooks;
 pub mod rng;

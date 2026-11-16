@@ -642,8 +642,9 @@ hollow-seam-lost = No match: { $n }% of max HP is gone for good, and no arm
 menu-library = Book of Cards
 library-title = Book of Cards
 library-count = { $open } of { $all } opened · hero level { $level }
-library-locked = Opens at{ "
-" }level { $n }
+library-locked =
+    Opens at
+    level { $n }
 lobby-circle-help-title = Circle of Nav
 lobby-circle-help = The run's difficulty. The host picks any circle opened so far; a new one opens with a win on the highest. Rules stack: each circle keeps all the ones before it.
 lobby-circle-1 = More elites on the map.

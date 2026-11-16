@@ -138,16 +138,25 @@ pub struct Player {
     pub whole_max_hp: i32,
     /// Cards removed at the shop so far; each next removal costs more.
     pub removals: u32,
+    /// Lisa's stash: gold laid by, coming back after the next fight with more to it.
+    #[serde(default)]
+    pub stash: i32,
 }
 
 /// What one player is offered after a fight or at a chest.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Reward {
     pub gold: i32,
+    /// Gold of this fight Lisa laid by in her stash instead (it comes back, grown, on the next floor).
+    #[serde(default)]
+    pub stashed: i32,
     pub cards: Vec<Id>,
     pub relic: Option<Id>,
     pub done: bool,
 }
+
+/// Kuzma's relic that makes the pedlar a fifth cheaper for him.
+pub const HORSESHOE_HORSE: &str = "kz_alt_horse";
 
 /// One player's shelves at the pedlar: `(id, price)`; a sold item becomes `None`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -511,6 +520,8 @@ pub enum RunEvent {
     Thrown { throws: Vec<(u8, u8)> },
     Hp { player: u8, delta: i32 },
     OmenResolved { option: u8 },
+    /// Lisa's stash came back to `player` on a new floor, with what it grew by.
+    StashPaid { player: u8, gold: i32 },
     ActCleared { act: u8 },
     Ended { won: bool },
 }
@@ -733,7 +744,7 @@ impl Run {
             if circle_rules.starts_with_toska() && c.cards.contains_key("toska") {
                 deck.push(("toska".into(), false));
             }
-            players.push(Player { hero: h.clone(), hp: d.max_hp, max_hp: d.max_hp, gold: 99, deck, relics: vec![relic.clone()], potions: vec![], falls: 0, lost_limbs: 0, lost_arms: 0, beheaded: false, walks_headless: false, whole_max_hp: 0, removals: 0 });
+            players.push(Player { hero: h.clone(), hp: d.max_hp, max_hp: d.max_hp, gold: 99, deck, relics: vec![relic.clone()], potions: vec![], falls: 0, lost_limbs: 0, lost_arms: 0, beheaded: false, walks_headless: false, whole_max_hp: 0, removals: 0, stash: 0 });
         }
         let map = generate_map(&mut rng, circle_rules);
         let n = players.len();
@@ -1465,6 +1476,19 @@ impl Run {
             self.trail.push((floor, node));
         }
         ev.push(RunEvent::Moved { floor, node, kind });
+        // a new floor: Lisa's stash comes back to her, except on the last one, where it is her strength
+        if !(kind == NodeKind::Boss && self.act >= 4) {
+            for p in 0..self.players.len() {
+                let pl = &mut self.players[p];
+                let sly = c.heroes.get(&pl.hero).is_some_and(|h| h.mechanic == Mechanic::Sly);
+                if sly && pl.stash > 0 {
+                    let gold = std::mem::take(&mut pl.stash);
+                    pl.gold += gold;
+                    ev.push(RunEvent::Gold { player: p as u8, delta: gold });
+                    ev.push(RunEvent::StashPaid { player: p as u8, gold });
+                }
+            }
+        }
         match kind {
             NodeKind::Fight | NodeKind::Elite | NodeKind::Boss => self.start_fight(c, kind, ev),
             NodeKind::Rest => self.stage = Stage::Rest { done: vec![false; self.players.len()] },
@@ -1474,7 +1498,7 @@ impl Run {
             }
             NodeKind::Chest => {
                 self.floors_cleared += 1;
-                let rewards = (0..self.players.len()).map(|p| Reward { gold: 0, cards: vec![], relic: self.roll_relic(c, p), done: false }).collect();
+                let rewards = (0..self.players.len()).map(|p| Reward { gold: 0, stashed: 0, cards: vec![], relic: self.roll_relic(c, p), done: false }).collect();
                 self.grant(c, rewards, ev);
             }
             NodeKind::Shop => {
@@ -1587,8 +1611,15 @@ impl Run {
         } };
         let seed = ((self.rng.next_u32() as u64) << 32) | self.rng.next_u32() as u64;
         let (mut combat, events) = combat::start_with(c, &party, &enemies, seed, opts);
-        for (h, p) in combat.heroes.iter_mut().zip(&self.players) {
+        let last_floor = kind == NodeKind::Boss && self.act >= 4;
+        for (h, p) in combat.heroes.iter_mut().zip(self.players.iter_mut()) {
             h.gold = p.gold;
+            // on the last floor Lisa's stash is no use as gold: it is her strength for the fight
+            if last_floor && p.stash > 0 && h.mechanic == Mechanic::Sly {
+                let str = (p.stash / crate::craft::STASH_TO_STRENGTH).max(1);
+                *h.statuses.entry(StatusKind::Strength).or_insert(0) += str;
+                p.stash = 0;
+            }
         }
         self.combat = Some(combat);
         self.fighting = Some(kind);
@@ -1673,7 +1704,30 @@ impl Run {
             };
             let cards = self.roll_cards(c, p, kind);
             let relic = if kind == NodeKind::Elite { self.roll_relic(c, p) } else { None };
-            rewards.push(Reward { gold: base * gold_pct / 100, cards, relic, done: false });
+            let mut gold = base * gold_pct / 100;
+            let mut stashed = 0;
+            // Lisa: a share of this fight's gold is laid by, and comes back on the next floor with
+            // more to it
+            if let Some(h) = combat.heroes.get(p).filter(|h| h.mechanic == Mechanic::Sly) {
+                let flag = |k: &str| h.flags.get(k).copied().unwrap_or(0);
+                let back = crate::craft::STASH_BACK + 10 * flag("stash_plus");
+                let kept = gold * crate::craft::STASH_SHARE / 100;
+                gold -= kept;
+                let mut stash = self.players[p].stash + (kept + flag("stash")) * back / 100;
+                stashed = stash - self.players[p].stash;
+                if flag("stash_den") == 0 {
+                    stash = stash.min(crate::craft::STASH_CAP);
+                }
+                self.players[p].stash = stash;
+                // the barter: a random card of the deck is bettered for good
+                if flag("mena") > 0 {
+                    let can: Vec<usize> = (0..self.players[p].deck.len()).filter(|i| !self.players[p].deck[*i].1 && c.cards.get(&self.players[p].deck[*i].0).is_some_and(|d| d.up.is_some())).collect();
+                    if let Some(&i) = self.rng.pick(&can) {
+                        self.players[p].deck[i].1 = true;
+                    }
+                }
+            }
+            rewards.push(Reward { gold, stashed, cards, relic, done: false });
         }
         // four fights in ten leave a draught behind
         for p in 0..self.players.len() {
@@ -2039,6 +2093,13 @@ impl Run {
             if let Some(id) = self.rng.pick(&potions) {
                 let cost = self.rng.range(45, 60);
                 stock.potions.push(Some(((*id).clone(), cost)));
+            }
+        }
+        if self.players[p].relics.iter().any(|r| r == HORSESHOE_HORSE) {
+            for shelf in [&mut stock.cards, &mut stock.relics, &mut stock.potions] {
+                for (_, price) in shelf.iter_mut().flatten() {
+                    *price = *price * 80 / 100;
+                }
             }
         }
         stock

@@ -1,0 +1,528 @@
+// Иванушка-дурачок: карты с диапазоном (Marked — число брошено в руке, иначе — при розыгрыше),
+// Удача от каждой такой карты, карты Удачи бьют врага или своего. Список: docs/heroes/ivan.md.
+[
+    (
+        id: "iv_club", hero: "ivan", kind: Attack, rarity: Starter, cost: 1, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(4, 9), Target)],
+        up: (effects: [Damage(Roll(6, 11), Target)]),
+    ),
+    (
+        id: "iv_cover", hero: "ivan", kind: Skill, rarity: Starter, cost: 1, keywords: [Marked],
+        effects: [Block(Roll(3, 7), Me)],
+        up: (effects: [Block(Roll(5, 9), Me)]),
+    ),
+    (
+        id: "iv_tumble", hero: "ivan", kind: Skill, rarity: Starter, cost: 1,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 2), Target)], friend: [Block(Stat(Luck, Me, 2), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_pockets", hero: "ivan", kind: Skill, rarity: Starter, cost: 0,
+        effects: [Discard(Roll(0, 2)), Draw(Roll(1, 3))],
+        up: (effects: [Discard(Roll(0, 2)), Draw(Roll(2, 4))]),
+    ),
+    (
+        id: "iv_backhand", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(5, 8), Target)],
+        up: (effects: [Damage(Roll(7, 10), Target)]),
+    ),
+    (
+        id: "iv_big_swing", hero: "ivan", kind: Attack, rarity: Common, cost: 2, target: Enemy,
+        effects: [Damage(Roll(6, 20), Target)],
+        up: (effects: [Damage(Roll(8, 24), Target)]),
+    ),
+    (
+        id: "iv_fist", hero: "ivan", kind: Attack, rarity: Common, cost: 0, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(2, 5), Target)],
+        up: (effects: [Damage(Roll(3, 7), Target)]),
+    ),
+    (
+        id: "iv_bast_shoe", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Hits(Roll(2, 6), 2, Target)],
+        up: (effects: [Hits(Roll(3, 8), 2, Target)]),
+    ),
+    (
+        id: "iv_flail", hero: "ivan", kind: Attack, rarity: Common, cost: 1, keywords: [Marked],
+        effects: [Damage(Roll(3, 6), AllFoes)],
+        up: (effects: [Damage(Roll(5, 8), AllFoes)]),
+    ),
+    (
+        id: "iv_hothead", hero: "ivan", kind: Attack, rarity: Common, cost: 0,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 3), Target)])],
+        up: (effects: [Luck(foe: [Damage(Stat(Luck, Me, 4), Target)])]),
+    ),
+    (
+        id: "iv_slingshot", hero: "ivan", kind: Attack, rarity: Common, cost: 1,
+        effects: [Damage(Roll(1, 12), RandomFoe)],
+        up: (effects: [Damage(Roll(3, 14), RandomFoe)]),
+    ),
+    (
+        id: "iv_pounce", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(4, 7), Target), Apply(Weak, Roll(1, 2), Target)],
+        up: (effects: [Damage(Roll(6, 9), Target), Apply(Weak, Roll(2, 3), Target)]),
+    ),
+    (
+        id: "iv_cudgels", hero: "ivan", kind: Attack, rarity: Common, cost: 2, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(10, 14), Target)],
+        up: (effects: [Damage(Roll(13, 17), Target)]),
+    ),
+    (
+        id: "iv_kick", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(Roll(3, 9), Target), Draw(Roll(0, 2))],
+        up: (effects: [Damage(Roll(5, 11), Target), Draw(Roll(0, 2))]),
+    ),
+    (
+        id: "iv_fool_strength", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(Sum([N(4), Stat(Luck, Me, 1)]), Target)],
+        up: (effects: [Damage(Sum([N(7), Stat(Luck, Me, 1)]), Target)]),
+    ),
+    (
+        id: "iv_eyes_fear", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(6, 9), Target), If(Has(Luck, Me, 5), [Damage(N(4), Target)])],
+        up: (effects: [Damage(Roll(8, 11), Target), If(Has(Luck, Me, 5), [Damage(N(4), Target)])]),
+    ),
+    (
+        id: "iv_boot", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(Roll(4, 10), Target), Apply(Vulnerable, N(1), Target)],
+        up: (effects: [Damage(Roll(6, 12), Target), Apply(Vulnerable, N(1), Target)]),
+    ),
+    (
+        id: "iv_back_of_head", hero: "ivan", kind: Attack, rarity: Common, cost: 1,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 2), Target)], friend: [Apply(TempStrength, Stat(Luck, Me, 1), Target)])],
+        up: (effects: [Luck(foe: [Damage(Stat(Luck, Me, 3), Target)], friend: [Apply(TempStrength, Stat(Luck, Me, 1), Target)])]),
+    ),
+    (
+        id: "iv_daring_swing", hero: "ivan", kind: Attack, rarity: Common, cost: 2, level: 3,
+        effects: [Hits(Roll(3, 7), 2, AllFoes)],
+        up: (effects: [Hits(Roll(5, 9), 2, AllFoes)]),
+    ),
+    (
+        id: "iv_at_random", hero: "ivan", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(Roll(0, 15), Target)],
+        up: (effects: [Damage(Roll(2, 18), Target)]),
+    ),
+    (
+        id: "iv_hat_cover", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(Roll(2, 10), Me)],
+        up: (effects: [Block(Roll(4, 12), Me)]),
+    ),
+    (
+        id: "iv_fence", hero: "ivan", kind: Skill, rarity: Common, cost: 1, keywords: [Marked],
+        effects: [Block(Roll(5, 8), Me)],
+        up: (effects: [Block(Roll(7, 10), Me)]),
+    ),
+    (
+        id: "iv_hat_round", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Luck(foe: [Apply(Weak, Stat(Luck, Me, 1), Target)], friend: [Apply(TempStrength, Stat(Luck, Me, 1), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_somehow", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(Roll(0, 14), Me)],
+        up: (effects: [Block(Roll(2, 17), Me)]),
+    ),
+    (
+        id: "iv_scratch_head", hero: "ivan", kind: Skill, rarity: Common, cost: 0,
+        effects: [Draw(Roll(1, 3))],
+        up: (effects: [Draw(Roll(2, 4))]),
+    ),
+    (
+        id: "iv_reroll", hero: "ivan", kind: Skill, rarity: Common, cost: 0,
+        effects: [Hook("reroll"), Apply(Luck, N(1), Me)],
+        up: (effects: [Hook("reroll"), Apply(Luck, N(2), Me)]),
+    ),
+    (
+        id: "iv_shake_out", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Discard(Roll(1, 3)), Draw(Sum([Discarded(1), N(1)]))],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_third_son", hero: "ivan", kind: Skill, rarity: Common, cost: 0, keywords: [Marked],
+        effects: [Draw(Roll(1, 2))],
+        up: (effects: [Draw(Roll(2, 3))]),
+    ),
+    (
+        id: "iv_open_coat", hero: "ivan", kind: Skill, rarity: Common, cost: 1, keywords: [Marked],
+        effects: [Block(Roll(4, 9), Me), Discard(N(1))],
+        up: (effects: [Block(Roll(6, 11), Me), Discard(N(1))]),
+    ),
+    (
+        id: "iv_sivka", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 2), Target)], friend: [DrawFor(Part(Luck, 2), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_granny", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Apply(Luck, N(2), Me)],
+        up: (effects: [Apply(Luck, N(3), Me)]),
+    ),
+    (
+        id: "iv_gingerbread", hero: "ivan", kind: Skill, rarity: Common, cost: 1, keywords: [Marked],
+        effects: [Block(Roll(3, 6), Me), Heal(Roll(1, 3), Me)],
+        up: (effects: [Block(Roll(5, 8), Me), Heal(Roll(2, 4), Me)]),
+    ),
+    (
+        id: "iv_whistle", hero: "ivan", kind: Skill, rarity: Common, cost: 0,
+        effects: [Apply(Luck, Roll(0, 3), Me)],
+        up: (effects: [Apply(Luck, Roll(1, 4), Me)]),
+    ),
+    (
+        id: "iv_spit", hero: "ivan", kind: Skill, rarity: Common, cost: 0,
+        effects: [Apply(Luck, N(1), Me), Draw(N(1))],
+        up: (effects: [Apply(Luck, N(2), Me), Draw(N(1))]),
+    ),
+    (
+        id: "iv_lots", hero: "ivan", kind: Skill, rarity: Common, cost: 1,
+        effects: [Energy(Roll(0, 2), Me)],
+        up: (effects: [Energy(Roll(0, 3), Me)]),
+    ),
+    (
+        id: "iv_footwraps", hero: "ivan", kind: Skill, rarity: Common, cost: 1, keywords: [Marked],
+        effects: [Block(Roll(3, 7), Me)],
+        on_discard: [Block(Roll(2, 4), Me)],
+        up: (effects: [Block(Roll(5, 9), Me)], on_discard: [Block(Roll(3, 5), Me)]),
+    ),
+    (
+        id: "iv_kick_shoes", hero: "ivan", kind: Skill, rarity: Common, cost: 0, keywords: [Marked],
+        effects: [Block(Roll(2, 4), Me)],
+        on_discard: [Apply(Luck, N(1), Me), Draw(N(1))],
+        up: (effects: [Block(Roll(4, 6), Me)]),
+    ),
+    (
+        id: "iv_fools_luck", hero: "ivan", kind: Power, rarity: Common, cost: 1,
+        passives: [(on: RollMin, effects: [Block(N(3), Me)])],
+        up: (passives: [(on: RollMin, effects: [Block(N(5), Me)])]),
+    ),
+    (
+        id: "iv_simple_soul", hero: "ivan", kind: Power, rarity: Common, cost: 1,
+        passives: [(on: TurnStart, effects: [Apply(Luck, N(1), Me)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_avos", hero: "ivan", kind: Power, rarity: Common, cost: 1, level: 3,
+        effects: [Set("avos", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_cartwheel", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 2,
+        effects: [Repeat(N(3), [Damage(Roll(2, 6), RandomFoe)])],
+        up: (effects: [Repeat(N(3), [Damage(Roll(4, 8), RandomFoe)])]),
+    ),
+    (
+        id: "iv_shaft", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(8, 16), Target)],
+        up: (effects: [Damage(Roll(11, 19), Target)]),
+    ),
+    (
+        id: "iv_if_not_fool", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 2), Target), Apply(Vulnerable, N(1), Target)])],
+        up: (effects: [Luck(foe: [Damage(Stat(Luck, Me, 3), Target), Apply(Vulnerable, N(1), Target)])]),
+    ),
+    (
+        id: "iv_good_lad", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy,
+        effects: [Damage(Sum([N(6), Stat(Luck, Me, 2)]), Target)],
+        up: (effects: [Damage(Sum([N(9), Stat(Luck, Me, 2)]), Target)]),
+    ),
+    (
+        id: "iv_bang", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Damage(Roll(5, 11), Target), If(Flag("last_roll", 10), [Damage(Flag("last_roll", 1), Target)])],
+        up: (effects: [Damage(Roll(7, 13), Target), If(Flag("last_roll", 10), [Damage(Flag("last_roll", 1), Target)])]),
+    ),
+    (
+        id: "iv_fence_stick", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy, keywords: [Marked],
+        effects: [Hits(Roll(2, 4), 4, Target)],
+        up: (effects: [Hits(Roll(3, 5), 4, Target)]),
+    ),
+    (
+        id: "iv_wild_blow", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 0,
+        effects: [Damage(Roll(4, 12), RandomAny)],
+        up: (effects: [Damage(Roll(6, 14), RandomAny)]),
+    ),
+    (
+        id: "iv_fistfight", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(6, 9), Target), Block(Roll(2, 4), Me)],
+        up: (effects: [Damage(Roll(8, 11), Target), Block(Roll(3, 5), Me)]),
+    ),
+    (
+        id: "iv_daring", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Damage(Sum([N(5), Flag("turn_ranged", 2)]), Target)],
+        up: (effects: [Damage(Sum([N(8), Flag("turn_ranged", 2)]), Target)]),
+    ),
+    (
+        id: "iv_head_on", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy,
+        effects: [Damage(Roll(8, 22), Target)],
+        up: (effects: [Damage(Roll(11, 25), Target)]),
+    ),
+    (
+        id: "iv_hit_friend", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1, target: Ally,
+        effects: [Damage(N(6), Ally), Apply(Luck, N(3), Me), Apply(TempStrength, N(2), Me)],
+        up: (effects: [Damage(N(6), Ally), Apply(Luck, N(4), Me), Apply(TempStrength, N(3), Me)]),
+    ),
+    (
+        id: "iv_bear_hug", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy, keywords: [Marked],
+        effects: [Damage(Roll(9, 13), Target), Apply(Weak, Roll(1, 2), Target)],
+        up: (effects: [Damage(Roll(12, 16), Target), Apply(Weak, Roll(2, 3), Target)]),
+    ),
+    (
+        id: "iv_blind_luck", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1,
+        effects: [PikeWill],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_beat_own", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 1, level: 5,
+        effects: [Damage(Stat(Luck, Me, 1), AllFoes), Damage(Stat(Luck, Me, 1), AllFriends), Remove(Luck, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_tsarevich", hero: "ivan", kind: Attack, rarity: Uncommon, cost: 2, level: 7, target: Enemy,
+        effects: [If(Has(Luck, Me, 8), [Damage(N(20), Target)], [Damage(N(10), Target)])],
+        up: (effects: [If(Has(Luck, Me, 8), [Damage(N(26), Target)], [Damage(N(13), Target)])]),
+    ),
+    (
+        id: "iv_somersault", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Block(Roll(4, 12), Me), Discard(Roll(0, 2))],
+        up: (effects: [Block(Roll(6, 14), Me), Discard(Roll(0, 2))]),
+    ),
+    (
+        id: "iv_good_day", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1, keywords: [Exhaust],
+        effects: [Apply(Luck, Stat(Luck, Me, 1), Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_frog_princess", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Luck(foe: [Apply(Vulnerable, Stat(Luck, Me, 1), Target)], friend: [Block(Stat(Luck, Me, 3), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_flying_carpet", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Draw(Roll(2, 4)), Discard(Roll(1, 2))],
+        up: (effects: [Draw(Roll(3, 5)), Discard(Roll(1, 2))]),
+    ),
+    (
+        id: "iv_seven_league", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 0, keywords: [Exhaust],
+        effects: [Energy(Roll(0, 2), Me)],
+        up: (effects: [Energy(Roll(1, 3), Me)]),
+    ),
+    (
+        id: "iv_tablecloth", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Luck(foe: [Apply(Weak, Stat(Luck, Me, 1), Target)], friend: [Heal(Stat(Luck, Me, 1), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_daydream", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Apply(Luck, N(3), Me)],
+        up: (effects: [Apply(Luck, N(5), Me)]),
+    ),
+    (
+        id: "iv_hat_askew", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1, keywords: [Marked],
+        effects: [Block(Roll(6, 10), Me)],
+        on_discard: [Apply(Luck, N(1), Me)],
+        up: (effects: [Block(Roll(8, 12), Me)]),
+    ),
+    (
+        id: "iv_gut", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 0,
+        effects: [DiscardHand, Draw(Roll(3, 6))],
+        up: (effects: [DiscardHand, Draw(Roll(4, 7))]),
+    ),
+    (
+        id: "iv_ball_thread", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Pick(pile: Draw, from: Me, then: Take, top: 3)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_back", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1, target: Ally, keywords: [Marked],
+        effects: [Block(Roll(5, 10), Ally)],
+        up: (effects: [Block(Roll(7, 12), Ally)]),
+    ),
+    (
+        id: "iv_foolish_deed", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 0,
+        effects: [Discard(N(1)), Apply(Luck, N(2), Me)],
+        up: (effects: [Discard(N(1)), Apply(Luck, N(3), Me)]),
+    ),
+    (
+        id: "iv_on_chance", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 2,
+        effects: [Block(Roll(10, 20), Me)],
+        up: (effects: [Block(Roll(13, 24), Me)]),
+    ),
+    (
+        id: "iv_lucky_lucky", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Set("lucky_next", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_grass", hero: "ivan", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Repeat(Roll(0, 2), [Hook("cleanse_one")]), Block(Roll(3, 6), Me)],
+        up: (effects: [Repeat(Roll(1, 3), [Hook("cleanse_one")]), Block(Roll(5, 8), Me)]),
+    ),
+    (
+        id: "iv_eye_eye", hero: "ivan", kind: Power, rarity: Uncommon, cost: 1,
+        effects: [Set("eye_eye", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_fools_fortune", hero: "ivan", kind: Power, rarity: Uncommon, cost: 2, level: 6,
+        passives: [(on: LuckHitAlly, effects: [Set("energy_more", 1, Me)])],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_rage", hero: "ivan", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: HurtFriend, effects: [Apply(TempStrength, N(2), Me)])],
+        up: (passives: [(on: HurtFriend, effects: [Apply(TempStrength, N(3), Me)])]),
+    ),
+    (
+        id: "iv_no_king", hero: "ivan", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: TurnStart, effects: [DiscardRandom(Roll(0, 2)), Draw(Sum([Discarded(1), N(1)]))])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_upside_down", hero: "ivan", kind: Power, rarity: Uncommon, cost: 2, level: 5,
+        passives: [(on: TurnStart, effects: [Hook("shuffle_costs")])],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_kopeck", hero: "ivan", kind: Power, rarity: Uncommon, cost: 1,
+        effects: [Set("kopeck", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_dropped", hero: "ivan", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: Discarded, effects: [Damage(N(2), RandomFoe)])],
+        up: (passives: [(on: Discarded, effects: [Damage(N(3), RandomFoe)])]),
+    ),
+    (
+        id: "iv_wide_soul", hero: "ivan", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: RollMax, effects: [Draw(N(1))])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_firebird_feather", hero: "ivan", kind: Attack, rarity: Rare, cost: 2, target: Enemy,
+        effects: [Damage(Stat(Luck, Me, 3), Target), Remove(Luck, Me)],
+        up: (effects: [Damage(Stat(Luck, Me, 4), Target), Remove(Luck, Me)]),
+    ),
+    (
+        id: "iv_boiling", hero: "ivan", kind: Attack, rarity: Rare, cost: 2,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 4), Target)])],
+        up: (effects: [Luck(foe: [Damage(Stat(Luck, Me, 5), Target)])]),
+    ),
+    (
+        id: "iv_self_sword", hero: "ivan", kind: Attack, rarity: Rare, cost: 3, level: 9,
+        effects: [Damage(Roll(5, 15), AllFoes)],
+        up: (effects: [Damage(Roll(8, 18), AllFoes)]),
+    ),
+    (
+        id: "iv_dubinushka", hero: "ivan", kind: Attack, rarity: Rare, cost: 2,
+        effects: [Damage(Sum([N(8), Stat(Luck, Me, 2)]), AllFoes), Remove(Luck, Me)],
+        up: (effects: [Damage(Sum([N(12), Stat(Luck, Me, 2)]), AllFoes), Remove(Luck, Me)]),
+    ),
+    (
+        id: "iv_swing_arm", hero: "ivan", kind: Attack, rarity: Rare, cost: 0, x_cost: true, target: Enemy,
+        effects: [Repeat(X(1), [Damage(Roll(3, 9), Target)])],
+        up: (effects: [Repeat(X(1), [Damage(Roll(5, 11), Target)])]),
+    ),
+    (
+        id: "iv_hundred_woes", hero: "ivan", kind: Attack, rarity: Rare, cost: 2, target: Enemy,
+        effects: [Damage(Flag("luck_cards", 3), Target)],
+        up: (effects: [Damage(Flag("luck_cards", 4), Target)]),
+    ),
+    (
+        id: "iv_fool_field", hero: "ivan", kind: Attack, rarity: Rare, cost: 1, target: Enemy,
+        effects: [Damage(Roll(1, 30), Target)],
+        up: (effects: [Damage(Roll(4, 33), Target)]),
+    ),
+    (
+        id: "iv_sneeze", hero: "ivan", kind: Attack, rarity: Rare, cost: 1,
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 3), Target)], friend: [Block(Stat(Luck, Me, 3), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_full_reel", hero: "ivan", kind: Attack, rarity: Rare, cost: 2, level: 8,
+        effects: [Repeat(Sum([N(1), Part(Luck, 3)]), [Damage(Roll(4, 10), AllFoes)])],
+        up: (effects: [Repeat(Sum([N(1), Part(Luck, 3)]), [Damage(Roll(6, 12), AllFoes)])]),
+    ),
+    (
+        id: "iv_firebird", hero: "ivan", kind: Skill, rarity: Rare, cost: 2, keywords: [Exhaust],
+        effects: [Luck(foe: [Damage(Stat(Luck, Me, 4), Target)], friend: [Block(Stat(Luck, Me, 4), Target)], keep: true)],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_apple", hero: "ivan", kind: Skill, rarity: Rare, cost: 1, keywords: [Exhaust],
+        effects: [Luck(foe: [Apply(Weak, Stat(Luck, Me, 1), Target)], friend: [Heal(Stat(Luck, Me, 2), Target)])],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_water", hero: "ivan", kind: Skill, rarity: Rare, cost: 2, keywords: [Exhaust],
+        effects: [Heal(Roll(4, 12), Me), Apply(Luck, N(2), Me)],
+        up: (effects: [Heal(Roll(7, 15), Me), Apply(Luck, N(2), Me)]),
+    ),
+    (
+        id: "iv_go_there", hero: "ivan", kind: Skill, rarity: Rare, cost: 1,
+        effects: [Draw(Roll(0, 5))],
+        up: (effects: [Draw(Roll(1, 6))]),
+    ),
+    (
+        id: "iv_no_law", hero: "ivan", kind: Skill, rarity: Rare, cost: 0,
+        effects: [Hook("all_blind")],
+        up: (effects: [Hook("all_blind"), Draw(N(1))]),
+    ),
+    (
+        id: "iv_inside_out", hero: "ivan", kind: Skill, rarity: Rare, cost: 1,
+        effects: [Hook("reshuffle"), Draw(Roll(2, 4))],
+        up: (effects: [Hook("reshuffle"), Draw(Roll(3, 5))]),
+    ),
+    (
+        id: "iv_cat_in_bag", hero: "ivan", kind: Skill, rarity: Rare, cost: 0,
+        effects: [Hook("cat_in_bag")],
+        up: (effects: [Hook("cat_in_bag"), Draw(N(1))]),
+    ),
+    (
+        id: "iv_luck_hands", hero: "ivan", kind: Skill, rarity: Rare, cost: 1, keywords: [Exhaust],
+        effects: [Apply(Luck, Stat(Luck, Me, 2), Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_good_riddance", hero: "ivan", kind: Skill, rarity: Rare, cost: 2,
+        effects: [Block(Roll(12, 24), Me)],
+        up: (effects: [Block(Roll(15, 28), Me)]),
+    ),
+    (
+        id: "iv_humpback_horse", hero: "ivan", kind: Power, rarity: Rare, cost: 3, level: 10,
+        passives: [(on: TurnStart, effects: [Hook("humpback")])],
+        up: (cost: 2),
+    ),
+    (
+        id: "iv_nesmeyana", hero: "ivan", kind: Power, rarity: Rare, cost: 2,
+        passives: [(on: RollMin, effects: [Apply(Luck, N(1), Me)])],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_kaurka", hero: "ivan", kind: Power, rarity: Rare, cost: 2,
+        passives: [(on: TurnStart, effects: [If(Has(Luck, Me, 5), [Energy(N(1), Me)])])],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_fool_fool", hero: "ivan", kind: Power, rarity: Rare, cost: 2,
+        effects: [Set("fool_fool", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_lucky_one", hero: "ivan", kind: Power, rarity: Rare, cost: 3, level: 10,
+        effects: [Set("lucky_one", 1, Me)],
+        passives: [(on: TurnEnd, effects: [Hook("halve_luck")])],
+        up: (cost: 2),
+    ),
+    (
+        id: "iv_own_mind", hero: "ivan", kind: Power, rarity: Rare, cost: 1,
+        effects: [Set("own_mind", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "iv_vanka", hero: "ivan", kind: Power, rarity: Rare, cost: 2,
+        effects: [Set("vanka", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "iv_spree", hero: "ivan", kind: Power, rarity: Rare, cost: 2,
+        passives: [(on: RangePlayed, effects: [EveryThisTurn("spree", 5, [Damage(N(10), AllFoes)])])],
+        up: (cost: 1),
+    ),
+]

@@ -261,7 +261,7 @@ pub fn dev_fight(db: &nav_core::Content, run: &mut nav_core::Run, enemies: &[Str
     if let (Ok(hand), Some(c)) = (std::env::var("TROPA_HAND"), run.combat.as_mut()) {
         let ids: Vec<String> = if hand == "all" { db.cards.keys().cloned().collect() } else { hand.split(',').map(|s| s.trim().to_string()).filter(|s| db.cards.contains_key(s)).collect() };
         for h in &mut c.heroes {
-            h.hand = ids.iter().enumerate().map(|(i, def)| nav_core::Card { uid: 90_000 + i as u32, def: def.clone(), upgraded: false, free: false }).collect();
+            h.hand = ids.iter().enumerate().map(|(i, def)| nav_core::Card { uid: 90_000 + i as u32, def: def.clone(), upgraded: false, free: false, ..Default::default() }).collect();
         }
     }
     // TROPA_ACT=2 puts that fight on another act's backdrop
@@ -696,6 +696,7 @@ fn notes(
                     // the hands at the chest are shaken out before anything is handed over
                     RunEvent::Thrown { .. } => true,
                     RunEvent::CardTaken { player, card } => *player == me && card.is_some(),
+                    RunEvent::StashPaid { player, .. } => *player == me,
                     _ => false,
                 }).cloned());
                 let combat_events: Vec<nav_core::Event> = events.iter().filter_map(|e| if let RunEvent::Combat(c) = e { Some(c.clone()) } else { None }).collect();

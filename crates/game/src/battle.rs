@@ -41,13 +41,14 @@ mod gore;
 mod held;
 mod impact;
 pub(crate) mod piles;
+mod pick;
 mod rig;
 mod stands;
 mod stature;
 mod status_row;
 
 pub fn plugin(app: &mut App) {
-    app.add_plugins((aim::plugin, fit_text::plugin, fx::plugin, gore::plugin, held::plugin, impact::plugin, piles::plugin, rig::plugin, status_row::plugin));
+    app.add_plugins((aim::plugin, fit_text::plugin, fx::plugin, gore::plugin, held::plugin, impact::plugin, piles::plugin, pick::plugin, rig::plugin, status_row::plugin));
     app.insert_resource(AnimSpeed(1.0))
         .init_resource::<Outbox>()
         .init_resource::<RunOutbox>()
@@ -64,7 +65,7 @@ pub fn plugin(app: &mut App) {
             Update,
             (
                 playback,
-                (sync_units, gore::lay_out_the_headless, sync_hand, live_costs, sync_potions, flask_menu, count_relics, cue_effects).chain(),
+                (sync_units, gore::lay_out_the_headless, sync_hand, live_costs, live_marks, sync_potions, flask_menu, count_relics, cue_effects).chain(),
                 no_eyes,
                 (pick_hover, layout_hand, layout_units, swap_form_art, animate_sprites, update_labels, update_intent_icons, update_bars, update_tooltip),
                 (floaters, fly_ghosts, dying, style_buttons, impact::shake_screen, turn_timer, send_pings, show_pings, light_bonuses),
@@ -237,7 +238,8 @@ struct CardWidget {
     /// Lifted out of the hand and waiting above it for a target (see `aim`).
     aiming: bool,
     /// Upgraded, and made free: either changing in hand reprints the card where it is.
-    look: (bool, bool),
+    /// What the card shows as printed for this fight: upgraded, free, its numbers, its price.
+    look: u64,
     /// Seconds it waits at the draw pile before it comes to hand, so a draw comes one by one.
     wait: f32,
     /// Where it was last drawn on the stage, to leave the hand from.
@@ -1784,7 +1786,12 @@ pub fn spawn_card<B: Bundle>(
 /// What is drawn on a card, its frame aside.
 #[allow(clippy::too_many_arguments)]
 pub fn card_face(c: &mut ChildSpawnerCommands, card: &Card, def: &CardDef, form: Form, hidden: bool, l10n: &L10n, fonts: &Fonts, art: &Art, assets: &AssetServer) {
-    let view = def.view(card.upgraded, form);
+    // a copy of another's card plays as a man's card, and owes no sleep
+    let form = if card.alien { Form::Human } else { form };
+    let mut view = def.view(card.upgraded, form);
+    if card.alien {
+        view.drowse = 0;
+    }
     let cost = if hidden || view.has(Keyword::Unplayable) {
         String::new()
     } else if view.x_cost {
@@ -1794,7 +1801,7 @@ pub fn card_face(c: &mut ChildSpawnerCommands, card: &Card, def: &CardDef, form:
     } else if view.drowse > 0 {
         view.drowse.to_string()
     } else {
-        view.cost.to_string()
+        card.cost_set.unwrap_or(view.cost).to_string()
     };
     // a card paid for in sleep wears its cost on the blue of Nav
     let sleepy = view.drowse > 0 && !card.free && !view.has(Keyword::Unplayable);
@@ -1829,11 +1836,13 @@ pub fn card_face(c: &mut ChildSpawnerCommands, card: &Card, def: &CardDef, form:
                 Some(_) => format!("{kind} · {}", l10n.t(&format!("rarity-{:?}", def.rarity))),
                 None => kind,
             };
+            // a copy of someone else's card says so on its type line, so the text keeps its room
+            let line = if card.alien { format!("{line} · {}", l10n.t("kw-Alien")) } else { line };
             c.spawn((theme::text(line, &fonts.body, 14.0, gem.unwrap_or(theme::DIM)), Node { margin: UiRect::vertical(px(2)), ..default() }));
             // a long text shrinks to stay on the card: about 110 letters fit at full size, and
             // what this guess misses is measured and brought in by `fit_text`
             // a werewolf card tells its other side too, on a line of its own
-            let text = l10n.full_card_text(&card.def, def, card.upgraded, form);
+            let text = l10n.instance_text(card, def, form);
             let size = (18.0 * (110.0 / text.chars().count().max(1) as f32).sqrt()).clamp(12.0, 18.0);
             c.spawn((
                 theme::text(text, &fonts.body, size, theme::BONE),
@@ -1895,7 +1904,7 @@ fn live_costs(
             continue;
         }
         let now = nav_core::combat::energy_cost(h, card, &view);
-        let (want, ink) = if now < view.cost { (now.to_string(), FREE_INK) } else { (view.cost.to_string(), theme::CANDLE) };
+        let (want, ink) = if now < view.cost { (now.to_string(), FREE_INK) } else { (now.to_string(), theme::CANDLE) };
         for kid in kids.iter() {
             let Ok((inner, mut edge)) = badges.get_mut(kid) else { continue };
             if *edge != BorderColor::all(ink) {
@@ -1943,14 +1952,14 @@ fn sync_hand(
         } else if held.is_none() || w.form != h.form || w.hidden != blind {
             // a form change flips every card, so the widget is rebuilt
             commands.entity(entity).despawn();
-        } else if held.is_some_and(|c| (c.upgraded, c.free) != w.look) {
+        } else if held.is_some_and(|c| look_of(c) != w.look) {
             commands.entity(entity).despawn();
             reprint.push((w.uid, w.pos));
         }
     }
     let mut drawn = 0;
     for card in &h.hand {
-        let current = |w: &CardWidget| w.uid == card.uid && w.form == h.form && w.hidden == blind && w.look == (card.upgraded, card.free);
+        let current = |w: &CardWidget| w.uid == card.uid && w.form == h.form && w.hidden == blind && w.look == look_of(card);
         if !cards.iter().any(|(_, w)| current(w)) {
             // new cards come in from the draw pile one by one; a reprinted one stays where it was
             let again = reprint.iter().find(|(uid, _)| *uid == card.uid).map(|(_, p)| *p);
@@ -1960,14 +1969,41 @@ fn sync_hand(
                 drawn += 1;
             }
             let widget = (
-                CardWidget { uid: card.uid, form: h.form, hidden: blind, pos: from, drag: Vec2::ZERO, dragging: false, aiming: false, look: (card.upgraded, card.free), wait, shown: from, power: db.0.cards.get(&card.def).is_some_and(|d| d.kind == CardType::Power) },
+                CardWidget { uid: card.uid, form: h.form, hidden: blind, pos: from, drag: Vec2::ZERO, dragging: false, aiming: false, look: look_of(card), wait, shown: from, power: db.0.cards.get(&card.def).is_some_and(|d| d.kind == CardType::Power) },
                 // let the pointer through, so a dragged card can be dropped on the unit under it
                 Pickable { should_block_lower: false, is_hoverable: true },
             );
-            spawn_card(&mut commands, *layer, card, h.form, Some(from), blind, widget, &db.0, &l10n, &fonts, &art, &assets);
+            // in the hand a blind card of chance shows the ends of its numbers, not "?"
+            crate::l10n::with_ranges(|| spawn_card(&mut commands, *layer, card, h.form, Some(from), blind, widget, &db.0, &l10n, &fonts, &art, &assets));
         }
     }
 }
+
+/// What makes a card in the hand look the way it does this fight, as one number to compare.
+fn look_of(card: &Card) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (card.upgraded, card.free, &card.rolls, card.blind, card.alien, card.cost_set).hash(&mut h);
+    h.finish()
+}
+
+/// Kuzma's forge mark: a card bearing it glows like iron in the coals while it stays in the hand.
+fn live_marks(mut commands: Commands, session: Res<Session>, cards: Query<(Entity, &CardWidget, Has<ForgeGlow>)>) {
+    let h = session.my_hero();
+    for (e, w, lit) in &cards {
+        let forged = h.hand.iter().any(|c| c.uid == w.uid && c.forged) && !h.flags.contains_key("blind");
+        if forged && !lit {
+            commands.entity(e).insert((ForgeGlow, BoxShadow::new(FORGE_GLOW, px(0), px(0), px(6), px(22))));
+        } else if !forged && lit {
+            commands.entity(e).remove::<(ForgeGlow, BoxShadow)>();
+        }
+    }
+}
+
+#[derive(Component)]
+struct ForgeGlow;
+/// The orange of iron in the coals.
+const FORGE_GLOW: Color = Color::srgba(1.0, 0.45, 0.08, 0.9);
 
 /// A card of the hand whose bonus would come off if played now: ringed in candlelight.
 #[derive(Component)]

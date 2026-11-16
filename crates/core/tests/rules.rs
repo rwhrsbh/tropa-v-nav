@@ -818,7 +818,7 @@ fn koschei_fight(deck: &[&str]) -> (Content, Combat) {
 
 /// Puts a free test card straight into the hero's hand.
 fn give(s: &mut Combat, uid: u32, def: &str) {
-    s.heroes[0].hand.push(Card { uid, def: def.into(), upgraded: false, free: true });
+    s.heroes[0].hand.push(Card { uid, def: def.into(), upgraded: false, free: true, ..Default::default() });
 }
 
 #[test]
@@ -1177,7 +1177,7 @@ fn dragged_under_and_shaken_heroes_start_the_turn_short() {
 #[test]
 fn the_fever_burns_and_moves_on() {
     let (c, mut s) = duo(&[], &[], &["dummy"]);
-    s.heroes[0].hand.push(Card { uid: 9999, def: "fever".into(), upgraded: false, free: false });
+    s.heroes[0].hand.push(Card { uid: 9999, def: "fever".into(), upgraded: false, free: false, ..Default::default() });
     let has = |h: &Hero| h.hand.iter().chain(&h.draw).chain(&h.discard).any(|x| x.def == "fever");
     end_round(&c, &mut s);
     assert_eq!(s.heroes[0].hp, 47);
@@ -1288,8 +1288,8 @@ fn a_lone_hero_faces_a_shorter_chain() {
 #[test]
 fn curses_that_spoil_the_next_turn() {
     let (c, mut s) = solo(&["t_block"; 12], &["dummy"]);
-    s.heroes[0].hand.push(Card { uid: 9001, def: "evil_dream".into(), upgraded: false, free: false });
-    s.heroes[0].hand.push(Card { uid: 9002, def: "ice_shard".into(), upgraded: false, free: false });
+    s.heroes[0].hand.push(Card { uid: 9001, def: "evil_dream".into(), upgraded: false, free: false, ..Default::default() });
+    s.heroes[0].hand.push(Card { uid: 9002, def: "ice_shard".into(), upgraded: false, free: false, ..Default::default() });
     end_round(&c, &mut s);
     assert_eq!(s.heroes[0].energy, 2);
     // the dream is back in the deck and may be drawn again; the shard melted for good

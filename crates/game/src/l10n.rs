@@ -77,6 +77,19 @@ impl Lang {
     }
 }
 
+thread_local! {
+    /// Set while a card in the hand is told: a blind range reads as its two ends, not as "?".
+    static SHOW_RANGES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Tells what is written inside with blind ranges shown as their ends, as the hand shows them.
+pub fn with_ranges<T>(f: impl FnOnce() -> T) -> T {
+    let was = SHOW_RANGES.with(|c| c.replace(true));
+    let out = f();
+    SHOW_RANGES.with(|c| c.set(was));
+    out
+}
+
 #[derive(Resource)]
 pub struct L10n {
     pub lang: Lang,
@@ -189,6 +202,20 @@ impl L10n {
             Amount::HandSize(m) => scaled(*m, self.t("amount-hand")),
             Amount::ExhaustPile(m) => scaled(*m, self.t("amount-exhausted")),
             Amount::Hoard(base, _) => base.to_string(),
+            // a number of chance: its ends in the hand, a question mark anywhere else
+            Amount::Roll(lo, hi) => {
+                if SHOW_RANGES.with(|c| c.get()) {
+                    format!("{lo}–{hi}")
+                } else {
+                    "?".into()
+                }
+            }
+            Amount::Flag(name, m) => scaled(*m, self.t(&format!("amount-flag-{name}"))),
+            Amount::Part(st, by) => self.tf("amount-part", &[("s", self.t(&format!("status-{st:?}")).into()), ("n", (*by).into())]),
+            Amount::Sum(list) => list.iter().map(|a| self.amount_in(a, mult)).collect::<Vec<_>>().join(" + "),
+            Amount::AtLeast(a, n) => self.tf("amount-atleast", &[("a", self.amount_in(a, mult).into()), ("n", (*n).into())]),
+            Amount::AliensInHand(m) => scaled(*m, self.t("amount-aliens")),
+            Amount::MaxBlock => self.t("amount-maxblock"),
         }
     }
 
@@ -204,7 +231,15 @@ impl L10n {
             Cond::Mask(m) => self.t(&format!("cond-mask-{m:?}")),
             Cond::Coop => self.t("cond-coop"),
             Cond::Not(inner) if **inner == Cond::Coop => self.t("cond-solo"),
+            Cond::Not(inner) if **inner == Cond::InPlate => self.t("cond-not-plate"),
             Cond::Not(inner) => self.tf("cond-not", &[("c", self.cond(inner).into())]),
+            Cond::Flag(name, n) => self.tf(&format!("cond-flag-{name}"), &[("n", (*n).into())]),
+            Cond::InPlate => self.t("cond-plate"),
+            Cond::Attacking => self.t("cond-attacking"),
+            Cond::Shielded => self.t("cond-shielded"),
+            Cond::HpAtMost(n) => self.tf("cond-hp-at-most", &[("n", (*n).into())]),
+            Cond::Flying => self.t("cond-flying"),
+            Cond::AlienInHand => self.t("cond-alien-in-hand"),
         }
     }
 
@@ -234,10 +269,11 @@ impl L10n {
     /// it opens with a game term or a name, which keep their capital.
     fn clause(&self, text: String) -> String {
         let first = text.split([' ', '.', ':', ',']).next().unwrap_or("");
-        const TERMS: [&str; 27] = [
+        const TERMS: [&str; 34] = [
             "kw-Guard", "kw-Taunt", "kw-Invoke", "kw-Shift", "kw-Echo", "kw-Link", "kw-PikeWill", "kw-Respond", "side-Human", "side-Beast",
             "status-Strength", "status-Drowse", "status-TempStrength", "status-Fortitude", "status-Vulnerable", "status-Weak", "status-Rot", "status-Hex",
             "status-Bleed", "status-Fear", "status-Thorns", "status-HuntMark", "status-Valor", "status-Stun", "status-Mist", "status-Chained", "status-Gloom",
+            "status-Forge", "status-Plate", "status-Luck", "status-Evade", "status-Charm", "status-Flattery", "kw-Alien",
         ];
         if TERMS.iter().any(|k| self.has(k) && self.t(k).split(' ').next() == Some(first)) {
             return text;
@@ -284,7 +320,7 @@ impl L10n {
 
     fn effect(&self, e: &Effect) -> String {
         // a fixed number is said as it is; a varying one through the `-x` phrasing ("deal damage: 3 × Valor")
-        let fixed = |a: &Amount| matches!(a, Amount::N(_));
+        let fixed = |a: &Amount| matches!(a, Amount::N(_) | Amount::Roll(..));
         let n = |a: &Amount| -> FluentValue {
             match a {
                 Amount::N(n) => (*n).into(),
@@ -373,13 +409,52 @@ impl L10n {
             // a hook with nothing to say to the player says nothing, not its key
             Effect::Hook(name) if !self.has(&format!("hook-{name}")) => String::new(),
             Effect::Hook(name) => self.t(&format!("hook-{name}")),
+            Effect::Forge(a) => say("forge", a, None),
+            Effect::Mark(Amount::N(n)) if *n >= 10 => self.t("fx-mark-all"),
+            Effect::Mark(a) => say("mark", a, None),
+            Effect::Plate(Amount::N(n)) if *n < 0 => self.fx("plate-spend", None, &[("n", (-*n).into())]),
+            Effect::Plate(a) => say("plate", a, None),
+            Effect::Reforge(a, from, _) => {
+                if let Amount::Stat(..) = a {
+                    self.t("fx-reforge-all-strength")
+                } else {
+                    self.fx("reforge", Some(*from), &[("n", n(a))])
+                }
+            }
+            Effect::Upgrade(Amount::N(k), t) if *k >= 10 => self.fx("upgrade-all", Some(*t), &[]),
+            Effect::Upgrade(a, t) => self.fx("upgrade", Some(*t), &[("n", n(a))]),
+            Effect::Set(name, k, t) => {
+                let key = format!("set-{name}-{t:?}");
+                let key = if self.has(&key) { key } else { format!("set-{name}") };
+                self.tf(&key, &[("n", (*k).into())])
+            }
+            Effect::DrawFor(a, t) => say("drawfor", a, Some(*t)),
+            Effect::Transmute(all, t) => self.fx(if *all { "transmute-all" } else { "transmute" }, Some(*t), &[]),
+            Effect::Pick { pile, from, then, top } => {
+                let key = format!("fx-pick-{then:?}-{pile:?}");
+                let key = if *from == Tgt::Me && self.has(&format!("{key}-Me")) { format!("{key}-Me") } else { key };
+                self.tf(&key, &[("n", (*top as i32).into())])
+            }
+            Effect::Luck { foe, friend, keep } => {
+                let mut s = if friend.is_empty() {
+                    self.tf("fx-luck-evil", &[("foe", body(foe))])
+                } else {
+                    self.tf("fx-luck", &[("foe", body(foe)), ("friend", body(friend))])
+                };
+                s.push(' ');
+                s.push_str(&self.t(if *keep { "fx-luck-keep" } else { "fx-luck-burn" }));
+                s
+            }
+            Effect::DiscardRandom(a) => say("discardrandom", a, None),
+            Effect::Alien { pile, count, .. } => self.fx(&format!("alien-{pile:?}"), None, &[("n", (*count).into())]),
+            Effect::Stash(k) => self.fx("stash", None, &[("n", (*k).into())]),
         }
     }
 
     /// The whole text printed on a card in `form`: a werewolf card with two sides tells the
     /// other one too, on a line of its own, so the turn holds no surprise.
     pub fn full_card_text(&self, id: &str, def: &CardDef, upgraded: bool, form: nav_core::Form) -> String {
-        if def.hero != "volkolak" || !def.two_sided(upgraded) {
+        if (def.hero != "volkolak" && def.hero != "kuzma") || !def.two_sided(upgraded) {
             return self.card_text(id, def, &def.view(upgraded, form));
         }
         // each side is played only in its own form: what a side does "as the beast" is settled
@@ -407,7 +482,27 @@ impl L10n {
         let text = self.card_text(id, def, &mine);
         // the keywords both sides share are said once, on this side
         let side = self.card_body(id, def, &theirs, |k| !mine.keywords.contains(k));
-        format!("{text}\n{}: {side}", self.t(&format!("side-{other:?}")))
+        // Kuzma's two sides are the forge and the plate, not a man and a beast
+        let label = if def.hero == "kuzma" { format!("side-plate-{other:?}") } else { format!("side-{other:?}") };
+        format!("{text}\n{}: {side}", self.t(&label))
+    }
+
+    /// The text of this very card: a marked card of chance tells the numbers thrown for it, one
+    /// made blind tells its moved ends; anything else reads as `full_card_text`.
+    pub fn instance_text(&self, card: &nav_core::Card, def: &CardDef, form: nav_core::Form) -> String {
+        let marked = def.keywords.contains(&Keyword::Marked) && card.blind.is_none() && !card.rolls.is_empty();
+        if !marked && card.blind.is_none() {
+            return self.full_card_text(&card.def, def, card.upgraded, form);
+        }
+        let mut view = def.view(card.upgraded, form);
+        if marked {
+            view.effects = nav_core::craft::settle_rolls(&view.effects, &card.rolls);
+        } else if let Some(by) = card.blind {
+            view.effects = nav_core::craft::bump_rolls(&view.effects, by);
+            // made blind, it is no longer marked
+            view.keywords.retain(|k| *k != Keyword::Marked);
+        }
+        self.card_text(&card.def, def, &view)
     }
 
     /// Rules text of a card. A hand-written `card-<id>-desc` overrides the generated one.
@@ -419,7 +514,10 @@ impl L10n {
     /// it does while held at the turn's end, then when thrown away ("Discard: ..."), and last the
     /// keywords `say` lets through.
     fn card_body(&self, id: &str, def: &CardDef, view: &CardView, say: impl Fn(&Keyword) -> bool) -> String {
-        let custom = format!("card-{id}-desc");
+        // an upgraded card may have words of its own (`card-<id>-up-desc`)
+        let upgraded = def.up.is_some() && def.view(true, nav_core::Form::Human).effects == view.effects && def.view(false, nav_core::Form::Human).effects != view.effects;
+        let up_key = format!("card-{id}-up-desc");
+        let custom = if upgraded && self.has(&up_key) { up_key } else { format!("card-{id}-desc") };
         let mut lines = Vec::new();
         if self.has(&custom) {
             lines.push(self.t(&custom));
@@ -469,6 +567,11 @@ impl L10n {
                 Amount::Curses(..) => keys.push("kw-Curse".into()),
                 Amount::Consumed(_) => keys.push("kw-Respond".into()),
                 Amount::Discarded(_) | Amount::DiscardedThisTurn(_) => keys.push("kw-Discard".into()),
+                Amount::Roll(..) => keys.push("kw-Range".into()),
+                Amount::Part(st, _) => keys.push(format!("status-{st:?}")),
+                Amount::AliensInHand(_) => keys.push("kw-Alien".into()),
+                Amount::Sum(list) => list.iter().for_each(|a| counts(a, keys)),
+                Amount::AtLeast(a, _) => counts(a, keys),
                 _ => {}
             }
         }
@@ -479,7 +582,11 @@ impl L10n {
                 Cond::Mask(m) => keys.push(format!("mask-{m:?}")),
                 Cond::Form(_) => keys.push("kw-Shift".into()),
                 Cond::Not(inner) => cond(inner, keys),
-                Cond::Fatal | Cond::Coop => {}
+                Cond::InPlate => keys.push("status-Plate".into()),
+                Cond::AlienInHand => keys.push("kw-Alien".into()),
+                Cond::Flag(name, _) if name.contains("alien") => keys.push("kw-Alien".into()),
+                Cond::Flag(name, _) if name.contains("forge") => keys.push("kw-Forged".into()),
+                _ => {}
             }
         }
         fn walk(list: &[Effect], keys: &mut Vec<String>) {
@@ -529,6 +636,34 @@ impl L10n {
                     Effect::Discard(_) | Effect::DiscardHand => keys.push("kw-Discard".into()),
                     Effect::ExhaustCards(_) => keys.push("kw-Exhaust".into()),
                     Effect::Hook(name) if name == "kolyada" => keys.push("kw-Rune".into()),
+                    Effect::Forge(a) | Effect::Mark(a) => {
+                        keys.push("kw-Forged".into());
+                        keys.push("status-Forge".into());
+                        counts(a, keys);
+                    }
+                    Effect::Plate(_) => keys.push("status-Plate".into()),
+                    Effect::Reforge(..) => keys.push("kw-Reforge".into()),
+                    Effect::Upgrade(..) => keys.push("kw-UpgradeFight".into()),
+                    Effect::Set(name, ..) if name == "bracers" => keys.push("kw-Bracers".into()),
+                    Effect::Transmute(..) => keys.push("kw-Transmute".into()),
+                    Effect::Pick { then, .. } => {
+                        if *then == nav_core::PickThen::Alien {
+                            keys.push("kw-Alien".into());
+                        }
+                        if *then == nav_core::PickThen::Transmute {
+                            keys.push("kw-Transmute".into());
+                        }
+                    }
+                    Effect::Luck { foe, friend, .. } => {
+                        keys.push("kw-LuckCard".into());
+                        keys.push("status-Luck".into());
+                        walk(foe, keys);
+                        walk(friend, keys);
+                    }
+                    Effect::Alien { .. } => keys.push("kw-Alien".into()),
+                    Effect::Stash(_) => keys.push("kw-Stash".into()),
+                    Effect::Hook(name) if name.contains("borrow") || name.contains("trick") => keys.push("kw-Borrow".into()),
+                    Effect::Hook(name) if name == "steal_move" || name.contains("alien") || name == "gifts" || name == "gossip" || name == "promise" || name == "swipe_top" || name == "copy_hand" => keys.push("kw-Alien".into()),
                     Effect::Hook(name) if name == "random_herb" => keys.push("kw-Brew".into()),
                     _ => {}
                 }
@@ -609,7 +744,7 @@ mod once_tests {
     fn dump_card_texts() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
         let c = nav_core::Content::load_dir(&root.join("data")).expect("content");
-        let lang = if std::env::var("DUMP_EN").is_ok() { Lang::En } else { Lang::Ru };
+        let lang = if std::env::var("DUMP_EN").is_ok() { Lang::En } else if std::env::var("DUMP_OLD").is_ok() { Lang::Old } else { Lang::Ru };
         let l = L10n::load(&crate::art::Art::new(root.clone()), lang);
         let mut ids: Vec<&String> = c.cards.keys().collect();
         ids.sort();

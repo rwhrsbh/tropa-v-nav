@@ -105,6 +105,12 @@ fn blocks_self(view: &CardView) -> bool {
 
 pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
     let Some(h) = s.hero(slot) else { return CombatAction::Ready(true) };
+    // a card to pick out of a pile: the first that may be picked
+    if let Some(p) = &h.picking {
+        if let Some(card) = crate::craft::pickable_cards(c, s, p).first() {
+            return CombatAction::Pick { card: *card };
+        }
+    }
     // a discard to pick for: throw a card that pays for being thrown, or the least use
     if h.choosing.is_some() {
         let worth = |card: &Card| -> i32 {
@@ -174,6 +180,7 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
                 CardTarget::None => Some(None),
                 CardTarget::Enemy => weakest.map(Some),
                 CardTarget::Ally | CardTarget::AnyHero => Some(None),
+                CardTarget::Anyone => weakest.map(Some),
                 CardTarget::Downed => s.heroes.iter().find(|a| a.downed).map(|a| Some(UnitRef::Hero(a.slot))),
             };
             if let Some(target) = target {
@@ -196,7 +203,7 @@ pub fn choose(c: &Content, s: &Combat, slot: u8) -> CombatAction {
     let target_for = |v: &CardView| -> Option<Option<UnitRef>> {
         match v.target {
             CardTarget::None => Some(None),
-            CardTarget::Enemy => weakest.map(Some),
+            CardTarget::Enemy | CardTarget::Anyone => weakest.map(Some),
             CardTarget::Ally => Some(other),
             CardTarget::AnyHero => Some(Some(other.unwrap_or(UnitRef::Hero(slot)))),
             CardTarget::Downed => None,

@@ -32,6 +32,9 @@ window.tropaTodo=(who,only)=>{ const done=new Set(tropaDone()); const out=[]; fo
 window.tropaRecord=async (who,n,only)=>{
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const log=[];
+  // never record with the page's default voice: the speaker chosen must be this hero's
+  const want=barkVoice[who].voice;
+  if(!new RegExp('Speaker 1 - '+want+'\\b').test(document.body.innerText)) return 'WRONG VOICE: pick '+want+' first';
   for(const [lang,key] of tropaTodo(who,only).slice(0,n)){
     if(/Quota limit/.test(document.body.innerText)) { log.push('QUOTA'); break; }
     // a run that hangs shows Stop instead of Run: give it time, then stop it

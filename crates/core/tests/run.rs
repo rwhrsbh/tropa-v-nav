@@ -720,7 +720,7 @@ fn trophies_and_pedlars_wares_are_never_found_on_the_road() {
 fn the_card_pool_matches_the_design_document() {
     let c = content();
     // the six of the design document: Yemelya the challenge hero came after it
-    let real: Vec<&CardDef> = c.cards.values().filter(|d| !d.id.starts_with("t_") && !d.id.starts_with("own_") && d.hero != "emelya").collect();
+    let real: Vec<&CardDef> = c.cards.values().filter(|d| !d.id.starts_with("t_") && !d.id.starts_with("own_") && !["emelya", "kuzma", "ivan", "lisa"].contains(&d.hero.as_str())).collect();
     let count = |f: &dyn Fn(&CardDef) -> bool| real.iter().filter(|d| f(d)).count();
     assert_eq!(count(&|d| d.hero.is_empty() && !matches!(d.kind, CardType::Curse | CardType::Status) && d.rarity != Rarity::Special), 30, "neutral");
     assert_eq!(count(&|d| d.kind == CardType::Curse), 13, "curses");
@@ -1447,4 +1447,17 @@ fn no_two_relics_do_the_same() {
     }
     let twins: Vec<_> = by.values().filter(|v| v.len() > 1).collect();
     assert!(twins.is_empty(), "relics that do the same: {twins:?}");
+}
+
+#[test]
+fn lisas_stash_comes_back_on_the_next_floor() {
+    let c = content();
+    let mut run = Run::new(&c, &["lisa".to_string()], 7, 0).unwrap();
+    run.players[0].stash = 30;
+    let gold = run.players[0].gold;
+    assert!(matches!(run.stage, Stage::Map { .. }));
+    let ev = run.apply(&c, 0, &RunAction::Vote(0)).unwrap();
+    assert!(ev.iter().any(|e| matches!(e, RunEvent::StashPaid { player: 0, gold: 30 })), "{ev:?}");
+    assert_eq!(run.players[0].stash, 0);
+    assert!(run.players[0].gold >= gold + 30);
 }

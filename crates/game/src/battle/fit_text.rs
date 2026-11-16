@@ -4,7 +4,7 @@
 use bevy::prelude::*;
 
 /// Height left for the rules text under the name, the picture and the type line.
-pub(super) const ROOM: f32 = 100.0;
+pub(super) const ROOM: f32 = 90.0;
 /// Smallest size still worth reading: a text too long for this is reported, not hidden.
 const SMALLEST: f32 = 9.0;
 

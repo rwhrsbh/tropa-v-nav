@@ -1,0 +1,529 @@
+// Лиса Патрикеевна: Чужие карты (копии чужих), Увёртка, Очарование, Лесть, Позаимствовать, Заначка.
+// Список: docs/heroes/lisa.md.
+[
+    (
+        id: "li_snap", hero: "lisa", kind: Attack, rarity: Starter, cost: 1, target: Enemy,
+        effects: [Damage(N(6), Target)],
+        up: (effects: [Damage(N(9), Target)]),
+    ),
+    (
+        id: "li_hop", hero: "lisa", kind: Skill, rarity: Starter, cost: 1,
+        effects: [Block(N(5), Me)],
+        up: (effects: [Block(N(8), Me)]),
+    ),
+    (
+        id: "li_peek", hero: "lisa", kind: Skill, rarity: Starter, cost: 0,
+        effects: [Alien(pile: Hand, from: RandomAlly)],
+        up: (effects: [Alien(pile: Hand, from: RandomAlly), Set("alien_cheap", 1, Me)]),
+    ),
+    (
+        id: "li_tail_flick", hero: "lisa", kind: Skill, rarity: Starter, cost: 2,
+        effects: [Apply(Evade, N(1), Me)],
+        up: (effects: [Apply(Evade, N(1), Me), Block(N(3), Me)]),
+    ),
+    (
+        id: "li_leap", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(N(8), Target)],
+        up: (effects: [Damage(N(11), Target)]),
+    ),
+    (
+        id: "li_tail_eyes", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(N(5), Target), Apply(Weak, N(1), Target)],
+        up: (effects: [Damage(N(7), Target), Apply(Weak, N(2), Target)]),
+    ),
+    (
+        id: "li_paws", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(N(5), Target), Set("alien_cheap", 1, Me)],
+        up: (effects: [Damage(N(8), Target), Set("alien_cheap", 1, Me)]),
+    ),
+    (
+        id: "li_bite_twice", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Hits(N(3), 2, Target)],
+        up: (effects: [Hits(N(5), 2, Target)]),
+    ),
+    (
+        id: "li_corner", hero: "lisa", kind: Attack, rarity: Common, cost: 0, target: Enemy,
+        effects: [If(Has(Charm, Target, 1), [Damage(N(8), Target)], [Damage(N(4), Target)])],
+        up: (effects: [If(Has(Charm, Target, 1), [Damage(N(12), Target)], [Damage(N(6), Target)])]),
+    ),
+    (
+        id: "li_teeth", hero: "lisa", kind: Attack, rarity: Common, cost: 2, target: Enemy,
+        effects: [Damage(N(12), Target)],
+        up: (effects: [Damage(N(16), Target)]),
+    ),
+    (
+        id: "li_lightning", hero: "lisa", kind: Attack, rarity: Common, cost: 1,
+        effects: [Damage(N(4), AllFoes)],
+        up: (effects: [Damage(N(6), AllFoes)]),
+    ),
+    (
+        id: "li_snatch", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(N(6), Target), Alien(pile: Hand, from: RandomAlly)],
+        up: (effects: [Damage(N(9), Target), Alien(pile: Hand, from: RandomAlly)]),
+    ),
+    (
+        id: "li_rooster", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [If(Attacking, [Damage(N(10), Target)], [Damage(N(7), Target)])],
+        up: (effects: [If(Attacking, [Damage(N(13), Target)], [Damage(N(10), Target)])]),
+    ),
+    (
+        id: "li_fox_way", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(Sum([N(4), Flag("turn_aliens", 2)]), Target)],
+        up: (effects: [Damage(Sum([N(6), Flag("turn_aliens", 2)]), Target)]),
+    ),
+    (
+        id: "li_scratch", hero: "lisa", kind: Attack, rarity: Common, cost: 0, target: Enemy,
+        effects: [Damage(N(3), Target), Apply(Bleed, N(2), Target)],
+        up: (effects: [Damage(N(4), Target), Apply(Bleed, N(3), Target)]),
+    ),
+    (
+        id: "li_scratch_scratch", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Hits(N(2), 3, Target)],
+        up: (effects: [Hits(N(3), 3, Target)]),
+    ),
+    (
+        id: "li_other_hands", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [If(Flag("turn_aliens", 1), [Damage(N(10), Target)], [Damage(N(6), Target)])],
+        up: (effects: [If(Flag("turn_aliens", 1), [Damage(N(13), Target)], [Damage(N(9), Target)])]),
+    ),
+    (
+        id: "li_feint", hero: "lisa", kind: Attack, rarity: Common, cost: 1, target: Enemy,
+        effects: [Damage(N(7), Target), Apply(Vulnerable, N(1), Target)],
+        up: (effects: [Damage(N(9), Target), Apply(Vulnerable, N(2), Target)]),
+    ),
+    (
+        id: "li_sly_bite", hero: "lisa", kind: Attack, rarity: Common, cost: 2, target: Enemy,
+        effects: [Damage(N(9), Target), Set("alien_cheap", 2, Me)],
+        up: (effects: [Damage(N(12), Target), Set("alien_cheap", 2, Me)]),
+    ),
+    (
+        id: "li_jackpot", hero: "lisa", kind: Attack, rarity: Common, cost: 1, level: 3, target: Enemy,
+        effects: [Damage(N(6), Target), If(Fatal, [Stash(5)])],
+        up: (effects: [Damage(N(9), Target), If(Fatal, [Stash(8)])]),
+    ),
+    (
+        id: "li_burrow", hero: "lisa", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(N(7), Me)],
+        up: (effects: [Block(N(10), Me)]),
+    ),
+    (
+        id: "li_hand_peek", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Ally,
+        effects: [Pick(pile: Hand, from: Ally, then: Alien)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_discard_dig", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Ally,
+        effects: [Pick(pile: Discard, from: Ally, then: Alien), Set("alien_cheap", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_deck_pull", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Ally,
+        effects: [Pick(pile: Draw, from: Ally, then: Alien)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_midwife", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Ally,
+        effects: [Alien(pile: Draw, from: Ally, count: 2)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_borrow", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Anyone,
+        effects: [Hook("borrow")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_charm", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Enemy,
+        effects: [Apply(Charm, N(1), Target)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_flattery", hero: "lisa", kind: Skill, rarity: Common, cost: 0, target: Enemy,
+        effects: [Apply(Flattery, N(1), Target)],
+        up: (effects: [Apply(Flattery, N(1), Target), Draw(N(1))]),
+    ),
+    (
+        id: "li_talk_teeth", hero: "lisa", kind: Skill, rarity: Common, cost: 1, target: Enemy,
+        effects: [Apply(Weak, N(2), Target)],
+        up: (effects: [Apply(Weak, N(3), Target)]),
+    ),
+    (
+        id: "li_sweep_tracks", hero: "lisa", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(N(4), Me), If(Flag("turn_aliens", 1), [Apply(Evade, N(1), Me)])],
+        up: (effects: [Block(N(7), Me), If(Flag("turn_aliens", 1), [Apply(Evade, N(1), Me)])]),
+    ),
+    (
+        id: "li_quick_fingers", hero: "lisa", kind: Skill, rarity: Common, cost: 0,
+        effects: [Set("alien_cheap", 1, Me), Draw(N(1))],
+        up: (effects: [Set("alien_cheap", 1, Me), Draw(N(2))]),
+    ),
+    (
+        id: "li_poor", hero: "lisa", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(N(5), Me), Stash(3)],
+        up: (effects: [Block(N(8), Me), Stash(4)]),
+    ),
+    (
+        id: "li_lurk", hero: "lisa", kind: Skill, rarity: Common, cost: 1,
+        effects: [Block(N(6), Me), Set("alien_next", 1, Me)],
+        up: (effects: [Block(N(9), Me), Set("alien_next", 1, Me)]),
+    ),
+    (
+        id: "li_sweet_talk", hero: "lisa", kind: Skill, rarity: Common, cost: 1,
+        effects: [Apply(TempStrength, N(-1), AllFoes)],
+        up: (effects: [Apply(TempStrength, N(-2), AllFoes)]),
+    ),
+    (
+        id: "li_jug", hero: "lisa", kind: Skill, rarity: Common, cost: 1,
+        effects: [Draw(N(2)), Discard(N(1)), If(Flag("last_discard_alien", 1), [Draw(N(1))])],
+        up: (effects: [Draw(N(3)), Discard(N(1)), If(Flag("last_discard_alien", 1), [Draw(N(1))])]),
+    ),
+    (
+        id: "li_gossip", hero: "lisa", kind: Skill, rarity: Common, cost: 1, level: 3, target: Ally,
+        effects: [Hook("gossip")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_switch_sides", hero: "lisa", kind: Skill, rarity: Common, cost: 0,
+        effects: [Hook("discard_alien"), Draw(N(2))],
+        up: (effects: [Hook("discard_alien"), Draw(N(3))]),
+    ),
+    (
+        id: "li_nose", hero: "lisa", kind: Power, rarity: Common, cost: 1,
+        passives: [(on: AlienPlayed, effects: [Block(N(1), Me)])],
+        up: (passives: [(on: AlienPlayed, effects: [Block(N(2), Me)])]),
+    ),
+    (
+        id: "li_red_coat", hero: "lisa", kind: Power, rarity: Common, cost: 1,
+        passives: [(on: Dodged, effects: [Block(N(3), Me)])],
+        up: (passives: [(on: Dodged, effects: [Block(N(5), Me)])]),
+    ),
+    (
+        id: "li_thrifty", hero: "lisa", kind: Power, rarity: Common, cost: 1,
+        effects: [Stash(5)],
+        up: (effects: [Stash(8)]),
+    ),
+    (
+        id: "li_sit_nose", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [If(Has(Flattery, Target, 1), [Damage(N(16), Target)], [Damage(N(6), Target)])],
+        up: (effects: [If(Has(Flattery, Target, 1), [Damage(N(20), Target)], [Damage(N(9), Target)])]),
+    ),
+    (
+        id: "li_low_blow", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy,
+        effects: [If(Has(Charm, Target, 1), [Damage(N(28), Target)], [Damage(N(14), Target)])],
+        up: (effects: [If(Has(Charm, Target, 1), [Damage(N(36), Target)], [Damage(N(18), Target)])]),
+    ),
+    (
+        id: "li_red_paw", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Hits(N(5), 2, Target), Set("alien_cheap", 1, Me)],
+        up: (effects: [Hits(N(7), 2, Target), Set("alien_cheap", 1, Me)]),
+    ),
+    (
+        id: "li_pickpocket", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Damage(N(7), Target), Stash(3)],
+        up: (effects: [Damage(N(10), Target), Stash(4)]),
+    ),
+    (
+        id: "li_crane", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, level: 5, target: Enemy,
+        effects: [Hook("crane")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_broom_tail", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 2,
+        effects: [Damage(N(7), AllFoes)],
+        up: (effects: [Damage(N(10), AllFoes)]),
+    ),
+    (
+        id: "li_sneaky", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [If(Flag("dodged_last", 1), [Damage(N(18), Target)], [Damage(N(9), Target)])],
+        up: (effects: [If(Flag("dodged_last", 1), [Damage(N(24), Target)], [Damage(N(12), Target)])]),
+    ),
+    (
+        id: "li_others_cost", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Damage(AliensInHand(3), Target)],
+        up: (effects: [Damage(AliensInHand(4), Target)]),
+    ),
+    (
+        id: "li_cling", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy,
+        effects: [Hits(N(6), 3, Target)],
+        up: (effects: [Hits(N(8), 3, Target)]),
+    ),
+    (
+        id: "li_fish_sled", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Damage(N(8), Target), Alien(pile: Discard, from: RandomAlly)],
+        up: (effects: [Damage(N(11), Target), Alien(pile: Discard, from: RandomAlly)]),
+    ),
+    (
+        id: "li_outwit", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Hook("strip_target_block"), Damage(N(6), Target)],
+        up: (effects: [Hook("strip_target_block"), Damage(N(9), Target)]),
+    ),
+    (
+        id: "li_tease", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 0, target: Enemy,
+        effects: [Damage(N(3), Target), Provoke],
+        up: (effects: [Damage(N(5), Target), Provoke]),
+    ),
+    (
+        id: "li_last_word", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 2, level: 7, target: Enemy,
+        effects: [Damage(Sum([N(10), Flag("dodged", 3)]), Target)],
+        up: (effects: [Damage(Sum([N(14), Flag("dodged", 3)]), Target)]),
+    ),
+    (
+        id: "li_trick_trick", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Damage(N(7), Target), Hook("borrow")],
+        up: (effects: [Damage(N(10), Target), Hook("borrow")]),
+    ),
+    (
+        id: "li_confessor", hero: "lisa", kind: Attack, rarity: Uncommon, cost: 2, target: Enemy,
+        effects: [Damage(N(12), Target), Heal(N(3), Me)],
+        up: (effects: [Damage(N(15), Target), Heal(N(5), Me)]),
+    ),
+    (
+        id: "li_copy_move", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Hook("steal_move")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_dodge", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 2,
+        effects: [If(Flag("turn_aliens", 3), [Apply(Evade, N(1), Me), Draw(N(2))])],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_somersault", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 2,
+        effects: [Apply(Evade, N(1), Me), Draw(N(1))],
+        up: (effects: [Apply(Evade, N(1), Me), Draw(N(2))]),
+    ),
+    (
+        id: "li_double_game", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Set("double_next", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_talk_round", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Apply(Charm, N(1), Target), Block(N(4), Me)],
+        up: (effects: [Apply(Charm, N(1), Target), Block(N(7), Me)]),
+    ),
+    (
+        id: "li_outfox", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Hook("borrow_block_all")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_gifts", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Hook("gifts")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_swipe", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 0, target: Ally,
+        effects: [Hook("swipe_top")],
+        up: (effects: [Hook("swipe_top"), Draw(N(1))]),
+    ),
+    (
+        id: "li_avert", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1, keywords: [Exhaust],
+        effects: [Apply(Evade, N(1), Me), Block(N(6), Me)],
+        up: (effects: [Apply(Evade, N(1), Me), Block(N(9), Me)]),
+    ),
+    (
+        id: "li_grouse", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1, target: Enemy,
+        effects: [Apply(Charm, N(1), Target), If(Flying, [Apply(Weak, N(2), Target)])],
+        up: (effects: [Apply(Charm, N(1), Target), If(Flying, [Apply(Weak, N(3), Target)])]),
+    ),
+    (
+        id: "li_not_caught", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 2,
+        effects: [Apply(Evade, N(1), Me), Stash(10)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_promise", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1, target: Ally,
+        effects: [Hook("promise")],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_hide_hole", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [Block(N(8), Me), Stash(3)],
+        up: (effects: [Block(N(11), Me), Stash(4)]),
+    ),
+    (
+        id: "li_tail_up", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1,
+        effects: [If(AlienInHand, [Apply(TempStrength, N(2), Me)])],
+        up: (effects: [If(AlienInHand, [Apply(TempStrength, N(3), Me)])]),
+    ),
+    (
+        id: "li_swap", hero: "lisa", kind: Skill, rarity: Uncommon, cost: 1, target: Ally,
+        effects: [Hook("drop_alien"), Pick(pile: Hand, from: Ally, then: Alien)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_nimble_hands", hero: "lisa", kind: Power, rarity: Uncommon, cost: 1,
+        effects: [Set("alien_more", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_fox_memory", hero: "lisa", kind: Power, rarity: Uncommon, cost: 1, level: 6,
+        effects: [Set("fox_memory", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_rogue", hero: "lisa", kind: Power, rarity: Uncommon, cost: 2, level: 5,
+        effects: [Set("plutovka", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_paw_skill", hero: "lisa", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: Dodged, effects: [Hook("hit_striker")])],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_others_goods", hero: "lisa", kind: Power, rarity: Uncommon, cost: 1,
+        passives: [(on: AlienPlayed, effects: [Damage(N(2), RandomFoe)])],
+        up: (passives: [(on: AlienPlayed, effects: [Damage(N(3), RandomFoe)])]),
+    ),
+    (
+        id: "li_glamour", hero: "lisa", kind: Power, rarity: Uncommon, cost: 2,
+        passives: [(on: TurnStart, effects: [Hook("charm_random")])],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_fox_scent", hero: "lisa", kind: Power, rarity: Uncommon, cost: 1,
+        effects: [Set("fox_nose", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_hoarder", hero: "lisa", kind: Power, rarity: Uncommon, cost: 1,
+        effects: [Set("stash_plus", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_rolling_pin", hero: "lisa", kind: Attack, rarity: Rare, cost: 1, target: Enemy,
+        effects: [Damage(Sum([N(6), Flag("count_pin", 6)]), Target), Set("count_pin", 1, Me)],
+        up: (effects: [Damage(Sum([N(9), Flag("count_pin", 6)]), Target), Set("count_pin", 1, Me)]),
+    ),
+    (
+        id: "li_predator", hero: "lisa", kind: Attack, rarity: Rare, cost: 2, target: Enemy,
+        effects: [Damage(N(20), Target)],
+        up: (effects: [Damage(N(26), Target)]),
+    ),
+    (
+        id: "li_mine", hero: "lisa", kind: Attack, rarity: Rare, cost: 2, target: Enemy,
+        effects: [Damage(Flag("turn_aliens", 5), Target)],
+        up: (effects: [Damage(Flag("turn_aliens", 7), Target)]),
+    ),
+    (
+        id: "li_throat", hero: "lisa", kind: Attack, rarity: Rare, cost: 3, target: Enemy,
+        effects: [Damage(N(25), Target), If(Fatal, [Energy(N(1), Me), Draw(N(2))])],
+        up: (effects: [Damage(N(32), Target), If(Fatal, [Energy(N(1), Me), Draw(N(2))])]),
+    ),
+    (
+        id: "li_whirl", hero: "lisa", kind: Attack, rarity: Rare, cost: 2,
+        effects: [Repeat(Sum([N(1), Flag("turn_aliens", 1)]), [Damage(N(4), AllFoes)])],
+        up: (effects: [Repeat(Sum([N(1), Flag("turn_aliens", 1)]), [Damage(N(6), AllFoes)])]),
+    ),
+    (
+        id: "li_tail_off", hero: "lisa", kind: Attack, rarity: Rare, cost: 1, target: Enemy,
+        effects: [If(Has(Evade, Me, 1), [Remove(Evade, Me), Damage(N(22), Target)], [Damage(N(10), Target)])],
+        up: (effects: [If(Has(Evade, Me, 1), [Remove(Evade, Me), Damage(N(28), Target)], [Damage(N(14), Target)])]),
+    ),
+    (
+        id: "li_wolf", hero: "lisa", kind: Attack, rarity: Rare, cost: 2, level: 8, target: Enemy,
+        effects: [Hook("fox_wolf")],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_kolobok", hero: "lisa", kind: Attack, rarity: Rare, cost: 1, target: Enemy, keywords: [Exhaust],
+        effects: [If(Has(Flattery, Target, 1), [If(HpAtMost(20), [Hook("execute")], [Damage(N(10), Target)])], [Damage(N(10), Target)])],
+        up: (effects: [If(Has(Flattery, Target, 1), [If(HpAtMost(30), [Hook("execute")], [Damage(N(14), Target)])], [Damage(N(14), Target)])]),
+    ),
+    (
+        id: "li_heist", hero: "lisa", kind: Attack, rarity: Rare, cost: 2, level: 9, target: Enemy,
+        effects: [Damage(N(12), Target), Hook("borrow")],
+        up: (effects: [Damage(N(16), Target), Hook("borrow")]),
+    ),
+    (
+        id: "li_play_dead", hero: "lisa", kind: Skill, rarity: Rare, cost: 2, keywords: [Exhaust],
+        effects: [Set("play_dead", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_clean_out", hero: "lisa", kind: Skill, rarity: Rare, cost: 2, target: Ally,
+        effects: [Pick(pile: Hand, from: Ally, then: Alien), Pick(pile: Draw, from: Ally, then: Alien), Pick(pile: Discard, from: Ally, then: Alien)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_around_finger", hero: "lisa", kind: Skill, rarity: Rare, cost: 2, keywords: [Exhaust],
+        effects: [Apply(Charm, N(1), AllFoes)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_aim", hero: "lisa", kind: Skill, rarity: Rare, cost: 0,
+        effects: [Set("aim_next", 1, Me)],
+        up: (effects: [Set("aim_next", 1, Me), Draw(N(1))]),
+    ),
+    (
+        id: "li_swapper", hero: "lisa", kind: Skill, rarity: Rare, cost: 1, keywords: [Exhaust],
+        effects: [Set("turn_alien_zero", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_stuff_burrow", hero: "lisa", kind: Skill, rarity: Rare, cost: 2, keywords: [Exhaust],
+        effects: [Stash(15)],
+        up: (effects: [Stash(20)]),
+    ),
+    (
+        id: "li_rooster_song", hero: "lisa", kind: Skill, rarity: Rare, cost: 1,
+        effects: [Taunt, Apply(Evade, N(1), Me), Block(N(8), Me)],
+        up: (effects: [Taunt, Apply(Evade, N(1), Me), Block(N(11), Me)]),
+    ),
+    (
+        id: "li_hare_hut", hero: "lisa", kind: Skill, rarity: Rare, cost: 2,
+        effects: [Block(MaxBlock, Me), Apply(TempStrength, N(2), Me)],
+        up: (effects: [Block(MaxBlock, Me), Apply(TempStrength, N(3), Me)]),
+    ),
+    (
+        id: "li_patrikeevna", hero: "lisa", kind: Skill, rarity: Rare, cost: 3, level: 10, target: Ally, keywords: [Exhaust],
+        effects: [Hook("copy_hand")],
+        up: (cost: 2),
+    ),
+    (
+        id: "li_mistress", hero: "lisa", kind: Power, rarity: Rare, cost: 3, level: 10,
+        effects: [Set("red_mistress", 1, Me)],
+        up: (cost: 2),
+    ),
+    (
+        id: "li_one_of_them", hero: "lisa", kind: Power, rarity: Rare, cost: 2,
+        effects: [Set("own_among", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_elusive", hero: "lisa", kind: Power, rarity: Rare, cost: 2,
+        passives: [(on: TurnStart, effects: [Apply(Evade, N(1), Me)])],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_honeyed", hero: "lisa", kind: Power, rarity: Rare, cost: 2,
+        effects: [Set("honeyed", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_eternal_rogue", hero: "lisa", kind: Power, rarity: Rare, cost: 2,
+        passives: [(on: AlienPlayed, effects: [EveryThisTurn("rogue3", 3, [Energy(N(1), Me)])])],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_barter", hero: "lisa", kind: Power, rarity: Rare, cost: 2,
+        effects: [Set("mena", 1, Me)],
+        up: (cost: 1),
+    ),
+    (
+        id: "li_fox_den", hero: "lisa", kind: Power, rarity: Rare, cost: 1,
+        effects: [Set("stash_den", 1, Me)],
+        up: (cost: 0),
+    ),
+    (
+        id: "li_mirror", hero: "lisa", kind: Power, rarity: Rare, cost: 2,
+        effects: [Set("mirror", 1, Me)],
+        up: (cost: 1),
+    ),
+    // a foe's move as Lisa copied it (`rolls`: the foe and the move); made by «Переняла приём»
+    (
+        id: "li_echo_move", hero: "", kind: Attack, rarity: Special, cost: 1, target: Enemy, keywords: [Exhaust],
+        effects: [Hook("play_move")],
+    ),
+]

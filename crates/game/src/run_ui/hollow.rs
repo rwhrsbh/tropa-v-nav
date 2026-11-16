@@ -96,9 +96,11 @@ fn loot_icon(commands: &mut Commands, row: Entity, loot: &Loot, hero: &str, art:
         Loot::Potion(id) => {
             commands.spawn((art.node(assets, &format!("potions/{id}"), theme::SOOT), whole, Pickable::IGNORE, ChildOf(slot)));
         }
-        Loot::Arm(_) => {
-            let hand: Handle<Image> = assets.load(crate::art::path(&format!("hands/{hero}_paper.png")));
-            commands.spawn((ImageNode::new(hand), Node { width: percent(100), ..default() }, Pickable::IGNORE, ChildOf(slot)));
+        Loot::Arm(arm) => {
+            // the hero's own arm, cut from their figure (tools/armicon.py); the paper hand of the
+            // old heroes if it is missing
+            let hand = art.image(assets, &format!("hands/{hero}_arm_{}", arm_word(*arm))).unwrap_or_else(|| assets.load(crate::art::path(&format!("hands/{hero}_paper.png"))));
+            commands.spawn((ImageNode::new(hand), whole, Pickable::IGNORE, ChildOf(slot)));
         }
         Loot::Gold(n) => {
             commands.entity(slot).insert((BackgroundColor(Color::srgb(0.45, 0.30, 0.10)), BorderColor::all(theme::CANDLE), Node { width: px(72), height: px(72), border: UiRect::all(px(3)), border_radius: BorderRadius::MAX, justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() }));
@@ -578,10 +580,15 @@ fn turn_drums(
     mut after: Query<&mut Visibility, (With<AfterSpin>, Without<WhileTurning>)>,
     mut during: Query<&mut Visibility, (With<WhileTurning>, Without<AfterSpin>)>,
     mut hold: ResMut<crate::between::BarHold>,
+    mut gains: ResMut<crate::deck_fx::HoldGains>,
     sfx: Res<crate::audio::Sfx>,
     mixer: Res<crate::audio::Mixer>,
 ) {
     if reels.turning() {
+        // the lever is pulled and the drums set rattling, as the spin begins
+        if reels.t == 0.0 {
+            sfx.play(&mut commands, "hollow_pull", &mixer, 1.0);
+        }
         reels.t += time.delta_secs();
         for k in 0..3 {
             if !reels.stopped[k] && reels.t >= STOPS[k] {
@@ -594,6 +601,8 @@ fn turn_drums(
         tf.translation = Val2::px(0.0, strip_y(reels.at(drum.0)));
     }
     let shown = !reels.turning();
+    // a relic or a flask won shows itself only once the drums have stopped
+    gains.set_if_neq(crate::deck_fx::HoldGains(!shown));
     for mut vis in &mut after {
         vis.set_if_neq(if shown { Visibility::Inherited } else { Visibility::Hidden });
     }
@@ -612,14 +621,18 @@ fn turn_drums(
             _ => None,
         });
         if let Some(spin) = spin {
-            let sound = if spin.tier > 0 {
-                "gold"
-            } else if spin.lost.iter().any(|l| matches!(l, Loot::Arm(_))) {
-                "limb_off"
+            let (sound, fallback) = if spin.tier == 3 {
+                ("hollow_jackpot", "gold")
+            } else if spin.tier > 0 {
+                ("hollow_win", "gold")
             } else {
-                "status"
+                ("hollow_lose", "status")
             };
-            sfx.play(&mut commands, sound, &mixer, 1.0);
+            sfx.play_or(&mut commands, sound, fallback, &mixer, 1.0);
+            // an arm the hollow took is heard going, after the groan of the loss
+            if spin.tier == 0 && spin.lost.iter().any(|l| matches!(l, Loot::Arm(_))) {
+                sfx.play(&mut commands, "limb_off", &mixer, 0.9);
+            }
         }
     }
 }

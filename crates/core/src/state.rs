@@ -17,7 +17,7 @@ pub enum UnitRef {
     Enemy(u32),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Card {
     pub uid: u32,
     pub def: Id,
@@ -25,6 +25,22 @@ pub struct Card {
     /// An Echo copy: costs nothing and is gone once played.
     #[serde(default)]
     pub free: bool,
+    /// Bears the mark of Kuzma's forge while it stays in the hand.
+    #[serde(default)]
+    pub forged: bool,
+    /// A copy of someone else's card in Lisa's hand: gone once played or when the turn ends.
+    #[serde(default)]
+    pub alien: bool,
+    /// Numbers thrown for a marked card of chance when it came to the hand, in the order its
+    /// ranges are written; for a copy of a foe's move, the foe and the move.
+    #[serde(default)]
+    pub rolls: Vec<i32>,
+    /// Made blind for the fight, with this much added to both ends of its ranges.
+    #[serde(default)]
+    pub blind: Option<i32>,
+    /// Its price set for the fight, whatever is printed on it.
+    #[serde(default)]
+    pub cost_set: Option<i32>,
 }
 
 pub type Statuses = BTreeMap<StatusKind, i32>;
@@ -86,6 +102,24 @@ pub struct Hero {
     /// done until they have.
     #[serde(default)]
     pub choosing: Option<Choosing>,
+    /// A card has asked this player to pick a card out of a pile; nothing else is done until they have.
+    #[serde(default)]
+    pub picking: Option<Picking>,
+}
+
+/// What a card that says "pick a card" waits on.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Picking {
+    /// Whose pile, and which.
+    pub owner: u8,
+    pub pile: Pile,
+    /// Only the top so many cards of a draw pile, when above 0.
+    pub top: u8,
+    pub then: PickThen,
+    pub rest: Vec<Effect>,
+    pub target: Option<UnitRef>,
+    pub x: i32,
+    pub attack: bool,
 }
 
 /// What a card that says "discard" waits on: how many more cards the player is to pick, and what
@@ -229,6 +263,8 @@ pub enum CombatAction {
     Discard { card: u32 },
     /// Pour the potion in this slot out on the ground: nothing comes of it.
     DropPotion { slot: u8 },
+    /// The card picked out of the pile a card asked to pick from.
+    Pick { card: u32 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -258,6 +294,8 @@ pub enum ActionError {
     Choosing,
     /// No discard is asked for now.
     NotChoosing,
+    /// A card is to be picked out of a pile first.
+    Picking,
 }
 
 /// Things that happened, in order, for the renderer and the log. Never read back by rules.
@@ -324,6 +362,14 @@ pub enum Event {
     /// A foe threw the gold it held: it is lost to its owners.
     GoldScattered { enemy: u32, amount: i32 },
     Ended { won: bool },
+    /// Kuzma's forge rose to this.
+    Forged { player: u8, total: i32 },
+    /// Kuzma put his plate on (`on`) or had it knocked off.
+    Plated { player: u8, on: bool },
+    /// The blow aimed at this hero found nothing.
+    Dodged { player: u8 },
+    /// This player is to pick a card out of a pile of `owner`.
+    Pick { player: u8, owner: u8, pile: Pile },
 }
 
 impl Combat {

@@ -316,7 +316,7 @@ fn cue_flights(
             }
             Event::PikeDrew { player, card, upgraded } if *player == me => {
                 // the back of a card, with the deck's lozenge, comes up off the draw pile
-                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: *upgraded, free: false };
+                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: *upgraded, free: false, ..Default::default() };
                 commands.spawn((
                     PikeShow { t: 0.0, face: false, card: shown, form: session.my_hero().form },
                     Node {
@@ -356,7 +356,7 @@ fn cue_flights(
                 };
                 let k = 0.62;
                 let from = Vec2::new(960.0 + gained as f32 * 90.0, 470.0);
-                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: false, free: false };
+                let shown = Card { uid: u32::MAX, def: card.clone(), upgraded: false, free: false, ..Default::default() };
                 let size = Vec2::new(CARD_W, CARD_H);
                 if let Some(e) = spawn_card(&mut commands, *layer, &shown, session.my_hero().form, Some(from - size / 2.0), false, (), &db.0, &l10n, &fonts, &art, &assets) {
                     commands.entity(e).insert((

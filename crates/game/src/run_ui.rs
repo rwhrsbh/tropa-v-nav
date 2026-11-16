@@ -97,7 +97,8 @@ fn explain_cards(mut commands: Commands, mut cards: Query<(Entity, &mut CardHint
                             row_gap: px(10.0 * k),
                             ..default()
                         }),
-                        GlobalZIndex(400),
+                        // above a spread pile and a pick (450, 455): what a card means shows over them
+                        GlobalZIndex(470),
                         Pickable::IGNORE,
                         ChildOf(card),
                     ))
@@ -717,8 +718,10 @@ fn draw_reward(
         ))
         .id();
     commands.spawn((theme::text(l10n.t("reward-title"), &fonts.title, 64.0, theme::CANDLE), ChildOf(column)));
-    if r.gold > 0 {
-        commands.spawn((theme::text(l10n.n("reward-gold", r.gold), &fonts.body, 28.0, theme::BONE), ChildOf(column)));
+    if r.gold > 0 || r.stashed > 0 {
+        // Lisa: what went into her stash is told beside what came to the purse
+        let line = if r.stashed > 0 { l10n.tf("reward-gold-stash", &[("n", r.gold.into()), ("s", r.stashed.into())]) } else { l10n.n("reward-gold", r.gold) };
+        commands.spawn((theme::text(line, &fonts.body, 28.0, theme::BONE), ChildOf(column)));
     }
     if let Some(relic) = &r.relic {
         // the relic as itself: its picture, its name and what it does
@@ -743,7 +746,7 @@ fn draw_reward(
     commands.spawn((theme::text(l10n.t("reward-pick"), &fonts.body, 26.0, theme::DIM), ChildOf(column)));
     let row = commands.spawn((Node { column_gap: px(40), margin: UiRect::vertical(px(10)), ..default() }, Pickable::IGNORE, ChildOf(column))).id();
     for (i, id) in r.cards.iter().enumerate() {
-        let card = Card { uid: i as u32, def: id.clone(), upgraded: false, free: false };
+        let card = Card { uid: i as u32, def: id.clone(), upgraded: false, free: false, ..Default::default() };
         let frame = db.0.cards.get(id).map(crate::battle::card_frame).unwrap_or(theme::PEAT);
         let mut hints = db.0.cards.get(id).map(|def| l10n.card_glossary(&def.view(false, Form::Human))).unwrap_or_default();
         if db.0.cards.get(id).is_some_and(|def| crate::card_flip::upgrades(def, Form::Human, &l10n)) {
@@ -802,6 +805,10 @@ fn draw_rest(
             if pl.walks_headless {
                 let place = Node { position_type: PositionType::Absolute, left: px(x - width / 2.0), top: px(880.0 - height), width: px(width), height: px(height), ..default() };
                 crate::between::figure_with_no_head(&mut commands, root, &stem, pl.lost_arms, place, Color::srgb(1.0, 0.86, 0.72), flip, &art, &assets);
+                continue;
+            }
+            let place = Node { position_type: PositionType::Absolute, left: px(x - width / 2.0), top: px(880.0 - height), width: px(width), height: px(height), ..default() };
+            if !pl.beheaded && crate::between::figure_short_of_arms(&mut commands, root, &stem, pl.lost_arms, place, Color::srgb(1.0, 0.86, 0.72), flip, &art, &assets) {
                 continue;
             }
             commands.spawn((
@@ -878,7 +885,7 @@ fn draw_rest(
 pub fn shown_card(commands: &mut Commands, slot: Entity, uid: usize, id: &str, up: bool, k: f32, db: &Content, l10n: &L10n, fonts: &Fonts, art: &Art, assets: &AssetServer) -> Option<Entity> {
     use crate::battle::{CARD_H, CARD_W};
     let def = db.cards.get(id)?;
-    let card = Card { uid: uid as u32, def: id.to_string(), upgraded: up, free: false };
+    let card = Card { uid: uid as u32, def: id.to_string(), upgraded: up, free: false, ..Default::default() };
     let at = Vec2::new(-CARD_W * (1.0 - k) / 2.0, -CARD_H * (1.0 - k) / 2.0);
     let mut hints = l10n.card_glossary(&def.view(up, Form::Human));
     // turned over on the right button: an upgrade shown beside what it was, and the other way
@@ -1448,7 +1455,7 @@ fn preview_omen_cards(
     let Ok(root) = root.single() else { return };
     let n = want.len() as f32;
     for (k, id) in want.iter().enumerate() {
-        let card = Card { uid: 0, def: id.clone(), upgraded: false, free: false };
+        let card = Card { uid: 0, def: id.clone(), upgraded: false, free: false, ..Default::default() };
         let at = Vec2::new(470.0 - n * (crate::battle::CARD_W + 20.0) / 2.0 + k as f32 * (crate::battle::CARD_W + 20.0), 380.0);
         crate::battle::spawn_card(&mut commands, root, &card, Form::Human, Some(at), false, (OmenPreview, GlobalZIndex(30), Pickable::IGNORE), &db.0, &l10n, &fonts, &art, &assets);
     }

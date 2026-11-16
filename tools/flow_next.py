@@ -20,6 +20,9 @@ LOOK = {
     "Z": "a stooped middle-aged woman in a dark headscarf with old burn scars on her face, bundles of dried herbs on her back, a sickle and two clay jugs at her belt, ",
     "E": "Yemelya, a plump clean-shaven grown peasant man with a round face and a blond bowl haircut, in a patched off-white linen shirt with a red collar and a red sash, grey trousers and bast shoes, ",
     "S": "a thin Slavic skomorokh jester in a patchwork coat sewn with small bells, bare-headed with a white grinning wooden mask on his face and three wooden masks on his belt, ",
+    "K": "Kuzma the blacksmith, a broad-shouldered dark-bearded man of forty with soot-blackened forearms, a red linen shirt under a scorched leather apron and a heavy forging hammer, ",
+    "I": "Ivanushka the fool, a lanky young peasant with messy straw-blond hair, a wide gap-toothed grin, a patched blue kaftan, a crooked grey felt hat and worn bast shoes, ",
+    "L": "Lisa Patrikeevna, a slim sly young woman with a long braid of fiery red hair, amber fox-like eyes, a russet-orange sarafan with a fox-fur collar and a thin dagger, ",
 }
 STYLE = (
     "Every picture: one clear action, dramatic composition, dark background fading to the edges. No magic glow, no sparks or particles. "
@@ -36,16 +39,23 @@ RELIC_STYLE = (
 
 def cards():
     out = []
-    order = ["volhv3", "volkolak3", "znaharka3", "skomoroh3", "neutral3", "bogatyr4", "vorozheya4", "volhv4", "volkolak4", "znaharka4", "skomoroh4", "emelya4", "emelya5", "bogatyr6", "vorozheya6", "volhv6", "volkolak6", "znaharka6", "skomoroh6", "emelya6"]
+    order = ["volhv3", "volkolak3", "znaharka3", "skomoroh3", "neutral3", "bogatyr4", "vorozheya4", "volhv4", "volkolak4", "znaharka4", "skomoroh4", "emelya4", "emelya5", "bogatyr6", "vorozheya6", "volhv6", "volkolak6", "znaharka6", "skomoroh6", "emelya6", "kuzma", "ivan", "lisa"]
     for name in order:
         j = json.load(open(os.path.join(ROOT, "docs", "prompts", "plots", name + ".json"), encoding="utf-8"))
         look = LOOK.get(j.get("_look", ""), "")
+        # the newer sets name their hero once per message instead of in every scene
+        short = name in ("kuzma", "ivan", "lisa")
         for k, v in j.items():
             if k.startswith("_"):
                 continue
             if os.path.exists(os.path.join(ROOT, "assets", "cards", k + "-gemini.png")):
                 continue
-            out.append((k, v[1:] if v.startswith("@") else look + v))
+            if v.startswith("@"):
+                out.append((k, v[1:]))
+            elif short:
+                out.append((k, "the hero " + v, look))
+            else:
+                out.append((k, look + v))
     return out
 
 
@@ -74,11 +84,14 @@ def main():
         return
     kind = "square 1:1 game item icons" if want_relics else "landscape 4:3 card illustrations"
     lines = [f"Create {len(todo)} separate images, one image per numbered scene, in this order, each as its own {kind[:-1]}. Do not ask, just generate them one after another."]
-    for i, (_, text) in enumerate(todo, 1):
-        lines.append(f"{i}) {text}")
+    heroes = {t[2] for t in todo if len(t) > 2}
+    if len(heroes) == 1:
+        lines.append("The hero in these scenes is always the same: " + heroes.pop().rstrip(", ") + ".")
+    for i, item in enumerate(todo, 1):
+        lines.append(f"{i}) {item[1]}")
     lines.append(RELIC_STYLE if want_relics else STYLE)
     print(" ".join(lines))
-    print(" ".join(k for k, _ in todo), file=sys.stderr)
+    print(" ".join(t[0] for t in todo), file=sys.stderr)
 
 
 main()

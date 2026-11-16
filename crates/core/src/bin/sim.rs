@@ -73,6 +73,18 @@ fn play(c: &Content, heroes: &[Id], seed: u64, circle: u8, tally: &mut Tally) {
         }
         if !moved {
             eprintln!("seed {seed}: stuck in {:?}", run.stage);
+            if std::env::var("SIM_WHY").is_ok() {
+                for p in 0..run.players.len() as u8 {
+                    let a = run_bot(c, &run, p);
+                    let r = a.as_ref().map(|a| run.clone().apply(c, p, a).map(|_| ()));
+                    eprintln!("  p{p} {}: {:?} -> {:?}", run.players[p as usize].hero, a, r);
+                }
+                if let Some(k) = &run.combat {
+                    for h in &k.heroes {
+                        eprintln!("  {} hp {} ready {} picking {:?} energy {} hand {:?}", h.def, h.hp, h.ready, h.picking, h.energy, h.hand.iter().map(|c| (&c.def, c.alien)).collect::<Vec<_>>());
+                    }
+                }
+            }
             break;
         }
     }
@@ -119,6 +131,16 @@ fn main() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/data");
     let c = Content::load_dir(&dir).unwrap_or_else(|e| panic!("content: {e}"));
     let heroes: Vec<Id> = c.heroes.keys().cloned().collect();
+    // `--only ivan,lisa` plays just that party, for chasing a problem
+    if let Some(only) = args.iter().position(|a| a == "--only").and_then(|i| args.get(i + 1)) {
+        let party: Vec<Id> = only.split(',').map(Id::from).collect();
+        let mut t = Tally::default();
+        for seed in 0..runs {
+            play(&c, &party, seed, circle, &mut t);
+        }
+        report(only, &t);
+        return;
+    }
     println!("{runs} runs each, Circle {circle}\n");
 
     let mut all = Tally::default();

@@ -121,7 +121,7 @@ pub(super) fn needs_unit(target: CardTarget, alone: bool) -> bool {
 fn takes(session: &Session, aim: CardTarget, passable: bool, unit: UnitRef, card: bool) -> bool {
     let me = session.me;
     match unit {
-        UnitRef::Enemy(uid) => aim == CardTarget::Enemy && session.truth.enemy(uid).is_some_and(|e| e.alive),
+        UnitRef::Enemy(uid) => matches!(aim, CardTarget::Enemy | CardTarget::Anyone) && session.truth.enemy(uid).is_some_and(|e| e.alive),
         UnitRef::Hero(i) => {
             let Some(h) = session.truth.hero(i) else { return false };
             if passable {
@@ -132,7 +132,7 @@ fn takes(session: &Session, aim: CardTarget, passable: bool, unit: UnitRef, card
                 return true;
             }
             match aim {
-                CardTarget::Ally => i != me && !h.downed,
+                CardTarget::Ally | CardTarget::Anyone => i != me && !h.downed,
                 CardTarget::AnyHero => !h.downed,
                 CardTarget::Downed => h.downed,
                 _ => false,

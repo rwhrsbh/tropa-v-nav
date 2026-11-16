@@ -111,7 +111,8 @@ pub(crate) fn bar_plate() -> impl Bundle {
 
 /// A figure on the bar, its mark beside it.
 pub(crate) fn bar_stat() -> impl Bundle {
-    (Node { align_items: AlignItems::Center, column_gap: px(8), ..default() }, Pickable::IGNORE)
+    // never squeezed: a long hero's name must not crush the numbers to nothing
+    (Node { align_items: AlignItems::Center, column_gap: px(8), flex_shrink: 0.0, ..default() }, Pickable::IGNORE)
 }
 
 fn stat_mark(mark: Color, rim: Color, round: BorderRadius) -> impl Bundle {
@@ -174,7 +175,9 @@ fn top_bar(
         ))
         .id();
     let hero = l10n.t(&format!("hero-{}", pl.hero));
-    commands.spawn((theme::text(hero, &fonts.title, 30.0, theme::hero_color(&pl.hero).lighter(0.1)), ChildOf(bar)));
+    // a long name (Ivanushka the Fool, Lisa Patrikeevna) is set smaller, so the bar still holds all
+    let size = if hero.chars().count() > 12 { 24.0 } else { 30.0 };
+    commands.spawn((theme::text(hero, &fonts.title, size, theme::hero_color(&pl.hero).lighter(0.1)), TextLayout::new(Justify::Left, LineBreak::NoWrap), Node { flex_shrink: 0.0, ..default() }, ChildOf(bar)));
     // health and purse, each with its mark: a drop of blood, a coin
     let health = commands.spawn((bar_stat(), ChildOf(bar))).id();
     commands.spawn((blood_mark(), ChildOf(health)));
@@ -183,7 +186,7 @@ fn top_bar(
     commands.spawn((coin_mark(), ChildOf(purse)));
     commands.spawn((theme::text(pl.gold.to_string(), &fonts.num, 28.0, theme::CANDLE), TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK }, ChildOf(purse)));
     // the potion belt: a flask is drunk, thrown or poured out from a little menu under it
-    let belt = commands.spawn((Node { column_gap: px(10), margin: UiRect::left(px(20)), ..default() }, Pickable::IGNORE, ChildOf(bar))).id();
+    let belt = commands.spawn((Node { column_gap: px(10), margin: UiRect::left(px(20)), flex_shrink: 0.0, ..default() }, Pickable::IGNORE, ChildOf(bar))).id();
     for slot in 0..potion_slots(&pl.relics) {
         let id = pl.potions.get(slot).cloned();
         let mut e = commands.spawn((
@@ -318,6 +321,24 @@ fn top_bar(
 /// A hero's standing figure with its head left off: its cut-out parts, stacked. Falls back on
 /// nothing if they were never cut.
 #[allow(clippy::too_many_arguments)]
+/// A hero standing with their head but short of an arm or both: the painted picture when there is
+/// one, else the rig's parts without the arms that are gone. Returns false when nothing is missing.
+pub fn figure_short_of_arms(commands: &mut Commands, root: Entity, stem: &str, lost_arms: u8, place: Node, color: Color, flip: bool, art: &Art, assets: &AssetServer) -> bool {
+    let Some(mark) = (lost_arms != 0).then(|| crate::battle::short_of(false, lost_arms)).flatten() else { return false };
+    if let Some(h) = art.image(assets, &format!("{stem}{mark}")) {
+        commands.spawn((place, ImageNode { color, flip_x: flip, ..ImageNode::new(h) }, Pickable::IGNORE, ChildOf(root)));
+        return true;
+    }
+    for (part, arm) in [("_body", 0), ("_head", 0), ("_shield", nav_core::combat::SHIELD_ARM), ("_arm", nav_core::combat::WEAPON_ARM)] {
+        if lost_arms & arm == 0 {
+            if let Some(h) = art.image(assets, &format!("{stem}{part}")) {
+                commands.spawn((place.clone(), ImageNode { color, flip_x: flip, ..ImageNode::new(h) }, Pickable::IGNORE, ChildOf(root)));
+            }
+        }
+    }
+    true
+}
+
 pub fn figure_with_no_head(commands: &mut Commands, root: Entity, stem: &str, lost_arms: u8, place: Node, color: Color, flip: bool, art: &Art, assets: &AssetServer) {
     // painted as it is, when it was
     let mark = crate::battle::short_of(true, lost_arms).unwrap_or("_headless");
@@ -879,10 +900,15 @@ pub fn pedlar_clearing(commands: &mut Commands, root: Entity, run: &Run, db: &Co
             figure_with_no_head(commands, root, &format!("heroes/{}", pl.hero), pl.lost_arms, place, Color::WHITE, false, art, assets);
             continue;
         }
+        let place = Node { position_type: PositionType::Absolute, left: px(foot.x - size.x / 2.0), top: px(foot.y - size.y), width: px(size.x), height: px(size.y), ..default() };
+        let tint = if pl.hp > 0 { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.45) };
+        if figure_short_of_arms(commands, root, &format!("heroes/{}", pl.hero), pl.lost_arms, place, tint, false, art, assets) {
+            continue;
+        }
         let Some(h) = art.image(assets, &format!("heroes/{}", pl.hero)) else { continue };
         commands.spawn((
             Node { position_type: PositionType::Absolute, left: px(foot.x - size.x / 2.0), top: px(foot.y - size.y), width: px(size.x), height: px(size.y), ..default() },
-            ImageNode { color: if pl.hp > 0 { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.45) }, ..ImageNode::new(h) },
+            ImageNode { color: tint, ..ImageNode::new(h) },
             Pickable::IGNORE,
             ChildOf(root),
         ));
