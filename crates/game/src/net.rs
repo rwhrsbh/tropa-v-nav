@@ -280,7 +280,11 @@ pub fn start_offline_run(commands: &mut Commands, db: &nav_core::Content, bots: 
     route(db, &mut node, &mut locals);
     let mine = hero.unwrap_or_else(|| db.heroes.keys().next().cloned().unwrap_or_default());
     node.pick_hero(Some(mine.clone()), 10);
-    let rest: Vec<String> = db.heroes.keys().filter(|h| **h != mine).cloned().collect();
+    // TROPA_BOT_HEROES=a,b,c seats the bots on these heroes, in order
+    let rest: Vec<String> = match std::env::var("TROPA_BOT_HEROES") {
+        Ok(list) => list.split(',').map(|h| h.trim().to_string()).filter(|h| db.heroes.contains_key(h)).collect(),
+        Err(_) => db.heroes.keys().filter(|h| **h != mine).cloned().collect(),
+    };
     for (i, bot) in locals.iter_mut().enumerate() {
         bot.pick_hero(rest.get(i).cloned(), 10);
     }
