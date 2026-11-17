@@ -9,6 +9,7 @@ paints the colour mask, the headless body, the corpse and the headless corpse, a
 `_inbox/flow_up/<id>_{mask,body,dead,deadhl}.png` for `tools/rig_in.py`. Paste the output into
 one `browser` call (it runs about four minutes).
 """
+import os
 import sys
 
 ADD = "eval \"() => { const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Добавить в запрос'); if(b){b.click(); return 'added'} return 'direct' }\""
@@ -33,9 +34,7 @@ def ask(prompt, out):
     ]
 
 
-def main():
-    foe, who, head = sys.argv[1:4]
-    its = sys.argv[4] if len(sys.argv) > 4 else "its"
+def prompts(foe, who, head, its):
     mask = (f"Edit the attached picture: square 1:1, one single image, no text, no labels. Keep the SAME {who}, {its} pose, framing, size, "
             f"position, lighting and plain green background pixel for pixel. Only paint {head} as ONE flat solid pure cyan #00FFFF "
             "silhouette with no shading, covering every hair and tip. Everything else unchanged.")
@@ -50,6 +49,43 @@ def main():
     headless = (f"DECAPITATE the attached lying body. Keep the picture exactly the same: same pose, same place, size, colours and plain green "
                 f"background, square 1:1, one single image, no text. Only {head} is gone, cut off and absent; at the neck, a raw bloody neck "
                 "stump with a little dark blood under it. Plain green where the head was. Nothing else changes.")
+    return mask, body, dead, headless
+
+
+def quick(foe, pic, asks):
+    """Upload `pic` once and send every prompt in `asks` against it without waiting."""
+    name = os.path.basename(pic)
+    out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200",
+           f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {pic}", "wait 9000"]
+    for i, a in enumerate(asks):
+        if i:
+            out += ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]
+        out += [f'click "text={name} >> visible=true >> nth=0"', "wait 1000", ADD, "wait 800", "press Escape", "wait 500",
+                "click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{a}"',
+                "click getByRole('button', { name: 'Начать генерацию' })", "wait 3000"]
+    return out
+
+
+def main():
+    if sys.argv[1] in ("--batch", "--headless"):
+        # --batch <list>: mask, body and corpse of every foe in a list file (id|who|head|pronoun per
+        # line), sent at once; --headless <list>: the beheaded corpse of each from its picked
+        # `_inbox/flow_up/<id>_dead.png`. Fetch the tiles by eye afterwards.
+        out = []
+        for line in open(sys.argv[2], encoding="utf-8"):
+            if not line.strip():
+                continue
+            foe, who, head, its = line.strip().split("|")
+            mask, body, dead, headless = prompts(foe, who, head, its)
+            if sys.argv[1] == "--batch":
+                out += quick(foe, f"{UP}/rig_{foe}.png", [mask, body, dead])
+            else:
+                out += quick(foe, f"{UP}/{foe}_dead.png", [headless])
+        print("\n".join(out))
+        return
+    foe, who, head = sys.argv[1:4]
+    its = sys.argv[4] if len(sys.argv) > 4 else "its"
+    mask, body, dead, headless = prompts(foe, who, head, its)
     out = attach(foe, True) + ask(mask, f"{foe}_mask") + attach(foe, False) + ask(body, f"{foe}_body") + attach(foe, False) + ask(dead, f"{foe}_dead")
     out += ['click "[role=group] img >> nth=0" --button right', "wait 1000", 'click "text=Добавить в запрос"', "wait 1000", "press Escape", "wait 500"]
     out += ask(headless, f"{foe}_deadhl")
