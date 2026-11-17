@@ -85,7 +85,10 @@ def main():
         part = np.zeros_like(R)
         stump = red & (owner == i) & (dist[i] < 260)
         reach = dist[i][stump].max() + 8 if stump.any() else 60
-        sel = whole & (owner == i) & (dist[i] <= reach)
+        # never what the body itself holds (a wing behind the necks), save the stump it covers
+        same = np.abs(R[..., :3].astype(int) - B[..., :3].astype(int)).sum(axis=2) < 60
+        body_own = ndimage.binary_opening(held & same & ~ndimage.binary_dilation(red, iterations=6), iterations=3)
+        sel = whole & (owner == i) & (dist[i] <= reach) & ~body_own
         part[sel] = R[sel]
         out[f"gorynych_{name}_head"] = Image.fromarray(part)
         # the neck joint: where this piece touches the body
@@ -114,7 +117,7 @@ def main():
                 if j != i:
                     others |= np.array(out[f"gorynych_{n2}_head"])[..., 3] > 24
             # another head's neck stays out only where nothing moved: a lunge may cross it
-            keep = there & ((own & ~others) | moved)
+            keep = there & ((own & ~others) | (moved & ~(held & ~own & (np.abs(P[..., :3].astype(int) - B[..., :3].astype(int)).sum(axis=2) < 70))))
             lab, n = ndimage.label(keep)
             if n > 1:
                 # the pieces of any size: specks of repaint elsewhere drop out
