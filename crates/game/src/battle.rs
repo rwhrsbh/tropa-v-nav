@@ -189,6 +189,10 @@ struct Ghost {
 
 #[derive(Component)]
 struct HpFill(UnitRef);
+/// The poisoned end of the health bar, as in StS: the health its Rot will take at the start of
+/// its next turn, green at the right of the fill (Rot goes past block, so block does not shrink it).
+#[derive(Component)]
+struct HpRot(UnitRef);
 /// The pale strip of health just lost, left standing a moment behind the fill and then
 /// draining after it, so a blow is read by how much it took.
 #[derive(Component)]
@@ -1024,6 +1028,13 @@ fn sync_units(
                             BackgroundColor(theme::FRESH_BLOOD),
                             Pickable::IGNORE,
                         ),
+                        (
+                            HpRot(unit),
+                            Node { position_type: PositionType::Absolute, left: px(0), top: px(0), width: px(0), height: percent(100), border_radius: BorderRadius::all(px(5)), ..default() },
+                            BackgroundColor(ROT_GREEN),
+                            Visibility::Hidden,
+                            Pickable::IGNORE,
+                        ),
                         (Label::Hp(unit), theme::text("", &fonts.num, 17.0, theme::BONE)),
                         (
                             BlockBadge(unit),
@@ -1540,11 +1551,15 @@ fn dying(
     }
 }
 
+/// Poison green on the health bar.
+const ROT_GREEN: Color = Color::srgb(0.38, 0.62, 0.18);
+
 fn update_bars(
     session: Res<Session>,
     time: Res<Time>,
-    mut fills: Query<(&HpFill, &mut Node), Without<HpTrail>>,
-    mut trails: Query<(&mut HpTrail, &mut Node), Without<HpFill>>,
+    mut fills: Query<(&HpFill, &mut Node), (Without<HpTrail>, Without<HpRot>)>,
+    mut trails: Query<(&mut HpTrail, &mut Node), (Without<HpFill>, Without<HpRot>)>,
+    mut rots: Query<(&HpRot, &mut Node, &mut Visibility), (Without<HpFill>, Without<HpTrail>, Without<BlockBadge>)>,
     mut frames: Query<(&HpBar, &mut BorderColor)>,
     mut badges: Query<(&BlockBadge, &mut Visibility)>,
 ) {
@@ -1558,6 +1573,23 @@ fn update_bars(
             if node.width != w {
                 node.width = w;
             }
+        }
+    }
+    for (rot, mut node, mut vis) in &mut rots {
+        let Some((hp, max, _)) = stats(rot.0) else { continue };
+        let mut bite = session.shown.status(rot.0, StatusKind::Rot);
+        // Pestilence: Rot on foes bites twice
+        if matches!(rot.0, UnitRef::Enemy(_)) && session.shown.heroes.iter().any(|h| !h.downed && h.flags.contains_key("mor")) {
+            bite *= 2;
+        }
+        let bite = bite.min(hp.max(0));
+        vis.set_if_neq(if bite > 0 { Visibility::Inherited } else { Visibility::Hidden });
+        let (left, w) = (percent(100.0 * (hp - bite).max(0) as f32 / max.max(1) as f32), percent(100.0 * bite as f32 / max.max(1) as f32));
+        if node.left != left {
+            node.left = left;
+        }
+        if node.width != w {
+            node.width = w;
         }
     }
     let dt = time.delta_secs();

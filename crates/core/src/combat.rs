@@ -2076,6 +2076,12 @@ impl<'a> Exec<'a> {
             if round > 1 {
                 h.block = 0;
             }
+            // Rot bites at the start of the poisoned one's own turn, as poison does in StS
+            self.rot_tick(UnitRef::Hero(slot));
+            if self.s.heroes[slot as usize].downed {
+                continue;
+            }
+            let h = self.hero(slot);
             // dragged under, shaken by a quake, or caught in Mara's winter
             let less_energy = h.flags.remove("energy_less").unwrap_or(0);
             // one limb gone, a card less a turn; both, strength less as well
@@ -2169,7 +2175,6 @@ impl<'a> Exec<'a> {
                 }
             }
             self.hero(slot).hand = keep;
-            self.rot_tick(UnitRef::Hero(slot));
         }
         // Morovitsa Doom countdown: it lifts when she is dead
         let morovitsa = self.s.enemies.iter().any(|e| e.alive && e.def == "morovitsa");
@@ -2242,6 +2247,11 @@ impl<'a> Exec<'a> {
                 continue;
             }
             self.s.enemies[idx].block = 0;
+            // Rot bites at the start of the foe's own turn, before it moves
+            self.rot_tick(UnitRef::Enemy(uid));
+            if !self.s.enemies[idx].alive {
+                continue;
+            }
             // bones lying since the heroes' turn come together instead of striking
             if self.s.enemies[idx].flags.remove(crate::state::BONES).is_some() {
                 let e = &mut self.s.enemies[idx];
@@ -2305,7 +2315,6 @@ impl<'a> Exec<'a> {
                     self.add_status(me, S::Strength, 1);
                 }
             }
-            self.rot_tick(me);
             if self.s.standing_heroes().next().is_none() {
                 break;
             }
@@ -2336,17 +2345,47 @@ impl<'a> Exec<'a> {
         }
     }
 
-    /// Rot: X damage, then one stack fewer.
+    /// Rot: X damage past any block, then one stack fewer.
     fn rot_tick(&mut self, u: UnitRef) {
         let rot = self.s.status(u, S::Rot);
         if rot > 0 && self.exists(u) {
             // Pestilence: Rot on enemies bites twice and does not fade
             let mor = matches!(u, UnitRef::Enemy(_)) && self.s.heroes.iter().any(|h| !h.downed && h.flags.contains_key("mor"));
-            self.hurt(None, u, rot, false);
+            // poison goes past block, as in StS: the block is set aside for the bite
+            let kept = self.take_block(u);
+            match u {
+                // nor does a guard take another's poison on himself
+                UnitRef::Hero(i) => {
+                    self.hero_take(None, i, rot, false);
+                }
+                UnitRef::Enemy(_) => {
+                    self.hurt(None, u, rot, false);
+                }
+            }
             if mor {
                 self.hurt(None, u, rot, false);
-            } else {
+            }
+            self.give_block(u, kept);
+            if !mor {
                 self.add_status(u, S::Rot, -1);
+            }
+        }
+    }
+
+    fn take_block(&mut self, u: UnitRef) -> i32 {
+        match u {
+            UnitRef::Hero(i) => std::mem::take(&mut self.s.heroes[i as usize].block),
+            UnitRef::Enemy(uid) => self.enemy_idx(uid).map(|i| std::mem::take(&mut self.s.enemies[i].block)).unwrap_or(0),
+        }
+    }
+
+    fn give_block(&mut self, u: UnitRef, b: i32) {
+        match u {
+            UnitRef::Hero(i) => self.s.heroes[i as usize].block = b,
+            UnitRef::Enemy(uid) => {
+                if let Some(i) = self.enemy_idx(uid) {
+                    self.s.enemies[i].block = b;
+                }
             }
         }
     }
