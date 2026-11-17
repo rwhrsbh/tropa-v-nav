@@ -43,6 +43,8 @@ BEAST_POSES = {
 OWN_POSES = {
     ("kot_bayun", "cast"): "It hisses a spell: still crouched on top of the SAME wooden post as in the attached picture, back arched, fur bristling, ears flat, mouth wide open in a yowl. No glow, no sparks, no magic effects.",
     ("death_duck", "cast"): "It screams a curse in flight: wings thrown wide and high, neck stretched up, beak wide open. No glow, no sparks, no magic effects.",
+    ("solovey", "cast"): "He WHISTLES with all his might: two fingers in his mouth, cheeks puffed out, body leaning forward to the LEFT, hair and rags blown back by the blast. No glow, no sparks, no magic effects.",
+    ("swamp_light", "cast"): "The cage of bones and reeds is tilted and swung, its bones spread open like grasping fingers, the trapped wisp inside flaring up bright and wild. No sparks, no smoke around it.",
     ("gagana", "cast"): "It screeches a curse: wings thrown wide and high, head raised, iron beak wide open, talons spread. No glow, no sparks, no magic effects.",
 }
 # by id: words in a description mislead ("a wolf-pelt hood", "toad-like" on a foe who stands upright)
