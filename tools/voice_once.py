@@ -87,10 +87,10 @@ def by_text(lang, key):
     # the first run of heard words that covers the line's first and last word, in order
     best = None
     for i, (st, _, w) in enumerate(flat):
-        if w[:4] != want[0][:4]:
+        if w[:3] != want[0][:3]:
             continue
         for j in range(i, len(flat)):
-            if flat[j][2][:4] == want[-1][:4] and j - i + 1 >= len(want) * 0.6:
+            if flat[j][2][:3] == want[-1][:3] and j - i + 1 >= len(want) * 0.6:
                 best = (st, flat[j][1])
                 break
         if best:
