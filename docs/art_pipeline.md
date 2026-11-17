@@ -69,6 +69,18 @@ Painting the missing poses of a foe in Flow:
   takes a tile of its own; tiles come newest first. One browser call may run five minutes at most,
   so the batch is also written as `submit.txt` (the asking) and `fetch.txt` (the saving): send
   them as two calls, the second a minute after the first ends.
+- Flow orders the tiles as they finish, not as they were asked. The fetch therefore starts by
+  printing every tile's own title (its `aria-label`, e.g. "Crone in defensive crouch"); paste that
+  line into `_inbox/flow_up/batch/titles.txt` and `pose_batch_in.py` names each tile's pose from
+  its title, and its foe from the `rig_<id>.png` upload tile. Check the result by eye anyway.
+- The grid holds the full 1024 pictures only while the page has been open since they were made;
+  after a reload it shows 512-pixel previews. Then open each tile (the edit view) and save its big
+  picture instead: tag the `img` wider than 300 pixels with an attribute and `download` that.
+- After an upload the ingredients panel's backdrop can stay over the prompt box; the commands
+  press Escape after each upload for that.
+- Poses no table fits (a cat on its post, birds) are written per foe in `OWN_POSES`.
+- Flow is used from the Google account it was set up in; after a sign-out the project is only at
+  `flow.google.com/u/<n>/project/<id>` for that account's number.
 - A foe that gains block (any `Block` in its moves) needs a `_guard` too: the game shows the
   guard pose whenever block is gained. Four-legged beasts get their own poses (all paws on the
   ground; the cast is a howl), or the model paints them on two legs or with five.

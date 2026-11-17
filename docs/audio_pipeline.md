@@ -49,11 +49,8 @@ The full prompt is always **persona + language style + the line**. Two ways were
 
 - **Through the API** (`tools/tts_api.py`, most of the takes): one text,
   `<persona> <style> Say only this line, once, in character: <line>`; the 3.8 models get
-  `## Style:
-<persona> <style>
-
-## Transcript:
-<line>` instead.
+  the same laid out in two parts, a `## Style:` heading over `<persona> <style>` and a
+  `## Transcript:` heading over the line, instead.
 - **On the AI Studio page** (`tools/barkpage.py`, the bogatyr's first takes): the Style box holds
   `<persona> <style> Speak only the line, once.` (the ru style there adds "The capital letters are
   only the start of sentences."), the line goes in the speech block alone, model
