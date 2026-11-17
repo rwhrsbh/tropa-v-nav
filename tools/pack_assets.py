@@ -1,7 +1,7 @@
 """Packs the game's assets for shipping, smaller, into target/pack/<profile>/assets.
 
-    python -X utf8 tools/pack_assets.py desktop   # nothing lost: WebP lossless, FLAC
-    python -X utf8 tools/pack_assets.py mobile    # by eye and ear the same: WebP q95, Ogg Vorbis q~7
+    python -X utf8 tools/pack_assets.py desktop   # by eye and ear the same: WebP q92, Ogg Vorbis
+    python -X utf8 tools/pack_assets.py mobile    # by eye and ear the same: WebP q90, Ogg Vorbis
     python -X utf8 tools/pack_assets.py mobile --only cards   # one folder, to look at
 
 What it does:
@@ -12,10 +12,17 @@ What it does:
 - writes `index.txt`, every packed file, which the game reads instead of the folder (on Android
   the folder cannot be read at all).
 
-Files already packed and not newer than their source are kept, so a second run is quick.
+Pictures are never kept larger than the game shows them (`MAX_SIDE`): a card's art is drawn a
+few hundred pixels wide at most, and was painted three times that.
+
+A file already packed from the same source bytes with the same settings is kept (the packed
+folder's `manifest.json` remembers what each was packed from), so a second run is quick, and a
+packed folder restored from an older cache only redoes what changed since.
 """
 
+import hashlib
 import io
+import json
 import os
 import sys
 import shutil
@@ -28,10 +35,17 @@ SKIP_DIRS = {"_old", "_work", "_src", "originals", "raw"}
 SKIP_FILES = {"Thumbs.db", ".DS_Store", "desktop.ini"}
 
 PROFILES = {
-    # (image save options, sound format, sound options)
-    "desktop": (dict(lossless=True, quality=100, method=5, exact=True), "flac", {}),
-    "mobile": (dict(quality=95, method=6), "ogg", dict(subtype="VORBIS", compression_level=0.25)),
+    # (image save options, sound format, sound options). Lossy WebP at these qualities and Ogg
+    # Vorbis cannot be told from the sources on a screen and in headphones, at a tenth the size
+    # of WebP lossless and FLAC
+    "desktop": (dict(quality=92, method=4, alpha_quality=100), "ogg", dict(subtype="VORBIS", compression_level=0.15)),
+    "mobile": (dict(quality=90, method=4, alpha_quality=95), "ogg", dict(subtype="VORBIS", compression_level=0.3)),
 }
+# The longest side a picture in this folder is ever drawn at, on a 4K screen (card art is shown at
+# most about 600 px wide there, in the book of cards)
+MAX_SIDE = {"cards/": 720}
+# bumped whenever the way files are packed changes: everything is packed again
+PACK_VERSION = 2
 
 
 def shadowed(dirpath, name, names):
@@ -73,8 +87,9 @@ def pack_one(job):
     else:
         rel = rel_stem + ext
     dest = os.path.join(dest_root, rel)
-    if os.path.exists(dest) and os.path.getmtime(dest) >= os.path.getmtime(src):
-        return rel, os.path.getsize(src), os.path.getsize(dest)
+    stamp = f"{PACK_VERSION}:{profile}:{digest(src)}"
+    if os.path.exists(dest) and old.get(rel) == stamp:
+        return rel, os.path.getsize(src), os.path.getsize(dest), stamp
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     tmp = dest + ".tmp"
     if kind == "image":
@@ -87,6 +102,10 @@ def pack_one(job):
         # a picture with an alpha channel that is opaque everywhere is kept without one
         if im.mode == "RGBA" and im.getchannel("A").getextrema() == (255, 255):
             im = im.convert("RGB")
+        most = next((m for d, m in MAX_SIDE.items() if rel.startswith(d)), None)
+        if most and max(im.size) > most:
+            k = most / max(im.size)
+            im = im.resize((round(im.size[0] * k), round(im.size[1] * k)), Image.LANCZOS)
         im.save(tmp, "WEBP", **image_opts)
         # a tiny picture can come out bigger as WebP; WebP lossless of it is never worse
         if os.path.getsize(tmp) > os.path.getsize(src) and not image_opts.get("lossless"):
@@ -100,11 +119,36 @@ def pack_one(job):
             subtype = "PCM_24" if info.subtype in ("PCM_24", "PCM_32", "FLOAT", "DOUBLE") else "PCM_16"
             sf.write(tmp, data, rate, format="FLAC", subtype=subtype)
         else:
-            sf.write(tmp, data, rate, format="OGG", **sound_opts)
+            # written in blocks: libsndfile's Vorbis encoder crashes the process on Windows when
+            # handed a long sound in one piece
+            with sf.SoundFile(tmp, "w", rate, data.shape[1], format="OGG", **sound_opts) as out:
+                for at in range(0, len(data), 1 << 15):
+                    out.write(data[at : at + (1 << 15)])
     else:
         shutil.copyfile(src, tmp)
     os.replace(tmp, dest)
-    return rel, os.path.getsize(src), os.path.getsize(dest)
+    return rel, os.path.getsize(src), os.path.getsize(dest), stamp
+
+
+def digest(path):
+    h = hashlib.blake2b(digest_size=16)
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+# what each packed file was packed from, as the last run left it (read in every worker)
+old = {}
+
+
+def load_manifest(path):
+    global old
+    try:
+        with open(path, encoding="utf-8") as f:
+            old = json.load(f)
+    except (OSError, ValueError):
+        old = {}
 
 
 def main():
@@ -113,6 +157,8 @@ def main():
     only = args[args.index("--only") + 1].strip("/") + "/" if "--only" in args else ""
     workers = int(os.environ.get("PACK_JOBS", "4"))
     dest_root = os.path.join(ROOT, "target", "pack", profile, "assets")
+    manifest = os.path.join(ROOT, "target", "pack", profile, "manifest.json")
+    load_manifest(manifest)
     jobs = [(src, rel, ext, kind, dest_root, profile) for src, rel, ext, kind in plan(only)]
     # the same name packed twice (a.png and a.webp both in the source) would hide one of them
     seen = {}
@@ -123,9 +169,11 @@ def main():
         seen[out] = j[0]
     total_in = total_out = 0
     packed = []
-    with ProcessPoolExecutor(workers) as pool:
-        for i, (rel, a, b) in enumerate(pool.map(pack_one, jobs, chunksize=4)):
+    stamps = dict(old)
+    with ProcessPoolExecutor(workers, initializer=load_manifest, initargs=(manifest,)) as pool:
+        for i, (rel, a, b, stamp) in enumerate(pool.map(pack_one, jobs, chunksize=4)):
             packed.append(rel)
+            stamps[rel] = stamp
             total_in += a
             total_out += b
             if i % 100 == 0:
@@ -140,6 +188,9 @@ def main():
                     os.remove(os.path.join(dirpath, name))
         with open(os.path.join(dest_root, "index.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("\n".join(sorted(packed)) + "\n")
+        stamps = {k: v for k, v in stamps.items() if k in keep}
+    with open(manifest, "w", encoding="utf-8") as f:
+        json.dump(stamps, f, indent=0, sort_keys=True)
     print(f"{profile}: {len(packed)} files, {total_in >> 20} MB -> {total_out >> 20} MB in {dest_root}")
 
 

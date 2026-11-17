@@ -268,7 +268,7 @@ impl ForgeTakes {
 pub struct Line;
 
 /// The masters of the acts, who speak when a fight with them begins, turns and ends.
-const MASTERS: [&str; 4] = ["leshy", "bolotnik", "mara", "koschei"];
+const MASTERS: [&str; 10] = ["leshy", "bolotnik", "mara", "koschei", "idolishche", "vikhor", "gore", "domovoy", "chernobog", "zhlya"];
 /// Seconds between two of the lesser lines (a kill, a heavy blow), so a fight is not all talk.
 const BETWEEN_LINES: f32 = 7.0;
 

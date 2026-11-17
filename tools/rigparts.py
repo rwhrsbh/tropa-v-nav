@@ -17,11 +17,13 @@ o = Image.open(orig_p).convert("RGBA")
 w, h = o.size
 O = np.asarray(o).astype(float)
 oa = O[:, :, 3] / 255.0
-# Flow returns its own frame (3:4), not the picture's: lay both edits over the original by
+# Flow returns its own frame, not the picture's: lay both edits over the original by
 # matching the figure's box in the colour mask (which still shows the whole figure) to the
 # original's
 def box(m):
     ys, xs = np.nonzero(m)
+    if len(ys) == 0 or len(xs) == 0:
+        return 0, 0, 1, 1
     return xs.min(), ys.min(), xs.max(), ys.max()
 
 
@@ -40,15 +42,20 @@ def lay(im):
     return np.asarray(im.convert("RGB").transform((w, h), Image.AFFINE, coeffs, Image.BICUBIC, fillcolor=tuple(int(v) for v in mbg))).astype(float)
 
 
-E = lay(Image.open(edit_p))
+E_raw = lay(Image.open(edit_p))
 M = lay(Mi)
 
-corner = np.concatenate([E[:20, :20].reshape(-1, 3), E[:20, -20:].reshape(-1, 3), E[-20:, :20].reshape(-1, 3), E[-20:, -20:].reshape(-1, 3)])
-bg = np.median(corner, axis=0)
-ea = np.clip((np.linalg.norm(E - bg, axis=2) - 10) / 25, 0, 1)
-ea = np.asarray(Image.fromarray((ea * 255).astype(np.uint8)).filter(ImageFilter.MedianFilter(5))).astype(float) / 255
+# Despill and key E so green background/halo in the headless image never bleeds onto the body
+e_r, e_g, e_b = E_raw[..., 0], E_raw[..., 1], E_raw[..., 2]
+e_excess = e_g - np.maximum(e_r, e_b)
+e_spill = np.clip(e_excess, 0, None)
+E = E_raw.copy()
+E[..., 1] = e_g - e_spill
+ea = 1.0 - np.clip(e_excess / 15.0, 0, 1)
+ea = np.asarray(Image.fromarray((ea * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3))).astype(float) / 255
 
-COLOURS = {"arm": (255, 0, 255), "head": (0, 255, 255), "shield": (255, 255, 0), "arm2": (0, 255, 0), "tail": (0, 0, 255)}
+# ONLY cyan (head), magenta (striking arm/weapon), and yellow (shield/off-arm). NEVER pure green (0,255,0)!
+COLOURS = {"arm": (255, 0, 255), "head": (0, 255, 255), "shield": (255, 255, 0)}
 
 
 def soft(m, grow):
@@ -124,37 +131,3 @@ for part, s in parts.items():
 stem = out_dir.replace("\\", "/").rstrip("/").split("/")[-1]
 print(f'    ("{stem}/{name}", &[{", ".join(c for _, c in sorted(cuts))}]),')
 
-# the figure lying dead, if Flow drew it (<edit dir>/<name>_dead.jpg): laid over the original's
-# frame like the other edits but on a canvas wide enough to lie in, its plain background keyed out
-import os as _os
-for _kind in ("dead", "dead_headless"):
-  dead_p = _os.path.join(_os.path.dirname(edit_p), f"{name}_{_kind}.jpg")
-  if _os.path.exists(dead_p):
-      W2 = int(h * 1.5)
-      dx = (W2 - w) / 2
-      dcoeffs = (sx, 0, mx0 - (ox0 + dx) * sx, 0, sy, my0 - oy0 * sy)
-      D_ = np.asarray(Image.open(dead_p).convert("RGB").transform((W2, h), Image.AFFINE, dcoeffs, Image.BICUBIC, fillcolor=tuple(int(v) for v in mbg))).astype(float)
-      dbg = np.median(np.concatenate([D_[:10, :10].reshape(-1, 3), D_[:10, -10:].reshape(-1, 3)]), axis=0)
-      da = np.clip((np.linalg.norm(D_ - dbg, axis=2) - 12) / 25, 0, 1)
-      # an uneven grey floor: whatever pale and grey touches the edge of the picture is background
-      pale = (D_.min(2) > 120) & (D_.max(2) - D_.min(2) < 28)
-      lab_, _n = ndimage.label(pale)
-      edge_ids = np.unique(np.concatenate([lab_[0], lab_[-1], lab_[:, 0], lab_[:, -1]]))
-      floor = np.isin(lab_, edge_ids[edge_ids > 0])
-      da = da * (1 - ndimage.binary_dilation(floor, iterations=1))
-      da = np.asarray(Image.fromarray((da * 255).astype(np.uint8)).filter(ImageFilter.MedianFilter(5))).astype(float) / 255
-      lab, n = ndimage.label(da > 0.3)
-      if n > 1:
-          sizes = ndimage.sum(np.ones_like(da), lab, range(1, n + 1))
-          da = da * ndimage.binary_dilation(np.isin(lab, [i + 1 for i in range(n) if sizes[i] > sizes.max() * 0.05]), iterations=2)
-      dead = Image.fromarray(np.dstack([D_, da * 255]).clip(0, 255).astype(np.uint8), "RGBA")
-      # Flow draws the body smaller than it stands: grow it about its bottom middle until it lies as
-      # long as the figure stands tall, capped by the canvas
-      bx0, by0, bx1, by1 = dead.getbbox()
-      k = min((oy1 - oy0) * 0.95 / max(bx1 - bx0, 1), W2 * 0.98 / max(bx1 - bx0, 1), h * 0.98 / max(by1 - by0, 1))
-      body = dead.crop((bx0, by0, bx1, by1))
-      body = body.resize((int(body.width * k), int(body.height * k)), Image.LANCZOS)
-      dead = Image.new("RGBA", (W2, h))
-      dead.alpha_composite(body, (int(W2 / 2 - body.width / 2), min(h - body.height, int(oy1 - body.height * 0.92))))
-      dead.save(f"{out_dir}/{name}_{_kind}-gemini.png")
-      print(_kind, W2, h)

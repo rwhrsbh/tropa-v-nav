@@ -9,6 +9,7 @@ mod hooks;
 pub mod rng;
 pub mod run;
 pub mod state;
+pub mod stats;
 
 pub use combat::{apply, reduce, start, start_with, STALL_ROUND};
 pub use data::*;

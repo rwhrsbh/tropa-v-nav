@@ -7,6 +7,9 @@
 use super::*;
 
 const CHIP: f32 = 34.0;
+/// At most this many marks side by side: more go on to a second row, so a unit loaded with them
+/// does not spread under its neighbours.
+const ROW_CHIPS: f32 = 5.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, sync_rows.after(sync_units).run_if(in_state(AppState::Battle)).run_if(resource_exists::<Session>));
@@ -22,7 +25,7 @@ pub(super) struct StatusRow {
 pub(super) fn status_row(unit: UnitRef) -> impl Bundle {
     (
         StatusRow { unit, shown: Vec::new() },
-        Node { flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(4), row_gap: px(4), margin: UiRect::top(px(4)), max_width: px(UNIT_W), ..default() },
+        Node { flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(4), row_gap: px(4), margin: UiRect::top(px(4)), max_width: px(ROW_CHIPS * CHIP + (ROW_CHIPS - 1.0) * 4.0), ..default() },
         GlobalZIndex(20),
         Pickable::IGNORE,
     )
@@ -41,6 +44,11 @@ pub(super) struct Chip {
     pub help: String,
 }
 
+/// Marks on a hero that help them; the rest of the named ones hinder.
+const BOON_FLAGS: &[&str] = &["free_rune", "foresight", "storm", "no_hunger", "mor", "first_rune_twice", "brew_all", "big_cauldron"];
+/// Marks whose number counts down to something, shown even at one.
+const COUNTDOWNS: &[&str] = &["doom"];
+
 fn boon(st: StatusKind) -> bool {
     matches!(st, StatusKind::Strength | StatusKind::TempStrength | StatusKind::Fortitude | StatusKind::Thorns | StatusKind::Valor | StatusKind::Mist | StatusKind::Drowse)
 }
@@ -55,7 +63,7 @@ fn help(l10n: &L10n, key: &str) -> String {
 }
 
 /// Everything on a unit, in the order the row shows it.
-pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> {
+pub(super) fn chips(l10n: &L10n, db: &nav_core::Content, session: &Session, unit: UnitRef) -> Vec<Chip> {
     let mut out = Vec::new();
     let status = |out: &mut Vec<Chip>, map: &Statuses| {
         for (st, n) in map.iter() {
@@ -117,11 +125,34 @@ pub(super) fn chips(l10n: &L10n, session: &Session, unit: UnitRef) -> Vec<Chip> 
             if copied > 0 {
                 out.push(Chip { icon: "status/stolen".into(), n: (copied > 1).then_some(copied), shown: None, good: Some(true), name: l10n.t("trait-copied-move"), help: help(l10n, "trait-copied-move") });
             }
-            for flag in ["marked", "blind", "coiled", "confused", "mired", "asleep", "charmed", "frozen", "winter", "draw_less", "energy_less", "no_intents", "doom"] {
-                if let Some(n) = real.flags.get(flag) {
-                    let key = format!("trait-{flag}");
-                    out.push(Chip { icon: format!("status/{flag}"), n: (*n > 1 || flag == "doom").then_some(*n), shown: None, good: Some(false), name: l10n.t(&key), help: help(l10n, &key) });
+            // every mark on the hero that has a name: the banes the foes laid, and the boons
+            // their own cards left for later (a free rune, a foresight)
+            for (flag, n) in &real.flags {
+                let key = format!("trait-{flag}");
+                if *n == 0 || !l10n.has(&key) {
+                    continue;
                 }
+                let good = BOON_FLAGS.contains(&flag.as_str());
+                let counted = *n > 1 || COUNTDOWNS.contains(&flag.as_str());
+                out.push(Chip { icon: format!("status/{flag}"), n: counted.then_some(*n), shown: None, good: Some(good), name: l10n.t(&key), help: help(l10n, &key) });
+            }
+            // the powers played this fight, each by its card, once however many times played
+            let mut powers: Vec<(String, i32)> = Vec::new();
+            for p in &real.powers {
+                if p.card.is_empty() {
+                    continue;
+                }
+                match powers.iter_mut().find(|(k, _)| *k == p.card) {
+                    Some((_, n)) => *n += 1,
+                    None => powers.push((p.card.clone(), 1)),
+                }
+            }
+            for (card, n) in powers {
+                // a power with two passives counts each: the card was played once
+                let passives = db.cards.get(&card).map_or(1, |d| d.passives.len().max(1)) as i32;
+                let n = n / passives;
+                let help = db.cards.get(&card).map(|def| l10n.card_text(&card, def, &def.view(false, h.form))).unwrap_or_default();
+                out.push(Chip { icon: format!("cards/{card}"), n: (n > 1).then_some(n), shown: None, good: Some(true), name: l10n.card_name(&card, false), help });
             }
             status(&mut out, &h.statuses);
         }
@@ -181,9 +212,10 @@ fn sync_rows(
     art: Res<Art>,
     assets: Res<AssetServer>,
     mut rows: Query<(Entity, &mut StatusRow)>,
+    db: Res<crate::session::Db>,
 ) {
     for (row, mut r) in &mut rows {
-        let chips = chips(&l10n, &session, r.unit);
+        let chips = chips(&l10n, &db.0, &session, r.unit);
         let now: Vec<(String, Option<i32>)> = chips.iter().map(|c| (c.icon.clone(), c.n)).collect();
         if now == r.shown {
             continue;

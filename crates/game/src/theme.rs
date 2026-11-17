@@ -34,9 +34,8 @@ pub fn hero_color(hero: &str) -> Color {
     }
 }
 
-/// The colour of a player's marker on the map: what they draw there is in it, and their token
-/// stands on a disc of it. Fixed by hero, the same colour each hero's claims wear at a contested
-/// chest.
+/// The colour of a player on the map: their hero's own, exactly as everywhere else. Their pencil
+/// draws in it and their token is framed in it, as at a contested chest.
 pub fn marker_color(hero: &str) -> Color {
     hero_color(hero)
 }

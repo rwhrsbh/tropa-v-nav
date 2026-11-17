@@ -144,6 +144,26 @@ fn test_act3_to_act4_heal() {
     assert_eq!(run.players[0].hp, 20 + expected_delta);
 }
 
+#[test]
+fn a_fallen_gorynych_head_grows_back_and_is_seen_to() {
+    let (c, mut s) = solo(&["t_block"], &["gorynych_fire", "gorynych_poison"]);
+    let fire = s.enemies[0].uid;
+    s.enemies[0].hp = 0;
+    s.enemies[0].alive = false;
+    // the hero stands through it all
+    s.heroes[0].max_hp = 999;
+    s.heroes[0].hp = 999;
+    let mut seen = false;
+    for _ in 0..3 {
+        let round = s.round;
+        let ev = apply(&c, &mut s, 0, &CombatAction::Ready(true)).unwrap();
+        seen |= ev.iter().any(|e| matches!(e, Event::Summoned { enemy, .. } if *enemy == fire));
+        assert!(s.round > round);
+    }
+    assert!(s.enemies[0].alive, "the head grew back");
+    assert!(seen, "and the others were told");
+}
+
 /// Kot Bayun's claws count the statuses that end up in the discard pile (the hand is thrown away
 /// before he moves), and his intent shows that blow before it lands.
 #[test]
@@ -170,4 +190,52 @@ fn the_pike_says_which_card_it_took() {
     let ev = play(&c, &mut s, 0, "em_pike_fetch", None);
     let at = ev.iter().position(|e| matches!(e, Event::PikeDrew { player: 0, .. })).expect("pike drew");
     assert!(ev[at..].iter().any(|e| matches!(e, Event::CardPlayed { .. })), "{ev:?}");
+}
+
+#[test]
+fn ogneya_runs_hotter_with_every_attack() {
+    let (c, mut s) = solo(&["t_block"], &["ogneya"]);
+    let lash = c.enemies["ogneya"].moves.iter().position(|m| m.id == "fire_whip").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: lash, target: Some(0) });
+    end_round(&c, &mut s);
+    assert_eq!(s.enemies[0].statuses.get(&StatusKind::Strength).copied().unwrap_or(0), 1);
+}
+
+#[test]
+fn bayun_up_his_post_is_out_of_reach_of_an_aimed_blow() {
+    let (c, mut s) = solo(&["t_hit", "t_hit_all"], &["kot_bayun"]);
+    let t = foe(&s, 0);
+    let start_hp = s.enemies[0].hp;
+    assert!(s.enemies[0].flags.contains_key("bayun_perch"));
+    play(&c, &mut s, 0, "t_hit", Some(t));
+    assert_eq!(s.enemies[0].hp, start_hp, "an aimed blow cannot reach him");
+    play(&c, &mut s, 0, "t_hit_all", None);
+    assert!(s.enemies[0].hp < start_hp, "a sweeping blow does");
+}
+
+#[test]
+fn bayun_leaps_down_to_claw_and_climbs_back_to_purr() {
+    let (c, mut s) = solo(&["t_block"], &["kot_bayun"]);
+    s.heroes[0].max_hp = 999;
+    s.heroes[0].hp = 999;
+    let moves = &c.enemies["kot_bayun"].moves;
+    let claws = moves.iter().position(|m| m.id == "claws").unwrap();
+    let purr = moves.iter().position(|m| m.id == "purr").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: claws, target: Some(0) });
+    end_round(&c, &mut s);
+    assert!(!s.enemies[0].flags.contains_key("bayun_perch"), "down off his post, in reach");
+    s.enemies[0].intent = Some(Intent { mv: purr, target: None });
+    end_round(&c, &mut s);
+    assert!(s.enemies[0].flags.contains_key("bayun_perch"), "back up again");
+}
+
+#[test]
+fn beast_scent_foresees_the_next_moves_of_the_pattern() {
+    let (c, s) = solo(&["t_block"], &["kot_bayun"]);
+    let e = &s.enemies[0];
+    let d = &c.enemies["kot_bayun"];
+    let now = e.intent.as_ref().unwrap().mv;
+    let ahead = nav_core::combat::upcoming(&c, e, 2);
+    let at = d.pattern.iter().position(|m| *m == now).unwrap();
+    assert_eq!(ahead, vec![d.pattern[(at + 1) % d.pattern.len()], d.pattern[(at + 2) % d.pattern.len()]]);
 }

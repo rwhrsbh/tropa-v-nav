@@ -58,6 +58,9 @@ fn pictures_ahead(run: &Run, c: &Content) -> Vec<String> {
             for e in c.encounters.values().filter(|e| e.act == run.act && e.kind == kind) {
                 for def in e.enemies.iter().chain(&e.solo).chain(&e.extra3).chain(&e.extra4) {
                     out.push(format!("bg/at_{def}"));
+                    if let Some((kin, _)) = def.rsplit_once('_') {
+                        out.push(format!("bg/at_{kin}"));
+                    }
                     out.push(format!("enemies/{def}"));
                 }
             }

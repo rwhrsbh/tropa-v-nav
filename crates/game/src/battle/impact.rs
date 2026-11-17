@@ -16,7 +16,7 @@ const SETTLE: f32 = 1.5;
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<Impacts>().init_resource::<HitStop>().add_systems(
         Update,
-        (feel, hold_time, flash_edges, burst_rings).chain().after(cue_effects).run_if(in_state(AppState::Battle)).run_if(resource_exists::<Session>),
+        (feel, hold_time, flash_edges, burst_rings).chain().after(cue_effects).run_if(in_state(AppState::Battle)).distributive_run_if(resource_exists::<Session>),
     );
 }
 

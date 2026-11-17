@@ -3,6 +3,7 @@
 //!   TROPA_SCREEN=coop|village|settings|lobby|run|host  open the party menu, the village, settings, an offline lobby, a run in progress, or a real Steam lobby
 //!   TROPA_BOTS=<0..3>           bot companions for `lobby` and `run`
 //!   TROPA_HERO=<id>             the local hero for `run`
+//!   TROPA_BOT_HEROES=<id>,<id>  the bots of `run` take these heroes, in order
 //!   TROPA_BOT_ME=1              the local seat is played by the autopilot too
 //!   TROPA_FORCE=shop|omen|rest|trophy|chest  open `run` straight at that stage
 //!   TROPA_SHRINE=<0..2>         pretend the shrine stands at this level (in memory only; never saved by a screenshot run)

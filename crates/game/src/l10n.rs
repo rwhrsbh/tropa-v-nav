@@ -455,6 +455,61 @@ impl L10n {
         }
     }
 
+    /// What an enemy's move does, told of the enemy: "Deals 9 damage to all heroes. Gains 8 block."
+    /// Each effect reads `foe-<effect>-<target>`, falling back to `foe-<effect>`; a hook reads
+    /// `foe-hook-<name>` and says nothing when there is none.
+    pub fn move_text(&self, effects: &[Effect]) -> String {
+        let foe = |name: &str, tgt: Option<Tgt>, args: &[(&str, FluentValue)]| -> String {
+            if let Some(t) = tgt {
+                let key = format!("foe-{name}-{t:?}");
+                if self.has(&key) {
+                    return self.tf(&key, args);
+                }
+            }
+            let key = format!("foe-{name}");
+            if self.has(&key) {
+                self.tf(&key, args)
+            } else {
+                String::new()
+            }
+        };
+        let n = |a: &Amount| -> FluentValue {
+            match a {
+                Amount::N(n) => (*n).into(),
+                other => self.amount(other).into(),
+            }
+        };
+        let mut out: Vec<String> = Vec::new();
+        for e in effects {
+            let line = match e {
+                Effect::Damage(a, t) => foe("damage", Some(*t), &[("n", n(a))]),
+                Effect::Hits(Amount::Hoard(base, pct), k, t) => {
+                    foe("hoard", Some(*t), &[("n", (*base).into()), ("pct", (*pct).into()), ("k", (*k).into())])
+                }
+                Effect::Hits(a, k, t) => foe("hits", Some(*t), &[("n", n(a)), ("k", (*k).into())]),
+                Effect::Block(a, t) => foe("block", Some(*t), &[("n", n(a))]),
+                Effect::Apply(st, a, t) => foe("apply", Some(*t), &[("n", n(a)), ("s", self.t(&format!("status-{st:?}")).into())]),
+                Effect::Heal(a, t) => foe("heal", Some(*t), &[("n", n(a))]),
+                Effect::LoseHp(a, t) => foe("losehp", Some(*t), &[("n", n(a))]),
+                Effect::AddCard { card, pile, to, count } => {
+                    foe(&format!("addcard-{pile:?}"), Some(*to), &[("c", self.card_name(card, false).into()), ("n", (*count).into())])
+                }
+                Effect::Summon(id, k) => foe("summon", None, &[("c", self.t(&format!("enemy-{id}")).into()), ("n", (*k).into())]),
+                Effect::StealGold(g) => foe("stealgold", None, &[("n", (*g).into())]),
+                Effect::StealGoldPct(p) => foe("stealgoldpct", None, &[("n", (*p).into())]),
+                Effect::ScatterHoard => foe("scatterhoard", None, &[]),
+                Effect::Flee => foe("flee", None, &[]),
+                Effect::Taunt => foe("taunt", None, &[]),
+                Effect::Hook(name) => foe(&format!("hook-{name}"), None, &[]),
+                _ => String::new(),
+            };
+            if !line.is_empty() && !out.contains(&line) {
+                out.push(line);
+            }
+        }
+        out.join(" ")
+    }
+
     /// The whole text printed on a card in `form`: a werewolf card with two sides tells the
     /// other one too, on a line of its own, so the turn holds no surprise.
     pub fn full_card_text(&self, id: &str, def: &CardDef, upgraded: bool, form: nav_core::Form) -> String {
@@ -709,6 +764,26 @@ fn once_at_the_end(text: String, sentence: &str) -> String {
 #[cfg(test)]
 mod once_tests {
     use super::{once_at_the_end, L10n, Lang};
+
+    #[test]
+    fn every_enemy_move_says_what_it_does() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let c = nav_core::Content::load_dir(&root.join("data")).expect("content");
+        let mut silent = Vec::new();
+        for lang in [Lang::Ru, Lang::En] {
+            let l = L10n::load(&crate::art::Art::new(root.clone()), lang);
+            for e in c.enemies.values() {
+                for mv in &e.moves {
+                    let desc = format!("move-{}-desc", mv.id);
+                    let text = if l.has(&desc) { l.t(&desc) } else { l.move_text(&mv.effects) };
+                    if text.trim().is_empty() || text.contains("foe-") || text.contains("move-") {
+                        silent.push(format!("{lang:?} {}/{}: {text:?}", e.id, mv.id));
+                    }
+                }
+            }
+        }
+        assert!(silent.is_empty(), "moves with nothing to say:\n{}", silent.join("\n"));
+    }
 
     #[test]
     fn no_card_shows_a_string_key() {

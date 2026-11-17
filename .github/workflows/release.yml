@@ -4,6 +4,10 @@
 # Caches: GitHub lets a tag run read the default branch's caches but never share its own, so
 # only runs on a branch save them. Start the build by hand from `main` (Actions > release >
 # Run workflow, branch main, tag name) and the next runs, tags included, start warm.
+# The repository has 10 GB of cache in all, and whatever is over it is thrown out oldest first:
+# the packed assets are one cache for all three desktops (they are the same files), restored
+# from the newest older one when the assets changed (the packer then redoes only what changed,
+# see its manifest), so a run no longer pushes out the Rust caches the next one needs.
 name: release
 
 on:
@@ -60,19 +64,15 @@ jobs:
         if: matrix.name == 'linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev pkg-config
       - name: Cache packed assets
-        id: packcache
         uses: actions/cache@v4
         with:
           path: target/pack/desktop
-          key: pack-desktop-${{ runner.os }}-${{ hashFiles('assets/**', 'tools/pack_assets.py') }}
+          key: pack-desktop-v2-${{ hashFiles('assets/**', 'tools/pack_assets.py') }}
+          restore-keys: pack-desktop-v2-
+          enableCrossOsArchive: true
       - name: Pack the assets
         shell: bash
         run: |
-          # the packer skips files not older than their packed copy; a fresh checkout makes
-          # every source "new", so with a cache hit the sources are dated far back
-          if [ "${{ steps.packcache.outputs.cache-hit }}" = "true" ]; then
-            find assets -type f -exec touch -t 200001010000 {} +
-          fi
           pip install pillow soundfile
           python -X utf8 tools/pack_assets.py desktop
       - name: Build
@@ -142,18 +142,13 @@ jobs:
           distribution: temurin
           java-version: "17"
       - name: Cache packed assets
-        id: packcache
         uses: actions/cache@v4
         with:
           path: target/pack/mobile
-          key: pack-mobile-${{ hashFiles('assets/**', 'tools/pack_assets.py') }}
+          key: pack-mobile-v2-${{ hashFiles('assets/**', 'tools/pack_assets.py') }}
+          restore-keys: pack-mobile-v2-
       - name: Pack the assets
         run: |
-          # see the desktop job: with a cache hit the sources are dated far back, so the
-          # packer keeps the cached files instead of redoing them
-          if [ "${{ steps.packcache.outputs.cache-hit }}" = "true" ]; then
-            find assets -type f -exec touch -t 200001010000 {} +
-          fi
           pip install pillow soundfile
           python -X utf8 tools/pack_assets.py mobile
       - name: Build the APK

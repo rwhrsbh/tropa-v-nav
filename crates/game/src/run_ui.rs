@@ -253,7 +253,7 @@ pub(crate) fn token_node(size: f32) -> Node {
 pub(crate) fn hero_token(token: &mut EntityCommands, hero: &str, seat: u8, art: &Art, assets: &AssetServer) {
     let _ = seat;
     let color = theme::marker_color(hero);
-    token.insert((BackgroundColor(color.lighter(0.12)), BorderColor::all(color.mix(&INK, 0.45)), Pickable::IGNORE));
+    token.insert((BackgroundColor(color.lighter(0.15)), BorderColor::all(color), Pickable::IGNORE));
     if let Some(face) = art.image(assets, &format!("map/hero_{hero}")) {
         token.insert(ImageNode::new(face));
     }
@@ -1390,6 +1390,7 @@ fn draw_omen_lot(
                 let last = tied.iter().rposition(|t| *t == chosen).unwrap_or(0);
                 let stops: Vec<usize> = (0..n * 3 + last + 1).map(|k| k % n).collect();
                 commands.insert_resource(OmenLot { tickets: tied, stops, step: 0, wait: 0.3, after: 1.4 });
+                status.lot_playing = true;
             }
         }
     }
@@ -1399,6 +1400,7 @@ fn draw_omen_lot(
         lot.after -= dt;
         if lot.after <= 0.0 {
             commands.remove_resource::<OmenLot>();
+            status.lot_playing = false;
         }
         return;
     }
@@ -1567,6 +1569,7 @@ fn draw_end(
     art: Res<Art>,
     assets: Res<AssetServer>,
     config: Option<Res<crate::Config>>,
+    db: Res<Db>,
 ) {
     let Some(mut net) = net else { return };
     let me = net.node.my_slot();
@@ -1579,7 +1582,12 @@ fn draw_end(
         if let Some(pl) = me.and_then(|m| run.players.get(m as usize)).filter(|_| !net.bot_me && !net.ephemeral) {
             let already = if banked.run == run.seed { banked.n } else { 0 };
             *opened = profile.record_run(&pl.hero, run.oberegi().saturating_sub(already), won, run.circle, run.floors_cleared, run.act);
-            crate::analytics::record_run(&run, config.as_ref().and_then(|c| c.telemetry_url.as_deref()), won);
+        }
+        // the balance record: once per run, from the host, for the whole party (LAN included);
+        // only the dev autopilot's own runs are left out
+        if net.node.is_host() && !net.bot_me {
+            let mode = if net.code == "LAN" { "lan" } else if !net.locals.is_empty() { "bots" } else if run.players.len() > 1 { "party" } else { "solo" };
+            crate::analytics::record_run(&db.0, &run, mode, if won { "won" } else { "lost" }, config.as_ref().and_then(|c| c.telemetry_url.as_deref()));
         }
         status.run_dirty = true;
     }

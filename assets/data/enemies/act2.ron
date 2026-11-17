@@ -104,8 +104,13 @@
             (id: "pull_down", intent: Attack, targeted: true, effects: [Damage(N(20), Target)]),
             (id: "mud_wave", intent: AttackAll, effects: [Damage(N(12), AllFoes)]),
             (id: "sink", intent: Defend, effects: [Block(N(25), Me), Heal(N(10), Me)]),
+            // half drowned himself, he drags the heroes under with him
+            (id: "drown", intent: Attack, targeted: true, effects: [Damage(N(28), Target), Apply(Weak, N(1), Target)]),
+            (id: "black_water", intent: AttackAll, effects: [Damage(N(16), AllFoes), Hook("mire_grab")]),
         ],
         opening: [0],
         pattern: [1, 2, 0, 1, 3, 2],
+        phase2_at: 50,
+        phase2: [5, 4, 1, 3, 4, 2],
     ),
 ]

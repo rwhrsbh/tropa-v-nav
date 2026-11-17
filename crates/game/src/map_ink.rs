@@ -50,7 +50,7 @@ pub struct MapInk {
     /// Where the eraser was last frame, while it is rubbing: it rubs the whole way between.
     rubbed_from: Option<Vec2>,
     pub tool: Tool,
-    /// This player's seat: their marks are drawn in its colour (see `theme::marker_color`).
+    /// This player's seat: their marks are drawn in their hero's colour.
     seat: Option<u8>,
     /// The hero in each seat: a player's marks are drawn in their hero's colour.
     heroes: Vec<String>,
@@ -244,6 +244,7 @@ fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMu
     }
     if ink.heroes.len() != run.players.len() || ink.heroes.iter().zip(&run.players).any(|(h, p)| *h != p.hero) {
         ink.heroes = run.players.iter().map(|p| p.hero.clone()).collect();
+        ink.remote_dirty = true;
     }
     // Flush earlier edits before answering a snapshot request so reliable ordering cannot
     // append those same points again after the snapshot.
@@ -270,18 +271,24 @@ fn sync_ink(mut ink: ResMut<MapInk>, net: Option<ResMut<Net>>, mut status: ResMu
 }
 
 /// A tool's button: its picture (`assets/map/tool_<name>`) beside its name.
-fn tray_button(commands: &mut ChildSpawnerCommands, label: String, icon: Option<Handle<Image>>, fonts: &Fonts) -> Entity {
+/// A tool's button: its picture alone (`assets/map/tool_<name>`); its name and what it does
+/// show on hover, and the name stands in for a picture not yet painted.
+fn tray_button(commands: &mut ChildSpawnerCommands, label: String, help: String, icon: Option<Handle<Image>>, fonts: &Fonts) -> Entity {
     let mut button = commands.spawn((
         Button,
-        Node { width: px(240), padding: UiRect::axes(px(10), px(6)), border: UiRect::all(px(3)), column_gap: px(10), align_items: AlignItems::Center, ..default() },
+        bevy::picking::hover::Hovered::default(),
+        crate::run_ui::CardHints::new(vec![(label.clone(), help)]),
+        Node { width: px(64), height: px(64), border: UiRect::all(px(3)), border_radius: BorderRadius::all(px(8)), align_items: AlignItems::Center, justify_content: JustifyContent::Center, ..default() },
         BackgroundColor(theme::PEAT),
         BorderColor::all(EDGE),
     ));
-    button.with_children(|b| {
-        if let Some(icon) = icon {
-            b.spawn((ImageNode::new(icon), Node { width: px(44), height: px(44), flex_shrink: 0.0, ..default() }, Pickable::IGNORE));
+    button.with_children(|b| match icon {
+        Some(icon) => {
+            b.spawn((ImageNode::new(icon), Node { width: px(52), height: px(52), ..default() }, Pickable::IGNORE));
         }
-        b.spawn(theme::text(label, &fonts.title, 24.0, theme::BONE));
+        None => {
+            b.spawn((theme::text(label, &fonts.title, 14.0, theme::BONE), Pickable::IGNORE));
+        }
     });
     button.id()
 }
@@ -329,13 +336,12 @@ fn tray(
             ChildOf(parent),
         ))
         .with_children(|p| {
-            p.spawn(theme::text(l10n.t("map-ink-title"), &fonts.body, 22.0, theme::BONE));
             let icon = |name: &str| art.image(&assets, &format!("map/tool_{name}"));
-            let pencil = tray_button(p, l10n.t("map-ink-pencil"), icon("pencil"), &fonts);
+            let pencil = tray_button(p, l10n.t("map-ink-pencil"), l10n.t("map-ink-title"), icon("pencil"), &fonts);
             p.commands().entity(pencil).insert((ToolButton(Tool::Pencil), observe(|_: On<Activate>, mut ink: ResMut<MapInk>| ink.tool = Tool::Pencil)));
-            let eraser = tray_button(p, l10n.t("map-ink-eraser"), icon("eraser"), &fonts);
+            let eraser = tray_button(p, l10n.t("map-ink-eraser"), String::new(), icon("eraser"), &fonts);
             p.commands().entity(eraser).insert((ToolButton(Tool::Eraser), observe(|_: On<Activate>, mut ink: ResMut<MapInk>| ink.tool = Tool::Eraser)));
-            let clear = tray_button(p, l10n.t("map-ink-clear"), icon("wipe"), &fonts);
+            let clear = tray_button(p, l10n.t("map-ink-clear"), String::new(), icon("wipe"), &fonts);
             p.commands().entity(clear).insert(observe(|_: On<Activate>, mut commands: Commands, mut ink: ResMut<MapInk>, dots: Query<Entity, (With<InkDot>, Without<RemoteInk>)>| wipe(&mut commands, &mut ink, &dots)));
         });
 }

@@ -11,7 +11,7 @@ use std::f32::consts::FRAC_PI_2;
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<Blows>()
         .init_resource::<Severed>()
-        .add_systems(Update, (play_frames, trickle_down.run_if(resource_exists::<Session>), (fly_severed, hide_lost_limbs).chain().run_if(resource_exists::<Session>)).run_if(in_state(AppState::Battle)))
+        .add_systems(Update, (play_frames, trickle_down.run_if(resource_exists::<Session>), (fly_severed, hide_lost_limbs).chain().distributive_run_if(resource_exists::<Session>)).run_if(in_state(AppState::Battle)))
         .add_systems(Startup, |mut commands: Commands, assets: Res<AssetServer>| commands.insert_resource(BloodArt::load(&assets))).add_systems(OnEnter(AppState::Battle), |mut b: ResMut<Blows>| b.0.clear()).add_systems(Update, (fall, fly_gibs, bleed).chain().after(dying).run_if(in_state(AppState::Battle)));
 }
 
@@ -411,8 +411,7 @@ pub(super) fn strike_down(
     let side = if hero { -1.0 } else { 1.0 };
     // the picture's top-left on the stage, and the widget's
     let pic = Vec2::new(foot.x - draw.x / 2.0, foot.y - draw.y);
-    // only a heavy killing blow strikes anything off, and each part takes its own chance: a
-    // light one only fells the body, a crushing one may take every part at once
+    // only a heavy killing blow strikes the head off
     let mut flying: Vec<bool> = parts
         .iter()
         .enumerate()
@@ -421,12 +420,9 @@ pub(super) fn strike_down(
             if hero {
                 return *part == rig::Part::Head;
             }
-            let chance = match part {
-                rig::Part::Head => weight * 1.3 - 0.2,
-                rig::Part::Arm => weight * 1.1 - 0.25,
-                rig::Part::Shield => weight * 0.9 - 0.3,
-            };
-            r(70 + k as u32) < chance
+            // a foe loses no arm: only its head flies, and it lies down in its own corpse picture
+            // (one with an arm struck off had none, and toppled its standing picture instead)
+            *part == rig::Part::Head && r(70 + k as u32) < weight * 1.3 - 0.2
         })
         .collect();
     // a body still whole crumples and gives way to its picture lying dead, a beheaded one to its

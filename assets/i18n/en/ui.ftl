@@ -657,3 +657,12 @@ lobby-circle-7 = A quarter less gold from fights.
 lobby-circle-8 = Enemies have 10% more health.
 lobby-circle-9 = Raising a fallen ally costs 3 energy instead of 2.
 lobby-circle-10 = When Koschei's needle snaps, his shadow rises and fights beside him.
+
+analytics-title = Balance Chronicle
+analytics-summary = Runs: { $runs }, won: { $won } ({ $pct }%)
+analytics-cards = Cards offered but passed over
+analytics-card = { $name }: offered { $offered }, taken { $taken }%, won with it { $won }%
+analytics-builds = Builds
+analytics-build = { $hero }, { $build }: runs { $runs }, won { $won }%
+
+battle-foresight = Beast Scent, then

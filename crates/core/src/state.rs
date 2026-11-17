@@ -326,7 +326,9 @@ pub enum Event {
     CardAdded { player: u8, card: Id, pile: Pile },
     /// The pike took the top card of this player's draw pile to play it by itself; what it does
     /// (or its going to the discard, if it cannot be played) follows.
-    PikeDrew { player: u8, card: Id, upgraded: bool },
+    /// `played`: the card then plays itself (a `CardPlayed` follows); else it goes, unplayed, to
+    /// the discard pile, which only its owner is shown.
+    PikeDrew { player: u8, card: Id, upgraded: bool, played: bool },
     Exhausted { player: u8, card: Id },
     /// Thrown out of the hand by a card or a power.
     Discarded { player: u8, card: Id },

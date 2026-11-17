@@ -24,7 +24,9 @@ pub fn plugin(app: &mut App) {
     app.init_resource::<NetStatus>()
         .add_systems(Startup, hook_callbacks.run_if(resource_exists::<Steam>))
         .add_systems(PreUpdate, (steam_events, receive).chain().run_if(resource_exists::<Steam>))
-        .add_systems(Update, (crate::session::submit, local_peers, autopilot, notes, follow_stage).chain().run_if(resource_exists::<Net>))
+        // each system asks for the party on its own: one of them may leave it mid-chain (a lost
+        // connection given up), and those after it must not run without it
+        .add_systems(Update, (crate::session::submit, local_peers, autopilot, notes, follow_stage).chain().distributive_run_if(resource_exists::<Net>))
         .add_systems(PostUpdate, send.run_if(resource_exists::<Net>));
 }
 
@@ -64,6 +66,10 @@ pub struct NetStatus {
     pub dirty: bool,
     /// The run changed; map, reward and rest screens should redraw.
     pub run_dirty: bool,
+    /// A lot is being drawn on the map or over an omen: the party does not set off until it has
+    /// landed. Set the moment the lot is heard (a resource inserted for it only exists from the
+    /// next frame, and the screen would have changed by then), cleared when it is over.
+    pub lot_playing: bool,
     /// Pings not yet shown: `(player slot, kind, unit)`.
     pub pings: Vec<(u8, u8, nav_core::UnitRef)>,
     /// Story votes not yet counted: `(player slot, page text key, skip)`.
@@ -278,7 +284,11 @@ pub fn start_offline_run(commands: &mut Commands, db: &nav_core::Content, bots: 
     route(db, &mut node, &mut locals);
     let mine = hero.unwrap_or_else(|| db.heroes.keys().next().cloned().unwrap_or_default());
     node.pick_hero(Some(mine.clone()), 10);
-    let rest: Vec<String> = db.heroes.keys().filter(|h| **h != mine).cloned().collect();
+    // TROPA_BOT_HEROES=a,b,c seats the bots on these heroes, in order
+    let rest: Vec<String> = match std::env::var("TROPA_BOT_HEROES") {
+        Ok(list) => list.split(',').map(|h| h.trim().to_string()).filter(|h| db.heroes.contains_key(h)).collect(),
+        Err(_) => db.heroes.keys().filter(|h| **h != mine).cloned().collect(),
+    };
     for (i, bot) in locals.iter_mut().enumerate() {
         bot.pick_hero(rest.get(i).cloned(), 10);
     }
@@ -771,11 +781,11 @@ fn follow_stage(
     // a lot drawn on the map is watched to its end before the party sets off
     // (or about to be: the map screen has not yet taken up the lot heard of this frame)
     let drawn = status.map.iter().any(|e| matches!(e, RunEvent::Lot { tied, .. } if !tied.is_empty()));
-    if now == AppState::Map && (lot.is_some() || drawn) {
+    if now == AppState::Map && (lot.is_some() || drawn || status.lot_playing) {
         return;
     }
     // so is one drawn over an omen's tied options, on the omen's own window
-    if now == AppState::Omen && (omen_lot.is_some() || drawn) {
+    if now == AppState::Omen && (omen_lot.is_some() || drawn || status.lot_playing) {
         return;
     }
     if now == AppState::Battle {

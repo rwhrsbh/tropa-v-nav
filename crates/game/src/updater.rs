@@ -750,9 +750,11 @@ mod tests {
 
     #[test]
     fn test_current_version_matches_crate_version() {
+        // the build stamps the version from its release tag (or the latest git tag), so the
+        // test checks the stamp is read, not one release's number
         let cur = SemVer::current();
         println!("Detected current game version: {}", cur.to_string());
-        assert_eq!(cur.to_string(), "0.1.8");
+        assert_eq!(Some(cur), SemVer::parse(env!("GAME_VERSION")).or_else(|| SemVer::parse(env!("CARGO_PKG_VERSION"))));
     }
 
     #[test]

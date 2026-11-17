@@ -38,6 +38,7 @@ mod aim;
 mod fit_text;
 mod fx;
 mod gore;
+mod gorynych;
 mod held;
 mod impact;
 pub(crate) mod piles;
@@ -65,14 +66,14 @@ pub fn plugin(app: &mut App) {
             Update,
             (
                 playback,
-                (sync_units, gore::lay_out_the_headless, sync_hand, live_costs, live_marks, sync_potions, flask_menu, count_relics, cue_effects).chain(),
+                (sync_units, gorynych::draw_body, gore::lay_out_the_headless, sync_hand, live_costs, live_marks, sync_potions, flask_menu, count_relics, cue_effects).chain(),
                 (no_eyes, push_belt),
                 (pick_hover, layout_hand, layout_units, swap_form_art, animate_sprites, update_labels, update_intent_icons, update_bars, update_tooltip),
                 (floaters, fly_ghosts, dying, style_buttons, impact::shake_screen, turn_timer, send_pings, show_pings, light_bonuses),
             )
                 .chain()
                 .run_if(in_state(AppState::Battle))
-                .run_if(resource_exists::<Session>),
+                .distributive_run_if(resource_exists::<Session>),
         )
         .add_observer(on_drag_start)
         .add_observer(on_card_click)
@@ -198,6 +199,10 @@ struct Ghost {
 
 #[derive(Component)]
 struct HpFill(UnitRef);
+/// The poisoned end of the health bar, as in StS: the health its Rot will take at the start of
+/// its next turn, green at the right of the fill (Rot goes past block, so block does not shrink it).
+#[derive(Component)]
+struct HpRot(UnitRef);
 /// The pale strip of health just lost, left standing a moment behind the fill and then
 /// draining after it, so a blow is read by how much it took.
 #[derive(Component)]
@@ -422,6 +427,10 @@ fn unit_place(shown: &Combat, unit: UnitRef) -> Option<(Vec2, Vec2)> {
         UnitRef::Hero(i) => shown.hero(i).map(|_| (hero_spot(i, shown.heroes.len()), HERO_SIZE)),
         UnitRef::Enemy(uid) => {
             let i = shown.enemies.iter().position(|e| e.uid == uid)?;
+            // Gorynych's heads stand on one body
+            if let Some(foot) = gorynych::place(shown, &shown.enemies[i].def) {
+                return Some((foot, ENEMY_SIZE));
+            }
             Some((stands::foe(uid, || shown.enemies.iter().map(|e| (e.uid, e.alive)).collect()).unwrap_or_else(|| enemy_foot(i, shown.enemies.len())), ENEMY_SIZE))
         }
     }
@@ -568,6 +577,13 @@ fn enter(
         // in the heart of the forest. The first such foe in the fight decides
         for e in &session.truth.enemies {
             want.push(format!("bg/at_{}", e.def));
+        }
+        // a foe that is one part of a greater beast (a head of the Gorynych) is met in the
+        // beast's own lair, when it has none of its own
+        for e in &session.truth.enemies {
+            if let Some((kin, _)) = e.def.rsplit_once('_') {
+                want.push(format!("bg/at_{kin}"));
+            }
         }
         match run.and_then(|r| r.fighting) {
             Some(nav_core::NodeKind::Boss) if real_act >= 4 => want.push("bg/koschei".to_string()),
@@ -855,7 +871,7 @@ fn enter(
                 Tooltip,
                 theme::panel(Node {
                     position_type: PositionType::Absolute,
-                    width: px(330),
+                    width: px(TIP_W),
                     padding: UiRect::all(px(12)),
                     border: UiRect::all(px(2)),
                     ..default()
@@ -935,7 +951,7 @@ fn sync_units(
         let wide = (!is_hero || stem == "heroes/emelya") && art.aspect(&stem).is_some_and(|a| a > 0.9);
         // a foe of known stature is drawn as tall as it stands, a raven small, a giant huge
         let tall = match unit {
-            UnitRef::Enemy(uid) => shown.enemy(uid).and_then(|e| stature::height_of(&e.def)),
+            UnitRef::Enemy(uid) => shown.enemy(uid).and_then(|e| gorynych::height_of(&e.def).or_else(|| stature::height_of(&e.def))),
             UnitRef::Hero(_) => None,
         };
         let draw = match tall {
@@ -950,6 +966,14 @@ fn sync_units(
             UnitRef::Hero(i) => shown.hero(i).map_or(draw, |h| draw * hp_stature(&db.0, &h.def, h.max_hp)),
             UnitRef::Enemy(_) => draw,
         };
+        // a head of Gorynych stands under itself but is drawn back onto the shared body, its bar
+        // and name lower than its left neighbour's so the three stay readable
+        let def = match unit {
+            UnitRef::Enemy(uid) => shown.enemy(uid).map(|e| e.def.to_string()).unwrap_or_default(),
+            UnitRef::Hero(_) => String::new(),
+        };
+        let shift = gorynych::picture_shift(&def);
+        let drop = gorynych::rank(&def).map_or(0.0, |r| r as f32 * 48.0);
         commands
             .spawn((
                 UnitWidget { unit, pos: origin },
@@ -971,7 +995,7 @@ fn sync_units(
                 u.spawn((
                     // over a picture that spills above its slot, the intent rises with it, so it
                     // stays over the head and not on the face
-                    Node { height: px(HEAD_ROOM), align_items: AlignItems::Center, top: px(-(draw.y - size.y)), ..default() },
+                    Node { height: px(HEAD_ROOM), align_items: AlignItems::Center, top: px(-(draw.y - size.y) + gorynych::head_top(&def) * draw.y), left: px(gorynych::intent_shift(&def)), ..default() },
                     // text is never hidden by a sprite, this unit's or a neighbour's
                     GlobalZIndex(20),
                     Pickable::IGNORE,
@@ -1027,7 +1051,7 @@ fn sync_units(
                         Node {
                             width: px(draw.x),
                             height: px(draw.y),
-                            margin: UiRect { left: px((size.x - draw.x) / 2.0), right: px((size.x - draw.x) / 2.0), top: px(size.y - draw.y), bottom: px(0) },
+                            margin: UiRect { left: px((size.x - draw.x) / 2.0 + shift), right: px((size.x - draw.x) / 2.0 - shift), top: px(size.y - draw.y), bottom: px(0) },
                             flex_shrink: 0.0,
                             ..default()
                         }
@@ -1045,7 +1069,7 @@ fn sync_units(
                     Node {
                         width: px(180),
                         height: px(22),
-                        margin: UiRect::top(px(8)),
+                        margin: UiRect::top(px(8.0 + drop)),
                         border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(px(7)),
                         align_items: AlignItems::Center,
@@ -1069,6 +1093,13 @@ fn sync_units(
                             HpFill(unit),
                             Node { position_type: PositionType::Absolute, left: px(0), top: px(0), width: percent(100), height: percent(100), border_radius: BorderRadius::all(px(5)), ..default() },
                             BackgroundColor(theme::FRESH_BLOOD),
+                            Pickable::IGNORE,
+                        ),
+                        (
+                            HpRot(unit),
+                            Node { position_type: PositionType::Absolute, left: px(0), top: px(0), width: px(0), height: percent(100), border_radius: BorderRadius::all(px(5)), ..default() },
+                            BackgroundColor(ROT_GREEN),
+                            Visibility::Hidden,
                             Pickable::IGNORE,
                         ),
                         (Label::Hp(unit), theme::text("", &fonts.num, 17.0, theme::BONE)),
@@ -1166,22 +1197,31 @@ pub(crate) fn pose_base(mut stem: &str) -> &str {
 
 fn swap_form_art(
     session: Res<Session>,
+    db: Res<Db>,
     art: Res<Art>,
     assets: Res<AssetServer>,
     mut preloaded: Local<Preloaded>,
     mut sprites: Query<(&mut UnitSprite, &Children)>,
-    skins: Query<(&MaterialNode<rig::RigMaterial>, &rig::RigSkin, &mut Visibility)>,
+    skins: Query<(&MaterialNode<rig::RigMaterial>, &mut rig::RigSkin, &mut Visibility, &mut Node)>,
     mut rigs: ResMut<Assets<rig::RigMaterial>>,
 ) {
     let mut skins = skins;
     // every picture a unit may change into is loaded before it is needed, so a first blow
     // is not drawn in the resting pose
-    let stems = session.shown.heroes.iter().flat_map(|h| [format!("heroes/{}", h.def), format!("heroes/{}_beast", h.def)]).chain(session.shown.enemies.iter().map(|e| format!("enemies/{}", e.def)));
+    let stems = session.shown.heroes.iter().flat_map(|h| [format!("heroes/{}", h.def), format!("heroes/{}_beast", h.def)]).chain(session.shown.enemies.iter().flat_map(|e| [format!("enemies/{}", e.def), format!("enemies/{}_ground", e.def)]));
     for stem in stems {
         if preloaded.seen.insert(stem.clone()) {
             for mark in ["", "_headless", "_noweapon", "_noshield", "_noarms", "_headless_noweapon", "_headless_noshield", "_headless_noarms"] {
                 for pose in ["", "_strike", "_cast", "_hurt", "_guard", "_downed"] {
                     if let Some(handle) = art.image(&assets, &format!("{stem}{mark}{pose}")) {
+                        preloaded.handles.push(handle);
+                    }
+                }
+            }
+            // a foe's own blows (see `blow` below)
+            if let Some(def) = stem.strip_prefix("enemies/").and_then(|d| db.0.enemies.get(d)) {
+                for mv in &def.moves {
+                    if let Some(handle) = art.image(&assets, &format!("{stem}_{}", mv.id)) {
                         preloaded.handles.push(handle);
                     }
                 }
@@ -1200,7 +1240,14 @@ fn swap_form_art(
             UnitRef::Enemy(uid) => {
                 // a foe falling keeps the picture it fell in
                 let Some(e) = session.shown.enemy(uid).filter(|e| e.alive && !s.vanish) else { continue };
-                (format!("enemies/{}", e.def), false)
+                // Kot Bayun down off his post is drawn on the ground, with no post under him
+                let off_post = session.truth.enemy(uid).is_some_and(|r| !r.flags.contains_key("bayun_perch"));
+                let ground = format!("enemies/{}_ground", e.def);
+                if off_post && art.image(&assets, &ground).is_some() {
+                    (ground, false)
+                } else {
+                    (format!("enemies/{}", e.def), false)
+                }
             }
         };
         // through the heart of a lunge the unit is drawn mid-blow, through a skill or power
@@ -1226,7 +1273,20 @@ fn swap_form_art(
         if downed && painted && art.image(&assets, &format!("{want}_downed")).is_some() {
             want = format!("{want}_downed");
         }
-        if let Some(pose) = pose.filter(|_| !downed && painted) {
+        // a foe's blow may have a picture of its own, named after the move: Gorynych's heads
+        // breathe fire, spit venom and roar thunder instead of only lunging
+        let blow = match (s.unit, s.anim) {
+            (UnitRef::Enemy(uid), Some((Anim::Lunge, t))) if (0.12..0.38).contains(&t) => session
+                .shown
+                .enemy(uid)
+                .and_then(|e| e.intent.as_ref().and_then(|i| db.0.enemies.get(&e.def)?.moves.get(i.mv)))
+                .map(|m| format!("{want}_{}", m.id))
+                .filter(|b| art.image(&assets, b).is_some()),
+            _ => None,
+        };
+        if let Some(b) = blow {
+            want = b;
+        } else if let Some(pose) = pose.filter(|_| !downed && painted) {
             if art.image(&assets, &format!("{want}{pose}")).is_some() {
                 want = format!("{want}{pose}");
             }
@@ -1239,18 +1299,39 @@ fn swap_form_art(
             // a form cut into parts shows its body and parts; one that is not, its whole
             // picture, the parts' skins hidden
             let parts = rig::parts_of(&art, &assets, &want);
+            // a whole picture is drawn at its own shape: a pose may be wider than the rest
+            let shape = art.aspect(&want);
             let mut iter = skins.iter_many_mut(children);
-            while let Some(Ok((skin, part, mut vis))) = iter.fetch_next() {
+            while let Some(Ok((skin, mut part, mut vis, mut node))) = iter.fetch_next() {
                 match (&parts, part.part) {
-                    (Some((body, _)), None) => rig::repaint(&mut rigs, skin, body.clone()),
+                    (Some((body, _)), None) => {
+                        rig::repaint(&mut rigs, skin, body.clone());
+                        // back from a wider pose, the body is its own shape again
+                        if let Some(a) = shape {
+                            rig::fit(&mut node, s.draw, a);
+                        }
+                    }
                     (Some((_, parts)), Some(p)) => match parts.iter().find(|(cut, _)| cut.0 == p) {
-                        Some((_, picture)) => {
+                        Some((cut, picture)) => {
                             rig::repaint(&mut rigs, skin, picture.clone());
+                            // a part lies on the same picture as its body: the same shape, and the
+                            // joint and give of this form (a beast's square picture is not the
+                            // man's narrow one, nor its shoulder where his is)
+                            if let Some(a) = shape {
+                                rig::fit(&mut node, s.draw, a);
+                                rig::rejoint(&mut rigs, skin, cut.1, a);
+                            }
+                            part.gain = cut.2;
                             *vis = Visibility::Inherited;
                         }
                         None => *vis = Visibility::Hidden,
                     },
-                    (None, None) => rig::repaint(&mut rigs, skin, handle.clone()),
+                    (None, None) => {
+                        rig::repaint(&mut rigs, skin, handle.clone());
+                        if let Some(a) = shape {
+                            rig::fit(&mut node, s.draw, a);
+                        }
+                    }
                     (None, Some(_)) => *vis = Visibility::Hidden,
                 }
             }
@@ -1496,8 +1577,14 @@ fn dying(
                 match sprites.get(c) {
                     Ok((s, skin_children)) => {
                         draw = s.draw;
-                        // a foe struck down mid-pose falls as itself
+                        // a foe struck down mid-pose falls as itself; Kot Bayun down off his post
+                        // lies as the same cat
                         stem = pose_base(&s.stem).to_string();
+                        if let Some(rest) = stem.strip_suffix("_ground") {
+                            if art.image(&assets, &format!("{stem}_dead")).is_none() {
+                                stem = rest.to_string();
+                            }
+                        }
                         let cuts = rig::cuts_of(&stem);
                         for (skin, part, material) in skins.iter_many(skin_children).flatten() {
                             let (Some(part), Some(m)) = (part.part, rigs.get(&material.0)) else { continue };
@@ -1519,6 +1606,8 @@ fn dying(
                 // drawn from what every player's game knows alike (who died, by how hard a
                 // blow), so the same parts fly the same way on every screen
                 let (weight, lost) = blows.0.get(&unit).copied().unwrap_or((0.0, 0));
+                // a head of Gorynych always comes off
+                let weight = if gorynych::is_head(&stem) { 9.0 } else { weight };
                 let seed = match unit {
                     UnitRef::Enemy(u) => u as u32,
                     UnitRef::Hero(i) => 1000 + i as u32,
@@ -1553,11 +1642,15 @@ fn dying(
     }
 }
 
+/// Poison green on the health bar.
+const ROT_GREEN: Color = Color::srgb(0.38, 0.62, 0.18);
+
 fn update_bars(
     session: Res<Session>,
     time: Res<Time>,
-    mut fills: Query<(&HpFill, &mut Node), Without<HpTrail>>,
-    mut trails: Query<(&mut HpTrail, &mut Node), Without<HpFill>>,
+    mut fills: Query<(&HpFill, &mut Node), (Without<HpTrail>, Without<HpRot>)>,
+    mut trails: Query<(&mut HpTrail, &mut Node), (Without<HpFill>, Without<HpRot>)>,
+    mut rots: Query<(&HpRot, &mut Node, &mut Visibility), (Without<HpFill>, Without<HpTrail>, Without<BlockBadge>)>,
     mut frames: Query<(&HpBar, &mut BorderColor)>,
     mut badges: Query<(&BlockBadge, &mut Visibility)>,
 ) {
@@ -1571,6 +1664,23 @@ fn update_bars(
             if node.width != w {
                 node.width = w;
             }
+        }
+    }
+    for (rot, mut node, mut vis) in &mut rots {
+        let Some((hp, max, _)) = stats(rot.0) else { continue };
+        let mut bite = session.shown.status(rot.0, StatusKind::Rot);
+        // Pestilence: Rot on foes bites twice
+        if matches!(rot.0, UnitRef::Enemy(_)) && session.shown.heroes.iter().any(|h| !h.downed && h.flags.contains_key("mor")) {
+            bite *= 2;
+        }
+        let bite = bite.min(hp.max(0));
+        vis.set_if_neq(if bite > 0 { Visibility::Inherited } else { Visibility::Hidden });
+        let (left, w) = (percent(100.0 * (hp - bite).max(0) as f32 / max.max(1) as f32), percent(100.0 * bite as f32 / max.max(1) as f32));
+        if node.left != left {
+            node.left = left;
+        }
+        if node.width != w {
+            node.width = w;
         }
     }
     let dt = time.delta_secs();
@@ -2530,6 +2640,12 @@ fn on_drop(
 #[derive(Resource, Default)]
 pub struct TooltipText(String);
 
+/// The tooltip's width, its distance from the stage's edges, and how high it may rise: to just
+/// under the bar along the top (health, gold, relics).
+const TIP_W: f32 = 330.0;
+const TIP_EDGE: f32 = 8.0;
+const TIP_TOP: f32 = 70.0;
+
 fn update_tooltip(
     session: Res<Session>,
     db: Res<Db>,
@@ -2539,7 +2655,7 @@ fn update_tooltip(
     units: Query<(&UnitWidget, &Hovered)>,
     relics: Query<(&RelicChip, &Hovered)>,
     mut tip: ResMut<TooltipText>,
-    mut panel: Single<(&mut Node, &mut Visibility), With<Tooltip>>,
+    mut panel: Single<(&mut Node, &mut Visibility, &ComputedNode), With<Tooltip>>,
 ) {
     let mut lines: Vec<(String, String)> = Vec::new();
     let mut at = Vec2::ZERO;
@@ -2564,12 +2680,23 @@ fn update_tooltip(
                     let desc = format!("{key}-desc");
                     // the kind first: it names the picture over the enemy's head
                     let kind = l10n.t(&format!("intent-{:?}", mv.intent));
-                    lines.push((format!("{kind} · {}", l10n.t(&key)), if l10n.has(&desc) { l10n.t(&desc) } else { String::new() }));
+                    // a hand-written line where there is one, else what the move does, read off it
+                    let text = if l10n.has(&desc) { l10n.t(&desc) } else { l10n.move_text(&mv.effects) };
+                    lines.push((format!("{kind} · {}", l10n.t(&key)), text));
+                    // the Werewolf's Beast Scent: the moves of the rounds after this one
+                    let ahead = session.my_hero().flags.get("foresight").copied().unwrap_or(0).clamp(0, 3) as usize;
+                    if ahead > 0 {
+                        let moves = &db.0.enemies[&e.def].moves;
+                        let next: Vec<String> = nav_core::combat::upcoming(&db.0, e, ahead).iter().filter_map(|m| moves.get(*m)).map(|m| l10n.t(&format!("move-{}", m.id))).collect();
+                        if !next.is_empty() {
+                            lines.push((l10n.t("battle-foresight"), next.join(" → ")));
+                        }
+                    }
                 }
             }
         }
         // everything the row under the unit shows, by name, with what it does
-        for c in status_row::chips(&l10n, &session, w.unit) {
+        for c in status_row::chips(&l10n, &db.0, &session, w.unit) {
             let name = match c.n {
                 Some(n) => format!("{} {}", c.name, c.shown.unwrap_or_else(|| n.to_string())),
                 None => c.name,
@@ -2579,14 +2706,24 @@ fn update_tooltip(
         at = Vec2::new((w.pos.x + UNIT_W + 6.0).min(STAGE_W - 350.0), w.pos.y + 80.0);
     }
     let body = lines.iter().map(|(k, v)| if v.is_empty() { k.clone() } else { format!("{k} — {v}") }).collect::<Vec<_>>().join("\n\n");
-    let (node, vis) = &mut *panel;
+    let (node, vis, shape) = &mut *panel;
     let want = if body.is_empty() { Visibility::Hidden } else { Visibility::Inherited };
     if **vis != want {
         **vis = want;
     }
     if !body.is_empty() {
-        node.left = px(at.x);
-        node.top = px(at.y);
+        // a long read grows wide rather than off the bottom of the screen: by its length, so the
+        // width does not flicker with the height it gives
+        let chars = body.chars().count();
+        let w = if chars < 1100 { TIP_W } else if chars < 2200 { TIP_W * 1.6 } else { TIP_W * 2.2 };
+        node.width = px(w);
+        // it stays on the stage: never past either side, and never below the bottom, rising as
+        // far as the bar at the top if it must
+        let h = shape.size().y * shape.inverse_scale_factor();
+        let x = at.x.min(STAGE_W - w - TIP_EDGE).max(TIP_EDGE);
+        let y = at.y.min(STAGE_H - h - TIP_EDGE).max(TIP_TOP);
+        node.left = px(x);
+        node.top = px(y);
     }
     if tip.0 != body {
         tip.0 = body;

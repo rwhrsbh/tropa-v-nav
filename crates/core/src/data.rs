@@ -310,6 +310,9 @@ data_enum!(Trigger {
 pub struct Passive {
     pub on: Trigger,
     pub effects: Vec<Effect>,
+    /// The power card this came from, once it lies on a hero (shown under them by its name).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub card: Id,
 }
 
 /// Overrides layered on a card: its upgrade, or the Beast side of a werewolf card.

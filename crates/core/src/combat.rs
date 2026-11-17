@@ -30,8 +30,13 @@ impl Ctx {
 /// A blow taking this share (percent) of the health a hero had before it may take a limb too.
 const MAIM_FROM: i32 = 30;
 const MOST_LIMBS: u8 = 2;
-/// A killing blow with this much (percent of whole health) still to spend takes the head.
+/// A killing blow with this much (percent of whole health) still to spend always takes the head.
 const BEHEAD_PAST: i32 = 40;
+/// A killing blow that takes at least this share (percent) of the health the hero had before it
+/// may take the head: a chance of `BEHEAD_CHANCE`, growing by two for every percent of whole
+/// health the blow had left over, up to certain at `BEHEAD_PAST`.
+const BEHEAD_FROM: i32 = 50;
+const BEHEAD_CHANCE: i32 = 20;
 
 /// Rounds a fight may run before the dark gathers on the heroes (see `StatusKind::Gloom`); an
 /// elite and a boss take longer to bring down, so they are given more.
@@ -88,6 +93,24 @@ pub fn bonus_ready(c: &Content, s: &Combat, slot: u8, effects: &[Effect]) -> boo
 
 /// One blow from no one in particular, for tests.
 #[doc(hidden)]
+/// The moves a foe will make in the rounds after the one it shows now, `n` of them, read off its
+/// pattern as the round start reads it (the Werewolf's Beast Scent sees them). A boss not yet in
+/// its second phase is foreseen as it is: the turn is not foretold.
+pub fn upcoming(c: &Content, e: &Enemy, n: usize) -> Vec<usize> {
+    let Some(d) = c.enemies.get(&e.def) else { return Vec::new() };
+    (1..=n)
+        .filter_map(|k| {
+            let step = e.step + k;
+            match e.flags.get("phase2") {
+                Some(since) if !d.phase2.is_empty() => d.phase2.get((step - (*since as usize).min(step)) % d.phase2.len()).copied(),
+                _ if step < d.opening.len() => d.opening.get(step).copied(),
+                _ if !d.pattern.is_empty() => d.pattern.get((step - d.opening.len()) % d.pattern.len()).copied(),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
 pub fn test_hit_hero(c: &Content, s: &mut Combat, slot: u8, n: i32) -> Vec<Event> {
     let mut ex = Exec { s, c, ev: Vec::new(), depth: 0 };
     let foe = ex.s.enemies.first().map(|e| UnitRef::Enemy(e.uid));
@@ -648,13 +671,13 @@ impl<'a> Exec<'a> {
                 } else {
                     d
                 };
-                // Baba Yaga mortar: reduces damage by 35% until 28+ damage taken in one turn (a
-                // `turn_` flag: it is forgotten as each round begins)
-                let d = if e.flags.contains_key("yaga_mortar") {
+                // Baba Yaga's mortar takes a third off every blow, until 28 or more have been
+                // struck at her in one round: then it is knocked aside till the next round
+                let d = if e.flags.contains_key("yaga_mortar") && !e.flags.contains_key("turn_mortar_broken") {
                     let taken = e.flags.entry("turn_mortar_damage".into()).or_insert(0);
                     *taken += d;
                     if *taken >= 28 {
-                        e.flags.remove("yaga_mortar");
+                        e.flags.insert("turn_mortar_broken".into(), 1);
                     }
                     d * 65 / 100
                 } else {
@@ -805,7 +828,12 @@ impl<'a> Exec<'a> {
             }
         }
         if fell && !self.unfound(i) {
-            if attack && past * 100 >= max_hp.max(1) * BEHEAD_PAST {
+            let over = past * 100 / max_hp.max(1);
+            let heavy = (lost + past) * 100 >= hp_before.max(1) * BEHEAD_FROM;
+            let headed = attack
+                && !self.s.foretelling
+                && (over >= BEHEAD_PAST || heavy && self.s.rng.chance((BEHEAD_CHANCE + over * 2).min(100)));
+            if headed {
                 // a head already gone is not lost twice
                 let first = !self.hero(i).walks_headless;
                 self.hero(i).beheaded = true;
@@ -1166,7 +1194,6 @@ impl<'a> Exec<'a> {
             self.ev.push(Event::Shuffled { player: p });
         }
         let Some(card) = self.hero(p).draw.pop() else { return };
-        self.ev.push(Event::PikeDrew { player: p, card: card.def.clone(), upgraded: card.upgraded });
         let h = &self.s.heroes[p as usize];
         let view = self.c.cards.get(&card.def).map(|d| d.view(card.upgraded, h.form));
         let barred = match &view {
@@ -1192,8 +1219,10 @@ impl<'a> Exec<'a> {
             }
         };
         let nobody = matches!(aim, CardTarget::Enemy | CardTarget::Downed | CardTarget::Anyone) && target.is_none();
+        let played = view.is_some() && !barred && !nobody;
+        self.ev.push(Event::PikeDrew { player: p, card: card.def.clone(), upgraded: card.upgraded, played });
         match view {
-            Some(view) if !barred && !nobody => self.resolve(p, card, view, target, 0, false),
+            Some(view) if played => self.resolve(p, card, view, target, 0, false),
             // shown going there by the pike's own flight (`Event::PikeDrew`)
             _ => self.hero(p).discard.push(card),
         }
@@ -1248,7 +1277,10 @@ impl<'a> Exec<'a> {
 
         let h = self.hero(p);
         if view.kind == CardType::Power {
-            h.powers.extend(view.passives.iter().cloned());
+            h.powers.extend(view.passives.iter().cloned().map(|mut p| {
+                p.card = card.def.clone();
+                p
+            }));
         } else if card.alien {
             // a copy of another's card is simply gone
         } else if view.has(Keyword::Exhaust) || card.free {
@@ -1727,8 +1759,9 @@ impl<'a> Exec<'a> {
                         for u in self.targets(ctx, *t) {
                             let n = if fresh && !first { self.amount(ctx, a) } else { n };
                             first = false;
-                            // the duck is on the wing: only blows that sweep everyone, and runes, reach it
-                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying"))) {
+                            // the duck is on the wing, the cat up his post: only blows that sweep
+                            // everyone, and runes, reach them
+                            if *t == Tgt::Target && matches!(u, UnitRef::Enemy(id) if self.s.enemy(id).is_some_and(|e| e.flags.contains_key("flying") || e.flags.contains_key("bayun_perch"))) {
                                 continue;
                             }
                             if self.strike(Some(ctx.src), u, n, ctx.attack) {
@@ -2332,6 +2365,12 @@ impl<'a> Exec<'a> {
             if round > 1 {
                 h.block = 0;
             }
+            // Rot bites at the start of the poisoned one's own turn, as poison does in StS
+            self.rot_tick(UnitRef::Hero(slot));
+            if self.s.heroes[slot as usize].downed {
+                continue;
+            }
+            let h = self.hero(slot);
             // dragged under, shaken by a quake, or caught in Mara's winter
             let less_energy = h.flags.remove("energy_less").unwrap_or(0) - h.flags.remove("energy_more").unwrap_or(0);
             // the bracers held through the foes' turn; what the plate took in it is remembered
@@ -2455,8 +2494,8 @@ impl<'a> Exec<'a> {
                 }
             }
             self.hero(slot).hand = keep;
+            // what Lisa borrowed goes back at the end of her turn (Rot now bites at the start of it)
             self.return_lent(slot);
-            self.rot_tick(UnitRef::Hero(slot));
         }
         // Morovitsa Doom countdown: it lifts when she is dead
         let morovitsa = self.s.enemies.iter().any(|e| e.alive && e.def == "morovitsa");
@@ -2529,6 +2568,11 @@ impl<'a> Exec<'a> {
                 continue;
             }
             self.s.enemies[idx].block = 0;
+            // Rot bites at the start of the foe's own turn, before it moves
+            self.rot_tick(UnitRef::Enemy(uid));
+            if !self.s.enemies[idx].alive {
+                continue;
+            }
             // bones lying since the heroes' turn come together instead of striking
             if self.s.enemies[idx].flags.remove(crate::state::BONES).is_some() {
                 let e = &mut self.s.enemies[idx];
@@ -2603,8 +2647,11 @@ impl<'a> Exec<'a> {
                         self.hurt(None, t, 5, false);
                     }
                 }
+                // Ogneya runs hotter with every lash of fire she throws
+                if attacks && self.s.enemy(uid).is_some_and(|e| e.alive && e.flags.contains_key("overheat")) {
+                    self.add_status(me, S::Strength, 1);
+                }
             }
-            self.rot_tick(me);
             if self.s.standing_heroes().next().is_none() {
                 break;
             }
@@ -2635,17 +2682,47 @@ impl<'a> Exec<'a> {
         }
     }
 
-    /// Rot: X damage, then one stack fewer.
+    /// Rot: X damage past any block, then one stack fewer.
     fn rot_tick(&mut self, u: UnitRef) {
         let rot = self.s.status(u, S::Rot);
         if rot > 0 && self.exists(u) {
             // Pestilence: Rot on enemies bites twice and does not fade
             let mor = matches!(u, UnitRef::Enemy(_)) && self.s.heroes.iter().any(|h| !h.downed && h.flags.contains_key("mor"));
-            self.hurt(None, u, rot, false);
+            // poison goes past block, as in StS: the block is set aside for the bite
+            let kept = self.take_block(u);
+            match u {
+                // nor does a guard take another's poison on himself
+                UnitRef::Hero(i) => {
+                    self.hero_take(None, i, rot, false);
+                }
+                UnitRef::Enemy(_) => {
+                    self.hurt(None, u, rot, false);
+                }
+            }
             if mor {
                 self.hurt(None, u, rot, false);
-            } else {
+            }
+            self.give_block(u, kept);
+            if !mor {
                 self.add_status(u, S::Rot, -1);
+            }
+        }
+    }
+
+    fn take_block(&mut self, u: UnitRef) -> i32 {
+        match u {
+            UnitRef::Hero(i) => std::mem::take(&mut self.s.heroes[i as usize].block),
+            UnitRef::Enemy(uid) => self.enemy_idx(uid).map(|i| std::mem::take(&mut self.s.enemies[i].block)).unwrap_or(0),
+        }
+    }
+
+    fn give_block(&mut self, u: UnitRef, b: i32) {
+        match u {
+            UnitRef::Hero(i) => self.s.heroes[i as usize].block = b,
+            UnitRef::Enemy(uid) => {
+                if let Some(i) = self.enemy_idx(uid) {
+                    self.s.enemies[i].block = b;
+                }
             }
         }
     }

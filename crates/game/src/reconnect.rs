@@ -37,6 +37,22 @@ struct Banner;
 
 fn watch(mut commands: Commands, time: Res<Time>, mut net: ResMut<Net>, mut status: ResMut<NetStatus>, mut w: ResMut<Watch>, steam: Option<Res<crate::steam::Steam>>, mut next: ResMut<NextState<AppState>>) {
     let dt = time.delta_secs();
+    // dev: `TROPA_LOSE=<s>` loses the line that many seconds in, a few seconds short of giving up
+    #[cfg(feature = "dev")]
+    if let Some(at) = std::env::var("TROPA_LOSE").ok().and_then(|v| v.parse::<f32>().ok()) {
+        if time.elapsed_secs() >= at {
+            let lost = status.lost.get_or_insert(GIVE_UP - 2.0);
+            *lost += dt;
+            if *lost >= GIVE_UP {
+                warn!("could not get back to the party in {GIVE_UP} s; leaving it (the host keeps the run saved)");
+                status.lost = None;
+                status.error = Some("coop-error-lost".into());
+                crate::net::leave(&mut commands, steam.as_deref(), &net);
+                next.set(AppState::Coop);
+            }
+            return;
+        }
+    }
     // an offline session (alone, or with bots in this process) has no line to lose
     let networked = net.lobby.is_some() || net.code == "LAN";
     if !networked {

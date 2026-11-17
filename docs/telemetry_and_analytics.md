@@ -1,136 +1,98 @@
-# Система телеметрии и балансной аналитики «Тропа в Навь»
+# Balance analytics
 
-## 1. Архитектура и назначение
+What the game writes down about every finished run, where it goes, and how to read it to see
+which cards, relics, enemies, heroes and builds carry runs and which do not.
 
-Система телеметрии предназначена для сбора детальной игровой статистики забегов, отслеживания баланса карт, опасности врагов и обнаружения перекосов сложности (имбовые связки против слабых карт, непроходимые враги против «груш для битья»).
+## What is recorded
 
-```mermaid
-flowchart LR
-    A[Конец забега в игре] --> B[Локальный лог: profiles/analytics.jsonl]
-    A --> C["Асинхронный HTTP POST (фоновый поток ureq)"]
-    C --> D["Google Apps Script Web App (Webhook)"]
-    D --> E[(Google Таблица)]
-    
-    subgraph Google Таблица
-        E --> S1[Лист: Забеги]
-        E --> S2[Лист: Аналитика Карт]
-        E --> S3[Лист: Баланс Врагов]
-    end
-    
-    subgraph Просмотр разработчиком
-        B --> F[Внутриигровой экран: Хроники -> Аналитика]
-        B --> G["CLI инструмент: tools/telemetry_parser.py"]
-        D --> G
-    end
-```
+The rules crate counts as the run is played (`crates/core/src/stats.rs`, kept in `Run::stats`,
+so it survives saves and travels with the party state):
 
----
+- **Per player:** every card played (times, damage, block), damage dealt and taken, block,
+  healing, times downed, potions drunk, gold gained and spent, every deck change (added,
+  upgraded, removed; act and floor) and every relic gained (and from where).
+- **Per fight:** act, floor, kind (fight, elite, boss), the foes, won or not, rounds, HP each hero
+  lost, damage by foe kind, heroes downed, cards played, potions drunk.
+- **Every offer:** each card, relic and potion shown in a reward, the shop, a chest or a trophy,
+  to whom, whether it was taken, and the price in the shop. This is what tells what keeps
+  appearing but is passed over.
+- **Omens:** which choice was made at each omen.
 
-## 2. Формат данных телеметрии
+When the run ends (won or lost), `crates/game/src/analytics.rs` adds the end state: every
+player's deck, relics, potions, HP and gold, the foe that ended the run, and the player's
+**build**.
 
-Каждый забег сериализуется в JSON следующей структуры:
+### Builds
 
-```json
-{
-  "run_id": "run_1710185920",
-  "version": "0.1.8",
-  "circle": 1,
-  "act": 4,
-  "floor": 19,
-  "won": true,
-  "heroes": ["ilya", "dobrynya"],
-  "final_deck": ["strike_ilya", "shield_slam", "heavy_armor"],
-  "relics": ["bogatyr_shield", "alatyr_shard"],
-  "cards_played": {
-    "strike_ilya": 24,
-    "shield_slam": 12
-  },
-  "enemies_summary": {
-    "kot_bayun": { "damage_dealt": 18, "hero_kills": 0 },
-    "koschei": { "damage_dealt": 48, "hero_kills": 0 }
-  }
-}
-```
+Each card belongs to one or more *families* by what it does (`family_of`): rot, bleed, hex,
+fear, debuff, strength, thorns, valor, block, runes, discard, exhaust, draw, energy, heal, brew,
+masks, shift, drowse, pike, echo, aoe, multi_hit, retain, coop, powers. Starting cards, curses
+and statuses do not count. A family held by a quarter of the remaining cards is a lead; the
+build is the one or two strongest leads joined with `+` (draw, energy, block and powers support
+every deck and never name one), or `mixed`. So a Hunter deck full of bleed cards reads
+`bleed`, a Volkhv deck of runes and hex `runes+hex`.
 
----
+A new card mechanic needs a family: add it in `family_of`. The test
+`every_reward_card_has_a_family` fails when more than a tenth of the cards have none.
 
-## 3. Google Таблицы и Apps Script Webhook
+## Where it goes
 
-Скрипт развёртывания находится в [`tools/google_sheets_telemetry.js`](file:///D:/grok-test/slaythespireclone/tools/google_sheets_telemetry.js).
+1. A line in `<user dir>/profiles/analytics.jsonl` (the in-game screen Chronicle → Analytics reads
+   it).
+2. The same line in `profiles/analytics_pending.jsonl`, then posted in a background thread to the
+   sheet's web app. A line that fails stays in the pending file and is tried again at the next
+   start. The sheet ignores a run it already has, so a retry never doubles a row.
 
-### Автоматически формируемые листы:
-1. **Лист «Забеги»**:
-   - Полный журнал каждого сыгранного забега: дата, результат, круг, акт, этаж, состав отряда, финальная колода, реликвии, сводки по сыгранным картам и урону врагов.
-2. **Лист «Аналитика Карт»**:
-   - Агрегирует статистику по каждой карте: сколько раз брали в колоду, сколько побед, процент побед (`% Побед`), общее число розыгрышей в боях.
-   - Автоматически выставляет статус баланса:
-     - 🌟 **ИМБА** — взята $\ge 3$ раз, винрейт $\ge 65\%$.
-     - 💀 **СЛАБАЯ** — взята $\ge 3$ раз, винрейт $\le 35\%$.
-     - ⚖️ **В НОРМЕ** — в пределах нормы.
-3. **Лист «Баланс Врагов»**:
-   - Учитывает количество встреч, суммарный урон, средний урон за бой и число убитых героев.
-   - Автоматически выставляет статус:
-     - ☠️ **ГРОЗА ЗАБЕГОВ** — средний урон $\ge 35$ либо есть убийства героев.
-     - 🥊 **ГРУША ДЛЯ БИТЬЯ** — средний урон $< 8$.
-     - ⚖️ **СБАЛАНСИРОВАН** — сбалансированная угроза.
+In a party only the **host** sends, once for everyone; LAN and Steam parties are sent like solo
+runs. Only the dev autopilot's own runs (`bot_me`) are left out; a dev session with autopilot
+allies is sent with mode `bots`.
 
-### Защита от одновременных запросов (`LockService`)
-Для предотвращения race condition (когда несколько клиентов одновременно завершают забеги и отправляют телеметрию) в Google Apps Script используется механизм script-level блокировки:
-```javascript
-var lock = LockService.getScriptLock();
-lock.waitLock(30000); // Ожидание очереди до 30 секунд
-try {
-  // Выполнение вставок и подсчетов
-  SpreadsheetApp.flush(); // Гарантированный коммит данных
-} finally {
-  lock.releaseLock();
-}
-```
+The address is `telemetry_url` in `assets/config.ron`, or the `TROPA_TELEMETRY_URL` environment
+variable, which wins. Empty means nothing is sent; the local file is still written.
 
----
+## The sheet
 
-## 4. Конфигурация в игре
+`tools/google_sheets_telemetry.js` is the whole server side: a Google Apps Script bound to a
+Google Sheet.
 
-URL вебхука настраивается в файле [`assets/config.ron`](file:///D:/grok-test/slaythespireclone/assets/config.ron):
+### Setting it up (or redeploying after a change)
 
-```ron
-(
-    steam_app_id: 480,
-    telemetry_url: "https://script.google.com/macros/s/AKfycbxgtLECTC7pTGTBDl9vM5VWaqxCYq1J0TDC3ibGilgG7zooomVp3XZy0CiSAa4MOeFz/exec",
-)
-```
+1. Open the sheet → Extensions → Apps Script. Paste the file over `Code.gs`, save.
+2. Deploy → New deployment → type *Web app*; execute as *Me*, access *Anyone*. Copy the `/exec`
+   address into `telemetry_url`. Changing the code later: Deploy → Manage deployments → edit →
+   *New version* (the address stays the same; saving the code alone changes nothing live).
+3. Reload the sheet: an «Аналитика» menu appears. Run «Пересчитывать каждый час» once (it asks
+   for permission) so the summaries refresh by themselves.
+4. Check it is alive: open the `/exec` address in a browser, it answers
+   `{"ok":true,"sheets":[…]}`.
 
-Также поддерживается переменная окружения:
-```bash
-set TROPA_TELEMETRY_URL=https://script.google.com/.../exec
-```
+### Raw sheets (written by each run)
 
-> [!NOTE]
-> Отправка телеметрии из игры выполняется в отдельном потоке (background thread) с таймаутом 5 секунд. При отсутствии интернета или сбое сети игра не зависает и не крашится, а данные продолжают сохраняться в локальный файл `profiles/analytics.jsonl`.
+| Sheet | One row per |
+|---|---|
+| Забеги | run: version, mode, result, circle, act, floors, elites, bosses, heroes, killed_by |
+| Игроки | player in a run: hero, build, families, deck, relics, potions, damage, block, healing, gold |
+| Бои | fight: act, floor, kind, foes, won, rounds, HP lost by the party, downed, damage by foe |
+| Предложения | card, relic or potion offered: to which hero, from where, taken or not, price |
+| Карты_игра | card per player per run: times played, damage, block |
 
----
+### Summary sheets (rebuilt by «Пересчитать»)
 
-## 5. Внутриигровой дашборд аналитики
+- **Карты:** offered, taken, *pick_rate*, bought, in how many final decks, *win_rate* of those
+  decks and *win_delta* against all players' win rate, plays per deck, damage and block per play.
+  Often offered with a low pick rate: nobody wants it. Taken often with a negative win delta: a
+  trap. Rarely played though held: dead weight in hand.
+- **Реликвии:** offered, taken, pick rate, held, win rate and delta.
+- **Враги:** fights, how many of those ended the run, times it struck the last blow, average HP
+  each hero lost, damage each hero took from it, rounds.
+- **Встречи:** the same per encounter (kind plus the set of foes).
+- **Герои / Сборки:** runs, wins, win rate and delta, damage dealt and taken, deck size; per hero
+  and per hero with build. A build that is common but loses is a planned build that does not
+  work; a build that never shows up was never offered enough cards to form.
 
-Игрок и разработчик могут просматривать статистику прямо в интерфейсе игры:
-- Главное меню -> **Хроники** -> кнопка **Аналитика забегов**.
-- Отображает общие метрики забегов, победы/поражения, а также таблицы баланса карт и врагов.
+Small numbers lie: read a rate only once its row has a few dozen runs behind it.
 
----
+## In the game
 
-## 6. CLI-инструмент разработчика (`tools/telemetry_parser.py`)
-
-Инструмент позволяет анализировать баланс в терминале без открытия браузера.
-
-### Основные команды:
-
-```bash
-# 1. Быстрый локальный парсинг сохранённых забегов (profiles/analytics.jsonl):
-python tools/telemetry_parser.py --local
-
-# 2. Проверка связи с Google Apps Script вебхуком:
-python tools/telemetry_parser.py --test-ping
-
-# 3. Стресс-тест одновременной отправки и наполнение Google Таблицы тестовыми данными:
-python tools/telemetry_parser.py --send-test-data --concurrent 6
-```
+Chronicle → Analytics shows the local history: runs and wins, the cards offered most and taken
+least, and the builds by hero with their win rate.

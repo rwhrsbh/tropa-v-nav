@@ -1,16 +1,128 @@
-# Враги — промпты
+# Враги — полный пайплайн генерации и промпты
 
-Файл-цель: `assets/enemies/<id>-gemini.png`. После генерации: `python tools/cutout.py <скачанный файл> enemies/<id> <ширина> <высота>`.
+> [!CAUTION]
+> **КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО: ПРОПОРЦИИ И КАДРИРОВАНИЕ (ASPECT RATIOS & MARGINS)**
+> В Google Flow (Nano Banana 2.1) **ОБЯЗАТЕЛЬНО** переключайте соотношение сторон в селекторе настроек (Триггер настроек) И явно прописывайте его в первой строке промпта!
+> Если пропорция не выбрана явно, генератор по умолчанию выдает `16:9` (альбомный widescreen). В таком формате вертикальные персонажи зверски обрезаются сверху и снизу (отрубленные головы, обрезанные ноги, перья, срезанные ветки), что делает их полностью непригодными для использования в игре!
 
-Каждый запрос = **описание** + **хвост**. Размеры: обычный враг 512×768 (портрет 2:3), элита 1024×1024 (1:1), босс 1536×1536 (1:1).
+## 1. Таблица обязательных пропорций и размеров
 
-## Хвост для врагов (в конец каждого запроса)
+| Тип ассета | Пропорция во Flow UI | Промпт во Flow | Итоговый размер в игре | Инструмент обработки |
+| :--- | :--- | :--- | :--- | :--- |
+| **Обычные враги (стоячие)** | `3:4` (портрет) | `portrait 3:4 aspect ratio` | `512×768` | `tools/cutout.py <file> enemies/<id> 512 768` |
+| **Элиты и Боссы (стоячие)** | `1:1` (квадрат) | `square 1:1 aspect ratio` | `1024×1024` или `1536×1536` | `tools/cutout.py <file> enemies/<id> 1024 1024` |
+| **Герои (стоячие)** | `3:4` (портрет) | `portrait 3:4 aspect ratio` | `768×1024` | `tools/cutout.py <file> heroes/<id> 768 1024` |
+| **Маска сочленений (`_colour_mask`)** | Совпадает с базовым (`1:1` или `3:4`) | `square 1:1` или `portrait 3:4` | Совпадает с оригиналом | `tools/rigparts.py` |
+| **Стоячий без головы (`_headless`)** | Совпадает с базовым (`1:1` или `3:4`) | `square 1:1` или `portrait 3:4` | Совпадает с оригиналом | `tools/rigparts.py` |
+| **Атака (`_strike`)** | Совпадает с базовым (`1:1` или `3:4`) | `square 1:1` или `portrait 3:4` | Совпадает с оригиналом | `tools/cutout.py` |
+| **Урон / получение удара (`_hurt`)** | Совпадает с базовым (`1:1` или `3:4`) | `square 1:1` или `portrait 3:4` | Совпадает с оригиналом | `tools/cutout.py` |
+| **Защита / щит (`_guard`)** | Совпадает с базовым (`1:1` или `3:4`) | `square 1:1` или `portrait 3:4` | Совпадает с оригиналом | `tools/cutout.py` |
+| **Труп с головой (`_dead`)** | **`16:9` (альбомный)** | **`wide 16:9 aspect ratio`** | `1152×768` (обычный) / `1536×1024` (босс/элита) | `tools/cutout.py` |
+| **Труп без головы (`_dead_headless`)**| **`16:9` (альбомный)** | **`wide 16:9 aspect ratio`** | `1152×768` (обычный) / `1536×1024` (босс/элита) | `tools/cutout.py` |
+| **Арены / Локации (фон битвы)** | **`16:9` (альбомный)** | `wide 16:9 aspect ratio` | `1920×1080` | `tools/cutout.py` / `stands.ron` |
 
+---
+
+## 2. Строгие правила кадрирования и чистоты фона
+
+1. **Видимый зазор со всех четырех сторон (Margins)**:
+   - Вся фигура персонажа обязана целиком помещаться в кадр.
+   - Ноги / когти / копыта должны стоять на плоскости земли около нижнего края, но **НЕ** касаться и **НЕ** обрезаться нижней рамкой (`diff[-1, :].sum() == 0`).
+   - Голова, шлем, корона, рога, поднятое оружие или крылья должны иметь свободный зазор до верхнего края (`diff[0, :].sum() == 0`).
+   - Руки, хвосты, крылья, посохи, косы не должны срезаться боковыми рамками (`diff[:, 0].sum() == 0` и `diff[:, -1].sum() == 0`).
+   - **Запрещены любые срезанные элементы фона**: никаких веток деревьев, сучьев, валунов, берегов рек, упирающихся в края кадра! Если персонаж сидит на шесте (как Кот Баюн), шест должен быть частью фигуры и иметь отступы до краев.
+2. **Сплошной чистый хромакей `#00FF00`**:
+   - Фон должен быть монолитным чисто зеленым `#00FF00` (без градиентов, без дымки, без тени под ногами, без текстуры травы или камня).
+   - На самом персонаже не должно быть чистого салатово-зеленого оттенка (чтобы не просвечивал при кеинге).
+   - Даже для поверженных трупов (`_dead` и `_dead_headless`) фон **ОБЯЗАН** быть чистым зеленым `#00FF00` без текстуры пола или грязи.
+
+---
+
+## 3. Маски расчленения и рига (Rigging Masks & Headless)
+
+В игре работает физический шейдерный 2D-риг с отлетающими головами и вращающимися сочленениями (`crates/game/src/battle/rig.rs`).
+
+### А. Цветовая маска (`<id>_colour_mask.jpg`)
+В Flow загружается базовый спрайт персонажа как референс (`.jpg`). Обязательно дожидаться завершения загрузки (`aria-busy="false"` на чипе).
+Промпт:
+```text
+Edit the attached picture: one single image, [square 1:1 / portrait 3:4], no text, no labels, no divider. Keep the SAME character figure, pose, framing, size, position, lighting and plain green background pixel for pixel. Only paint these parts as flat solid colours, clean silhouettes with no shading:
+- whole head with hair, beard, crown and face in pure cyan #00FFFF;
+- main striking forearm, hand and whole weapon (sabre/scythe/mace/claws) in pure magenta #FF00FF;
+- secondary off-arm, hand, shield, second wing or accessory in pure yellow #FFFF00.
+Everything else unchanged.
+```
+
+### Б. Обезглавленное стоячее тело (`<id>_headless.jpg`)
+В Flow загружается базовый стоячий спрайт персонажа.
+Промпт:
+```text
+DECAPITATE the attached figure. Keep the picture exactly the same, same body, pose, framing, size, colours and plain green background, one single image, [square 1:1 / portrait 3:4], no text. Only the whole head is gone: cut off and absent. Where the head was, a raw bloody neck stump with exposed gore and dripping blood, in the same painted style. Nothing else changes.
+```
+
+### В. Извлечение частей и регистрация суставов
+Скрипт `tools/rigparts.py` сопоставляет маску и тело, вырезает части и вычисляет координаты суставов вращения:
+```bash
+python tools/rigparts.py assets/enemies/<id>-gemini.png _generated_review/<id>_headless.jpg _generated_review/<id>_colour_mask.jpg assets/enemies <id> _generated_review/<id>_parts_preview.png
+```
+Скрипт выводит строку для `crates/game/src/battle/rig.rs:FIGURES`:
+```rust
+("enemies/<id>", &[(Part::Head, Vec2::new(x, y), 1.0), (Part::Shield, Vec2::new(x, y), 0.8), (Part::Arm, Vec2::new(x, y), 1.0)]),
+```
+Эта строка **обязательно** вносится в массив `FIGURES` в `crates/game/src/battle/rig.rs`.
+
+---
+
+## 4. Спецификация боевых спрайтов (Combat Action Sprites)
+
+Каждый враг и герой в игре имеет полный набор уникальных спрайтов действий на чистом зеленом фоне `#00FF00`:
+1. `<id>-gemini.png`: Базовая нейтральная стойка (в 3/4 лицом влево для врагов, вправо для героев).
+2. `<id>_strike-gemini.png`: Агрессивный динамичный выпад вперед, замах оружием или когтями.
+3. `<id>_hurt-gemini.png`: Резкая отдача назад от мощного удара, тело запрокинуто назад, раскрытый в крике боли рот.
+4. `<id>_guard-gemini.png`: Глухая оборонительная стойка, блок щитом, скрещенным оружием или крыльями.
+5. `<id>_dead-gemini.png`: Поверженный труп на полу в горизонтальной композиции (`16:9`), глаза закрыты.
+6. `<id>_dead_headless-gemini.png`: Поверженный труп на полу в `16:9`, но с отрубленной головой и кровавым срезом шеи.
+
+Обработка всех боевых спрайтов:
+```bash
+# Для стоячих (элиты/боссы 1024x1024, обычные 512x768):
+python tools/cutout.py _generated_review/<id>_<action>.jpg enemies/<id>_<action> <width> <height>
+
+# Для трупов (боссы 1536x1024, обычные 1152x768):
+python tools/cutout.py _generated_review/<id>_dead.jpg enemies/<id>_dead 1536 1024
+python tools/cutout.py _generated_review/<id>_dead_headless.jpg enemies/<id>_dead_headless 1536 1024
+```
+
+---
+
+## 5. Локации и маски стояния ног (Location Stands)
+
+Фоновые локации битвы (`assets/bg/<id>-gemini.png`) имеют размер `1920×1080` (16:9).
+Чтобы персонажи не висели в воздухе, не стояли в воде или на вертикальных стенах, создается маска стояния ног:
+1. Задник локации подается во Flow с промптом расставить маркеры точек опоры на реальной плоскости земли / твердого пола.
+2. **Герои (слева)**: 4 красные точки `#FF0000` (слоты 0..3 от передовой вглубь).
+3. **Враги (справа)**: 4 циановые точки `#00FFFF` (одиночный враг встает в центр, остальные распределяются по рангам).
+4. Центроиды точек детектируются и записываются в `assets/data/stands.ron`:
+```ron
+"bg/<backdrop_id>": (
+    heroes: [(x1, y1), (x2, y2), (x3, y3), (x4, y4)],
+    foes: [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
+),
+```
+5. Модуль `crates/game/src/battle/stands.rs` читает эту таблицу при старте боя и ставит базовую линию ног каждого персонажа ровно в координаты опорных точек пола.
+
+---
+
+## 6. Базовый мастер-стиль и описания врагов
+
+```text
+Style: dark painterly digital oil painting, visible thick brushstrokes, heavy chiaroscuro, single key light from upper left, cold rim light, limited palette of soot black, bone white, rust red, swamp green, candle amber, cold blue. Slavic folk tale, inspired by 19th-century Russian painting (Vasnetsov, Vrubel). Grim, grounded, readable silhouette. No text, no letters, no watermark, no frame, no modern objects.
+```
+
+Хвост для промпта:
 ```text
 Single full-body creature, three-quarter view facing left, feet on the ground near the bottom edge, whole figure inside the frame with a small margin, nothing cropped. Flat solid pure green #00FF00 background, no ground shadow, no background elements, no green on the character. No particles, sparks, embers, snow, smoke, magic aura or glow effects around the character: effects are added later in the game engine. Style: dark painterly digital oil painting, visible thick brushstrokes, heavy chiaroscuro, single key light from upper left, cold rim light, limited palette of soot black, bone white, rust red, swamp green, candle amber, cold blue. Slavic folk tale, inspired by 19th-century Russian painting (Vasnetsov, Vrubel). Grim, grounded, readable silhouette. No text, no letters, no watermark, no frame, no modern objects.
 ```
-
-Начало каждого запроса: `Generate an image, portrait 2:3 aspect ratio.` (для элит и боссов — `square 1:1 aspect ratio`).
 
 ## Акт 1. Чёрный лес
 
@@ -97,3 +209,16 @@ Single full-body creature, three-quarter view facing left, feet on the ground ne
 
 Боссы первого и второго актов (Идолище Поганое, Вихорь, Горе-Злосчастье, Злой Домовой), их значки и карта Горе —
 `docs/prompts/plots/bosses2.json`. Соловей, Корочун, Баба-Яга и Водяной царь с тех пор — элиты.
+
+## Kot Bayun off his post (`kot_bayun_ground*`)
+
+While `bayun_perch` is set he is drawn on his post (`kot_bayun`, `_strike`, `_hurt`, `_guard`);
+once he leaps down the game swaps in the `_ground` set. Each was painted in Flow from the resting
+picture attached as the look only (an edit of the perched picture kept the floating perch pose:
+ask for a completely new picture). Keyed with `tools/key_flood.py`, taken in with
+`tools/pose_in.py`.
+
+- `kot_bayun_ground`: Use the attached picture ONLY for what the cat looks like (huge black scarred cat, orange eyes, bristling fur, painted style, lighting). Draw a completely new picture, square 1:1, one single image, no text: the cat STANDING on the ground on all four straight legs, full side view, body horizontal, facing left, back arched and fur raised, head low and snarling at the viewer's left, tail raised high in a curve ABOVE his back. All four paws touch one flat ground line at the bottom of the picture; nothing hangs below the paws. No post, no stump, no rock. The whole cat inside the frame with a margin on every side. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
+- `kot_bayun_ground_strike`: Use the attached picture for what the cat looks like (the SAME huge black scarred cat, orange eyes, same fur, painted style, lighting and size). New pose, square 1:1, one single image, no text: he LUNGES forward to the left, striking with one front paw raised high, claws fully out, mouth wide open in a hiss, hind legs pushing off the ground, body stretched low. No post, no stump. Whole cat inside the frame with a margin on every side, his hind paws near the bottom. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
+- `kot_bayun_ground_hurt`: Use the attached picture for what the cat looks like (the SAME huge black scarred cat, orange eyes, same fur, painted style, lighting and size). New pose, square 1:1, one single image, no text: he has just been struck hard and REELS BACK to the right, away from the blow, head thrown back with eyes squeezed shut and mouth open in a yowl, front paws lifted off the ground, hind legs braced, fur flattened, a little dark blood on his shoulder. No post, no stump. Whole cat inside the frame with a margin on every side, his hind paws near the bottom. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.
+- `kot_bayun_ground_guard`: Use the attached picture for what the cat looks like (the SAME huge black scarred cat, orange eyes, same fur, painted style, lighting and size). New pose, square 1:1, one single image, no text: he crouches low and defensive on the ground, facing left, body pressed down and coiled, ears flattened back, fur bristling, one front paw raised before his face to ward off a blow, tail wrapped around his flank. No post, no stump. Whole cat inside the frame with a margin on every side, his paws near the bottom. Flat solid pure green #00FF00 background, no ground texture, no shadow, no green on the cat.

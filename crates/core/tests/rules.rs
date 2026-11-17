@@ -162,13 +162,26 @@ fn rot_ticks_then_shrinks() {
 }
 
 #[test]
-fn rot_on_a_hero_ticks_at_end_of_their_turn() {
+fn rot_on_a_hero_ticks_at_the_start_of_their_next_turn() {
     let (c, mut s) = solo(&["t_hit"], &["spore", "dummy"]);
     let t = foe(&s, 0);
     play(&c, &mut s, 0, "t_hit", Some(t));
     assert_eq!(s.status(ME, S::Rot), 3);
     end_round(&c, &mut s);
     assert_eq!((s.heroes[0].hp, s.status(ME, S::Rot)), (47, 2));
+}
+
+#[test]
+fn rot_on_a_foe_bites_before_it_moves() {
+    // as poison in StS: a foe poisoned to death never gets its blow in
+    let (c, mut s) = solo(&["t_rot"], &["hitter"]);
+    let t = foe(&s, 0);
+    s.enemies[0].hp = 3;
+    play(&c, &mut s, 0, "t_rot", Some(t));
+    let hp = s.heroes[0].hp;
+    end_round(&c, &mut s);
+    assert!(!s.enemies[0].alive);
+    assert_eq!(s.heroes[0].hp, hp);
 }
 
 #[test]
@@ -1573,7 +1586,8 @@ fn test_vulnerable_applied_by_enemy_does_not_burn_in_same_round() {
     // Round 3 execution: hero takes 13 damage
     let hp_before_venom = s.heroes[0].hp;
     end_round(&c, &mut s);
-    assert_eq!(hp_before_venom - s.heroes[0].hp, 13, "Hero took 13 damage from venom under Vulnerable");
+    // 13 from the bite under Vulnerable, then the Rot 3 it laid bites at the start of the hero's turn
+    assert_eq!(hp_before_venom - s.heroes[0].hp, 13 + 3, "Hero took 13 damage from venom under Vulnerable, then Rot 3");
     // After Round 3, the Vulnerable stack that was active during the attack finally expires
     assert_eq!(s.status(UnitRef::Hero(0), StatusKind::Vulnerable), 0, "Vulnerable expires after taking the attack");
 }
@@ -1675,4 +1689,31 @@ fn a_move_stunned_out_of_is_tried_again_next_round() {
     assert_eq!(s.enemies[0].intent.clone().unwrap().mv, first, "still counting its coins, not throwing them");
     end_round(&c, &mut s);
     assert_ne!(s.enemies[0].intent.clone().unwrap().mv, first, "and once it has, it goes on");
+}
+
+#[test]
+fn a_move_scared_out_of_is_tried_again_next_round() {
+    let c = content();
+    let party = [hero("t_plain", &["t_block"])];
+    let (mut s, _) = start(&c, &party, &ids(&["kladovik"]), 3);
+    // the purse is filled, the throw comes next; fear makes it drop the throw this round
+    end_round(&c, &mut s);
+    let throw = s.enemies[0].intent.clone().unwrap().mv;
+    s.enemies[0].statuses.insert(StatusKind::Fear, 1000);
+    end_round(&c, &mut s);
+    assert_eq!(s.enemies[0].intent.clone().unwrap().mv, throw, "it throws its coins next round instead");
+}
+
+#[test]
+fn the_hail_of_coins_strikes_every_hero_alike() {
+    let c = content();
+    let party = [hero("t_plain", &["t_block"]), hero("t_plain", &["t_block"])];
+    let (mut s, _) = start(&c, &party, &ids(&["kladovik"]), 3);
+    let hail = c.enemies["kladovik"].moves.iter().position(|m| m.id == "coin_hail").unwrap();
+    s.enemies[0].intent = Some(Intent { mv: hail, target: None });
+    let before: Vec<i32> = s.heroes.iter().map(|h| h.hp + h.block).collect();
+    end_round(&c, &mut s);
+    let lost: Vec<i32> = s.heroes.iter().zip(&before).map(|(h, b)| b - h.hp - h.block).collect();
+    assert!(lost[0] > 0, "the first hero is struck");
+    assert_eq!(lost[0], lost[1], "and the second just as hard");
 }

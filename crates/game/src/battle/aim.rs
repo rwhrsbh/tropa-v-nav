@@ -27,7 +27,7 @@ const NOBODY: Color = Color::srgb(0.85, 0.81, 0.72);
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<Aim>().add_systems(
         Update,
-        (track, (draw_arrow, forecast)).chain().after(pick_hover).before(layout_hand).run_if(in_state(AppState::Battle)).run_if(resource_exists::<Session>),
+        (track, (draw_arrow, forecast)).chain().after(pick_hover).before(layout_hand).run_if(in_state(AppState::Battle)).distributive_run_if(resource_exists::<Session>),
     );
     app.add_systems(Update, raise_hint.run_if(in_state(AppState::Battle)).run_if(resource_exists::<Session>));
     // the energy line is refreshed by update_labels; the forecast goes over it

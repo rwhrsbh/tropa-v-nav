@@ -138,51 +138,53 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/kostomakha", &[(Part::Head, Vec2::new(0.473, 0.143), 1.0), (Part::Shield, Vec2::new(0.888, 0.338), 0.8), (Part::Arm, Vec2::new(0.460, 0.381), 1.0)]),
     ("enemies/mara", &[(Part::Head, Vec2::new(0.54, 0.22), 1.0), (Part::Shield, Vec2::new(0.58, 0.45), 0.8), (Part::Arm, Vec2::new(0.32, 0.42), -0.5)]),
     ("enemies/poludnitsa", &[(Part::Head, Vec2::new(0.464, 0.219), 1.0), (Part::Shield, Vec2::new(0.387, 0.406), 0.8), (Part::Arm, Vec2::new(0.545, 0.406), 1.0)]),
-    ("enemies/kot_bayun", &[(Part::Head, Vec2::new(0.5, 0.396), 1.0)]),
-    ("enemies/mokhovik", &[(Part::Head, Vec2::new(0.5, 0.394), 1.0)]),
-    ("enemies/nochnitsa", &[(Part::Head, Vec2::new(0.5, 0.3), 1.0)]),
-    ("enemies/baba_yaga", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
-    ("enemies/polunochnitsa", &[(Part::Head, Vec2::new(0.499, 0.281), 1.0)]),
-    ("enemies/zlyden", &[(Part::Head, Vec2::new(0.5, 0.347), 1.0)]),
-    ("enemies/morovitsa", &[(Part::Head, Vec2::new(0.499, 0.281), 1.0)]),
-    ("enemies/ogneya", &[(Part::Head, Vec2::new(0.5, 0.3), 1.0)]),
-    ("enemies/sea_guard", &[(Part::Head, Vec2::new(0.499, 0.301), 1.0)]),
-    ("enemies/gagana", &[(Part::Head, Vec2::new(0.5, 0.375), 1.0)]),
-    ("enemies/gorynych", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/gorynych_fire", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/gorynych_poison", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/gorynych_thunder", &[(Part::Head, Vec2::new(0.499, 0.347), 1.0)]),
-    ("enemies/solovey", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
-    ("enemies/korochun", &[(Part::Head, Vec2::new(0.499, 0.3), 1.0)]),
-    ("enemies/vodyanoy_tsar", &[(Part::Head, Vec2::new(0.499, 0.318), 1.0)]),
+    ("enemies/kot_bayun", &[(Part::Head, Vec2::new(0.34, 0.26), 1.0)]),
+    ("enemies/kot_bayun_ground", &[(Part::Head, Vec2::new(0.28, 0.5), 1.0)]),
+    ("enemies/mokhovik", &[(Part::Head, Vec2::new(0.419, 0.301), 1.0), (Part::Shield, Vec2::new(0.131, 0.514), 0.8), (Part::Arm, Vec2::new(0.747, 0.408), 1.0)]),
+    ("enemies/nochnitsa", &[(Part::Head, Vec2::new(0.617, 0.238), 1.0), (Part::Arm, Vec2::new(0.390, 0.281), 1.0)]),
+    ("enemies/baba_yaga", &[(Part::Head, Vec2::new(0.543, 0.275), 1.0), (Part::Arm, Vec2::new(0.186, 0.080), 1.0)]),
+    ("enemies/polunochnitsa", &[(Part::Head, Vec2::new(0.495, 0.223), 1.0), (Part::Arm, Vec2::new(0.157, 0.278), 1.0)]),
+    ("enemies/zlyden", &[(Part::Head, Vec2::new(0.431, 0.329), 1.0)]),
+    ("enemies/morovitsa", &[(Part::Head, Vec2::new(0.540, 0.223), 1.0), (Part::Shield, Vec2::new(0.630, 0.393), 0.8), (Part::Arm, Vec2::new(0.314, 0.033), 1.0)]),
+    ("enemies/ogneya", &[(Part::Head, Vec2::new(0.626, 0.315), 1.0), (Part::Arm, Vec2::new(0.407, 0.427), 1.0)]),
+    ("enemies/sea_guard", &[(Part::Head, Vec2::new(0.562, 0.199), 1.0), (Part::Arm, Vec2::new(0.212, 0.040), 1.0)]),
+    ("enemies/gagana", &[(Part::Head, Vec2::new(0.292, 0.259), 1.0), (Part::Shield, Vec2::new(0.789, 0.573), 0.8), (Part::Arm, Vec2::new(0.571, 0.182), 1.0)]),
+    // Gorynych's heads are units of their own: each is drawn as its head and neck alone over an
+    // empty body, on the one sheet the shared body (`battle::gorynych`) is drawn on
+    ("enemies/gorynych_fire", &[(Part::Head, Vec2::new(0.494, 0.671), 1.0)]),
+    ("enemies/gorynych_poison", &[(Part::Head, Vec2::new(0.609, 0.475), 1.0)]),
+    ("enemies/gorynych_thunder", &[(Part::Head, Vec2::new(0.666, 0.598), 1.0)]),
+    ("enemies/solovey", &[(Part::Head, Vec2::new(0.379, 0.303), 1.0), (Part::Shield, Vec2::new(0.378, 0.258), 0.8), (Part::Arm, Vec2::new(0.279, 0.269), 1.0)]),
+    ("enemies/korochun", &[(Part::Head, Vec2::new(0.496, 0.219), 1.0), (Part::Shield, Vec2::new(0.661, 0.436), 0.8), (Part::Arm, Vec2::new(0.172, 0.202), 1.0)]),
+    ("enemies/vodyanoy_tsar", &[(Part::Head, Vec2::new(0.473, 0.405), 1.0), (Part::Shield, Vec2::new(0.657, 0.472), 0.8), (Part::Arm, Vec2::new(0.148, 0.037), 1.0)]),
     // the new wave: one picture each, cut at the neck by tools/foe_rig.py
-    ("enemies/biryuk", &[(Part::Head, Vec2::new(0.37, 0.30), 1.0)]),
-    ("enemies/podmenysh", &[(Part::Head, Vec2::new(0.574, 0.262), 1.0)]),
-    ("enemies/polevik", &[(Part::Head, Vec2::new(0.472, 0.245), 1.0)]),
-    ("enemies/zhivoglot", &[(Part::Head, Vec2::new(0.566, 0.355), 1.0)]),
-    ("enemies/gravedigger", &[(Part::Head, Vec2::new(0.567, 0.178), 1.0)]),
-    ("enemies/pugach", &[(Part::Head, Vec2::new(0.33, 0.55), 0.8)]),
-    ("enemies/bolotnitsa", &[(Part::Head, Vec2::new(0.571, 0.206), 1.0)]),
-    ("enemies/ancestor_shade", &[(Part::Head, Vec2::new(0.504, 0.206), 1.0)]),
+    ("enemies/biryuk", &[(Part::Head, Vec2::new(0.44, 0.27), 1.0)]),
+    ("enemies/podmenysh", &[(Part::Head, Vec2::new(0.5, 0.17), 1.0)]),
+    ("enemies/polevik", &[(Part::Head, Vec2::new(0.456, 0.2), 1.0)]),
+    ("enemies/zhivoglot", &[(Part::Head, Vec2::new(0.52, 0.2), 1.0)]),
+    ("enemies/gravedigger", &[(Part::Head, Vec2::new(0.44, 0.17), 1.0)]),
+    ("enemies/pugach", &[(Part::Head, Vec2::new(0.3, 0.6), 1.0)]),
+    ("enemies/bolotnitsa", &[(Part::Head, Vec2::new(0.467, 0.17), 1.0)]),
+    ("enemies/ancestor_shade", &[(Part::Head, Vec2::new(0.46, 0.16), 1.0)]),
     ("enemies/nav_hound", &[(Part::Head, Vec2::new(0.33, 0.60), 1.0)]),
-    ("enemies/fire_serpent", &[(Part::Head, Vec2::new(0.26, 0.26), 1.0)]),
-    ("enemies/tugarin", &[(Part::Head, Vec2::new(0.499, 0.253), 1.0)]),
-    ("enemies/black_volhv", &[(Part::Head, Vec2::new(0.565, 0.243), 1.0)]),
-    ("enemies/vedmak", &[(Part::Head, Vec2::new(0.499, 0.263), 1.0)]),
-    ("enemies/wolf_herder", &[(Part::Head, Vec2::new(0.557, 0.234), 1.0)]),
-    ("enemies/spinner", &[(Part::Head, Vec2::new(0.527, 0.302), 1.0)]),
-    ("enemies/upyr_knyaz", &[(Part::Head, Vec2::new(0.495, 0.178), 1.0)]),
-    ("enemies/miller", &[(Part::Head, Vec2::new(0.555, 0.253), 1.0)]),
-    ("enemies/obderikha", &[(Part::Head, Vec2::new(0.374, 0.281), 1.0)]),
-    ("enemies/chernobog_priest", &[(Part::Head, Vec2::new(0.587, 0.206), 1.0)]),
-    ("enemies/alkonost", &[(Part::Head, Vec2::new(0.418, 0.318), 1.0)]),
-    ("enemies/chernobog", &[(Part::Head, Vec2::new(0.601, 0.206), 1.0)]),
-    ("enemies/zhlya", &[(Part::Head, Vec2::new(0.467, 0.188), 1.0)]),
-    ("enemies/karna", &[(Part::Head, Vec2::new(0.52, 0.188), 1.0)]),
-    ("enemies/idolishche", &[(Part::Head, Vec2::new(0.499, 0.206), 1.0)]),
-    ("enemies/vikhor", &[(Part::Head, Vec2::new(0.521, 0.253), 1.0)]),
-    ("enemies/gore", &[(Part::Head, Vec2::new(0.404, 0.206), 1.0)]),
-    ("enemies/domovoy", &[(Part::Head, Vec2::new(0.498, 0.358), 1.0)]),
+    ("enemies/fire_serpent", &[(Part::Head, Vec2::new(0.32, 0.19), 1.0)]),
+    ("enemies/tugarin", &[(Part::Head, Vec2::new(0.477, 0.214), 1.0)]),
+    ("enemies/black_volhv", &[(Part::Head, Vec2::new(0.527, 0.18), 1.0)]),
+    ("enemies/vedmak", &[(Part::Head, Vec2::new(0.47, 0.21), 1.0)]),
+    ("enemies/wolf_herder", &[(Part::Head, Vec2::new(0.54, 0.21), 1.0)]),
+    ("enemies/spinner", &[(Part::Head, Vec2::new(0.5, 0.14), 1.0)]),
+    ("enemies/upyr_knyaz", &[(Part::Head, Vec2::new(0.5, 0.19), 1.0)]),
+    ("enemies/miller", &[(Part::Head, Vec2::new(0.515, 0.19), 1.0)]),
+    ("enemies/obderikha", &[(Part::Head, Vec2::new(0.448, 0.16), 1.0)]),
+    ("enemies/chernobog_priest", &[(Part::Head, Vec2::new(0.552, 0.19), 1.0)]),
+    ("enemies/alkonost", &[(Part::Head, Vec2::new(0.28, 0.24), 1.0)]),
+    ("enemies/chernobog", &[(Part::Head, Vec2::new(0.5, 0.21), 1.0)]),
+    ("enemies/zhlya", &[(Part::Head, Vec2::new(0.46, 0.18), 1.0)]),
+    ("enemies/karna", &[(Part::Head, Vec2::new(0.547, 0.16), 1.0)]),
+    ("enemies/idolishche", &[(Part::Head, Vec2::new(0.458, 0.1), 1.0)]),
+    ("enemies/vikhor", &[(Part::Head, Vec2::new(0.5, 0.17), 1.0)]),
+    ("enemies/gore", &[(Part::Head, Vec2::new(0.464, 0.155), 1.0)]),
+    ("enemies/domovoy", &[(Part::Head, Vec2::new(0.545, 0.25), 1.0)]),
 ];
 
 /// The parts `stem` is cut into, with their joints.
@@ -272,6 +274,16 @@ pub(super) fn skin(materials: &mut Assets<RigMaterial>, picture: Option<Handle<I
     )
 }
 
+/// Widens or narrows a whole-picture skin to a picture of another shape, keeping its height,
+/// its feet and its middle: a pose painted wider than the figure at rest (a blow swung out to the
+/// side) is drawn at the same scale, not squeezed into the resting picture's frame.
+pub(super) fn fit(node: &mut Node, draw: Vec2, aspect: f32) {
+    let wide = draw.y * aspect;
+    let w = wide / (1.0 - 2.0 * PAD_X);
+    node.width = px(w);
+    node.left = px(-(w - draw.x) / 2.0);
+}
+
 /// Writes a pose into a skin's material.
 pub(super) fn pose(materials: &mut Assets<RigMaterial>, handle: &MaterialNode<RigMaterial>, skin: &RigSkin, t: f32, p: Pose) {
     let Some(mut m) = materials.get_mut(&handle.0) else { return };
@@ -288,6 +300,16 @@ pub(super) fn pose(materials: &mut Assets<RigMaterial>, handle: &MaterialNode<Ri
     m.rig.tint = p.tint.to_linear().to_vec4();
     m.rig.flash = p.flash_color.to_linear().to_vec4();
     m.rig.sight = Vec4::new(if p.outline { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0);
+}
+
+/// Sets a part's joint and the shape of the picture it turns in, for a part put on a figure of
+/// another form (the beast's arm turns about the beast's shoulder, in a square picture).
+pub(super) fn rejoint(materials: &mut Assets<RigMaterial>, handle: &MaterialNode<RigMaterial>, joint: Vec2, aspect: f32) {
+    if let Some(mut m) = materials.get_mut(&handle.0) {
+        m.rig.limb.x = joint.x;
+        m.rig.limb.y = joint.y;
+        m.rig.limb.w = aspect;
+    }
 }
 
 /// Puts a new picture on a skin (a change of form).
