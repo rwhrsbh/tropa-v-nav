@@ -126,13 +126,17 @@ impl L10n {
         L10n { lang, bundle }
     }
 
-    /// A status amount as a player reads it: Fear is kept in tenths of a percent.
+    /// A status amount as a player reads it: Fear is kept in tenths of a percent and read as a
+    /// percent (250 is 25%, 75 is 7,5%).
     pub fn status_amount(&self, st: nav_core::StatusKind, n: i32) -> String {
-        if st != nav_core::StatusKind::Fear || n % 10 == 0 {
-            return if st == nav_core::StatusKind::Fear { (n / 10).to_string() } else { n.to_string() };
+        if st != nav_core::StatusKind::Fear {
+            return n.to_string();
+        }
+        if n % 10 == 0 {
+            return format!("{}%", n / 10);
         }
         let sep = if self.lang.code() == "en" { "." } else { "," };
-        format!("{}{sep}{}", n / 10, (n % 10).abs())
+        format!("{}{sep}{}%", n / 10, (n % 10).abs())
     }
 
     pub fn has(&self, key: &str) -> bool {
@@ -348,10 +352,10 @@ impl L10n {
                         return self.fx("apply-double", Some(*t), &named(st));
                     }
                 }
-                // fear is kept in tenths of a percent
+                // cards and relics give Fear in whole percent (the fight keeps it in tenths)
                 let amount: FluentValue = match a {
-                    Amount::N(v) if *st == StatusKind::Fear => self.status_amount(*st, *v).into(),
-                    other if *st == StatusKind::Fear => self.amount_in(other, &|m| self.status_amount(StatusKind::Fear, m)).into(),
+                    Amount::N(v) if *st == StatusKind::Fear => format!("{v}%").into(),
+                    other if *st == StatusKind::Fear => self.amount_in(other, &|m| format!("{m}%")).into(),
                     _ => n(a),
                 };
                 // laid on the one aimed at: a blessing is for an ally, a curse for a foe

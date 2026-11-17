@@ -66,7 +66,7 @@ pub fn plugin(app: &mut App) {
             (
                 playback,
                 (sync_units, gore::lay_out_the_headless, sync_hand, live_costs, live_marks, sync_potions, flask_menu, count_relics, cue_effects).chain(),
-                no_eyes,
+                (no_eyes, push_belt),
                 (pick_hover, layout_hand, layout_units, swap_form_art, animate_sprites, update_labels, update_intent_icons, update_bars, update_tooltip),
                 (floaters, fly_ghosts, dying, style_buttons, impact::shake_screen, turn_timer, send_pings, show_pings, light_bonuses),
             )
@@ -103,7 +103,15 @@ struct PotionBelt;
 struct RelicChip {
     id: String,
     at: Vec2,
+    /// its place among `count` relics, to be laid out again when the belt is pushed on
+    i: usize,
+    count: usize,
+    slots: usize,
 }
+/// The name, health and purse at the left of the battle bar: measured, so a long name pushes the
+/// belt and the relics on instead of running under them.
+#[derive(Component)]
+struct BarPart;
 /// The number in the corner of a relic that keeps a count: the hero's flag it is read from.
 #[derive(Component)]
 struct RelicCount(String);
@@ -314,6 +322,41 @@ fn relic_side(count: usize, left: f32) -> f32 {
     } else {
         // two rows, at least as many across as fit; past that they shrink further
         (room / (count as f32 / 2.0).ceil() - 4.0).clamp(10.0, 26.0)
+    }
+}
+
+/// Moves the belt and the relics right by as much as the name, health and purse overrun the
+/// belt's own place (a long name such as Иванушка-дурачок); laid out once the bar is measured.
+fn push_belt(parts: Query<&ComputedNode, With<BarPart>>, mut belt: Query<&mut Node, With<PotionBelt>>, mut chips: Query<(&mut RelicChip, &mut Node), Without<PotionBelt>>) {
+    if parts.is_empty() {
+        return;
+    }
+    let mut used = 20.0;
+    for p in &parts {
+        let w = p.size().x * p.inverse_scale_factor();
+        if w <= 0.0 {
+            return;
+        }
+        used += w + 26.0;
+    }
+    let push = (used + 10.0 - BELT_LEFT).max(0.0);
+    // laid out already: each new fight's bar starts at the belt's own place and is pushed once
+    let target = px(BELT_LEFT + push);
+    if belt.iter().all(|n| n.left == target) {
+        return;
+    }
+    for mut n in &mut belt {
+        n.left = px(BELT_LEFT + push);
+    }
+    for (mut chip, mut n) in &mut chips {
+        let left = relic_left(chip.slots) + push;
+        let side = relic_side(chip.count, left);
+        let at = relic_at(chip.i, chip.count, left);
+        chip.at = at;
+        n.left = px(at.x);
+        n.top = px(at.y);
+        n.width = px(side);
+        n.height = px(side);
     }
 }
 
@@ -574,12 +617,21 @@ fn enter(
             // the relics lie over it, the round at its right end
             let mine = session.my_hero();
             p.spawn((crate::between::bar_plate(), Pickable::IGNORE)).with_children(|bar| {
-                bar.spawn(theme::text(l10n.t(&format!("hero-{}", mine.def)), &fonts.title, 30.0, theme::hero_color(&mine.def).lighter(0.1)));
-                bar.spawn(crate::between::bar_stat()).with_children(|s| {
+                // a long name is set smaller, as between fights, and never wraps; what still does not
+                // fit pushes the belt and the relics on (see `push_belt`)
+                let name = l10n.t(&format!("hero-{}", mine.def));
+                let size = if name.chars().count() > 12 { 24.0 } else { 30.0 };
+                bar.spawn((
+                    BarPart,
+                    theme::text(name, &fonts.title, size, theme::hero_color(&mine.def).lighter(0.1)),
+                    TextLayout::new(Justify::Left, LineBreak::NoWrap),
+                    Node { flex_shrink: 0.0, ..default() },
+                ));
+                bar.spawn((BarPart, crate::between::bar_stat())).with_children(|s| {
                     s.spawn(crate::between::blood_mark());
                     s.spawn((Label::Hp(UnitRef::Hero(mine.slot)), theme::text("", &fonts.num, 28.0, theme::FRESH_BLOOD.lighter(0.2)), TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK }));
                 });
-                bar.spawn(crate::between::bar_stat()).with_children(|s| {
+                bar.spawn((BarPart, crate::between::bar_stat())).with_children(|s| {
                     s.spawn(crate::between::coin_mark());
                     s.spawn((Label::Gold, theme::text("", &fonts.num, 28.0, theme::CANDLE), TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK }));
                 });
@@ -634,7 +686,7 @@ fn enter(
                 let at = relic_at(i, count, left);
                 let picture = art.image(&assets, &format!("relics/{id}"));
                 let mut chip = p.spawn((
-                    RelicChip { id: id.clone(), at },
+                    RelicChip { id: id.clone(), at, i, count, slots: potion_slots(&mine.relics) },
                     Hovered::default(),
                     Node {
                         position_type: PositionType::Absolute,

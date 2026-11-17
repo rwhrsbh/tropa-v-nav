@@ -213,9 +213,12 @@ pub const HOLLOW_FACES: u8 = 8;
 /// The purses the hollow takes.
 pub const HOLLOW_GOLD_STAKES: [i32; 3] = [25, 50, 100];
 /// Percent of max HP the hollow keeps when an arm was played for and not won back.
-pub const HOLLOW_SEAM_PCT: i32 = 10;
+pub const HOLLOW_SEAM_PCT: i32 = 15;
 /// What the hollow gives for a potion it could not find room for on the belt.
 pub const HOLLOW_SPILL_GOLD: i32 = 25;
+/// What three plain signs pay on a relic staked: gold, about half a common relic, so a relic is
+/// worth staking only when it is worth little.
+pub const HOLLOW_RELIC_GOLD: i32 = 50;
 /// Out of a thousand spins: the firebird's three, three of a dear sign, three of a plain one.
 /// The rest lose. A purse comes back as 0.82 of itself on the whole: the hollow is fed.
 pub const HOLLOW_ODDS: [u32; 3] = [20, 90, 220];
@@ -272,8 +275,8 @@ pub struct Spin {
 pub fn stake_open(c: &Content, pl: &Player, stake: Stake) -> bool {
     match stake {
         Stake::Gold(n) => HOLLOW_GOLD_STAKES.contains(&n) && pl.gold >= n,
-        // what a hero set out with is not theirs to gamble away
-        Stake::Relic(i) => pl.relics.get(i as usize).and_then(|id| c.relics.get(id)).is_some_and(|r| r.rarity != Rarity::Starter),
+        // any relic may go on the stake, the one a hero set out with too
+        Stake::Relic(i) => pl.relics.get(i as usize).is_some_and(|id| c.relics.contains_key(id)),
         Stake::Potion(i) => (i as usize) < pl.potions.len(),
         Stake::Arm(arm) => {
             let known = arm == crate::combat::WEAPON_ARM || arm == crate::combat::SHIELD_ARM;
@@ -1937,7 +1940,7 @@ impl Run {
         let mut lost: Vec<Loot> = Vec::new();
         let mut for_seam = false;
         // what is won besides the stake itself: relics (dear ones first), gold
-        let (mut rare, mut any, mut gold) = (0, 0, 0);
+        let (mut common, mut rare, mut any, mut gold) = (0, 0, 0, 0);
         match stake {
             Stake::Gold(n) if win => gold = n * (hollow_pays(tier) - 1),
             Stake::Gold(n) => {
@@ -1961,7 +1964,7 @@ impl Run {
                 ev.push(RunEvent::PotionLost { player, potion: potion.clone() });
                 lost.push(Loot::Potion(potion));
             }
-            Stake::Relic(_) if win => (rare, any) = [(0, 0), (0, 1), (1, 0), (1, 1)][tier as usize],
+            Stake::Relic(_) if win => (rare, any, gold) = [(0, 0, 0), (0, 0, HOLLOW_RELIC_GOLD), (1, 0, 0), (1, 1, 0)][tier as usize],
             Stake::Relic(i) => {
                 let pl = &mut self.players[p];
                 let relic = pl.relics.remove(i as usize);
@@ -1985,14 +1988,14 @@ impl Run {
                     lost.push(Loot::MaxHp(cut));
                 }
             }
-            Stake::Arm(_) if win => (rare, any, gold) = [(0, 0, 0), (1, 0, 0), (1, 0, 100), (1, 1, 200)][tier as usize],
+            Stake::Arm(_) if win => (common, rare, gold) = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 1, 100)][tier as usize],
             Stake::Arm(arm) => {
                 self.tear_arm(c, p, arm);
                 ev.push(RunEvent::ArmTorn { player, arm });
                 lost.push(Loot::Arm(arm));
             }
         }
-        for want in std::iter::repeat_n(Some(Rarity::Rare), rare).chain(std::iter::repeat_n(None, any)) {
+        for want in std::iter::repeat_n(Some(Rarity::Rare), rare).chain(std::iter::repeat_n(Some(Rarity::Common), common)).chain(std::iter::repeat_n(None, any)) {
             if let Some(relic) = self.roll_relic_of(c, p, want) {
                 self.players[p].relics.push(relic.clone());
                 ev.push(RunEvent::RelicGained { player, relic: relic.clone() });

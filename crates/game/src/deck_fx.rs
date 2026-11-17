@@ -128,8 +128,17 @@ fn cue(
     mixer: Res<Mixer>,
     mut free_at: Local<f32>,
     hold: Res<HoldGains>,
+    bar: Res<crate::between::BarHold>,
+    net: Option<Res<crate::net::Net>>,
 ) {
     if status.deck.is_empty() || hold.0 {
+        return;
+    }
+    // a spin just come in has not set the drums turning yet: what it won waits for them too
+    let fresh_spin = net.as_ref().and_then(|n| Some((n.node.state.as_ref()?, n.node.my_slot()?))).is_some_and(|(run, me)| {
+        matches!(&run.stage, nav_core::Stage::Hollow { spins, .. } if spins.get(me as usize).is_some_and(|s| *s != bar.0))
+    });
+    if fresh_spin {
         return;
     }
     let now = time.elapsed_secs();

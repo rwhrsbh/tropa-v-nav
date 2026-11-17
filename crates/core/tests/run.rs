@@ -1291,7 +1291,9 @@ fn relics_and_potions_are_staked_too() {
     let (mut kept, mut gone) = (0, 0);
     for seed in 0..200 {
         let mut run = at_the_hollow(&c, seed);
-        assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Relic(0))), Err(RunError::BadChoice), "not what the hero set out with");
+        // what the hero set out with may go on the stake too; a relic not carried may not
+        assert!(stake_open(&c, &run.players[0], Stake::Relic(0)), "the starting relic is a stake too");
+        assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Relic(9))), Err(RunError::BadChoice), "no such relic to stake");
         assert_eq!(run.apply(&c, 0, &RunAction::Spin(Stake::Potion(0))), Err(RunError::BadChoice), "no potion to stake");
         run.players[0].relics.push(POTION_SASH.into());
         let potion = c.potions.keys().next().unwrap().clone();
@@ -1301,8 +1303,13 @@ fn relics_and_potions_are_staked_too() {
         if spin.tier > 0 {
             kept += 1;
             assert!(run.players[0].relics.iter().any(|r| r == POTION_SASH));
-            assert!(spin.won.iter().any(|l| matches!(l, Loot::Relic(_))), "{:?}", spin.won);
-            assert!(run.players[0].relics.len() >= 3);
+            // three plain signs pay gold, the dearer ones a relic
+            if spin.tier == 1 {
+                assert_eq!(spin.won, vec![Loot::Gold(HOLLOW_RELIC_GOLD)]);
+            } else {
+                assert!(spin.won.iter().any(|l| matches!(l, Loot::Relic(_))), "{:?}", spin.won);
+                assert!(run.players[0].relics.len() >= 3);
+            }
         } else {
             gone += 1;
             assert!(!run.players[0].relics.iter().any(|r| r == POTION_SASH));
@@ -1344,7 +1351,8 @@ fn an_arm_is_staked_torn_off_and_won_back() {
             prized += 1;
             assert_eq!(run.players[0].lost_arms, 0);
             let won = &run.players[0].relics[relics];
-            assert_eq!(c.relics[won.as_str()].rarity, Rarity::Rare, "an arm staked and kept wins a rare relic");
+            let want = if spin.tier == 1 { Rarity::Common } else { Rarity::Rare };
+            assert_eq!(c.relics[won.as_str()].rarity, want, "an arm staked and kept wins a common relic, or a rare one on dearer signs");
             continue;
         }
         torn += 1;
