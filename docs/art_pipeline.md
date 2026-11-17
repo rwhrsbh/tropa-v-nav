@@ -158,6 +158,15 @@ them.
 `tools/rigparts.py` is the part cutter under `rig_in.py` (`PARTS=head,arm` limits the parts,
 `GROW=` widens the seam). Describe wings, claws and paws per creature, never generic "arms".
 
+### Gorynych
+
+One dragon, three foes in the rules. `tools/gorynych_in.py` takes five Flow pictures (the whole
+dragon with three distinct heads, the same with all necks cut halfway, a three-colour head mask,
+and both corpses) and writes the body with three stumps, each head with its neck on the same
+sheet, and the corpses. In the game (`crates/game/src/battle/gorynych.rs`) the body is drawn once
+behind; each head unit draws only its head, which covers its stump; a head cut off flies and leaves
+the stump, one that grows back is drawn again, and with no head left the body lies down.
+
 ## Maimed heroes on the Edge
 
 A hero down on the Edge kneels in `<hero>_downed`; one short of the head or an arm kneels in

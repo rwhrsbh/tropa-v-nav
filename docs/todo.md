@@ -2,21 +2,7 @@
 
 Things agreed and not done yet. Take one, and strike it out here when it is in.
 
-## Gorynych as one body with three heads
+## Watch Gorynych in a real fight
 
-Gorynych (encounter `a4_gorynych`, act 4 elite) is three foes in the rules: `gorynych_fire`,
-`gorynych_poison` and `gorynych_thunder`, each with its own health and moves. A head that is
-killed grows back after two rounds with 35 HP while another head still lives
-(`crates/core/src/combat.rs`, end of round, flag `gorynych_head`), so all three must fall close
-together.
-
-On screen it is wrong: each head's picture is the whole three-headed dragon, so three identical
-dragons stand side by side and a killed head falls as a whole dead dragon.
-
-To do:
-
-1. Paint in Flow one body with three empty necks ending in bloody stumps, and the three heads
-   apart (fire, poison, thunder), each with a strike and a hurt pose.
-2. In the battle screen draw the shared body once and each head unit on its own neck; a dead
-   head leaves its stump, and `Event::Summoned` (sent when it regrows) puts it back.
-3. When all three are dead the body falls as `gorynych_dead`.
+The one-body Gorynych is in (see art_pipeline.md, Gorynych) and looks right standing; a head
+struck off, one growing back and the body lying down were not yet watched in play.

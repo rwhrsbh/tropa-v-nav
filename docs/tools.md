@@ -768,3 +768,25 @@ fetch them by eye: `python tools/downed_in.py <tile> <hero><mark>` takes one in.
 
 WEAPON / SHIELD say which arm is which in each hero's downed picture: the weapon arm is the one
 `_noweapon` loses.
+
+### `gorynych_in.py`
+
+Takes Gorynych into the game as one body with three heads on their own necks.
+
+```
+python tools/gorynych_in.py [<dir>]
+```
+
+Reads from `<dir>` (default `_inbox/flow_up`) the Flow pictures `gor3.png` (the whole dragon),
+`gor3_body.png` (the same dragon, all three necks cut halfway up), `gor3_mask.png` (the same
+dragon with the fire head magenta, the venom head cyan, the thunder head yellow), `gor3_dead.png`
+and `gor3_deadhl.png` (lying dead, with and without heads). Writes into assets/enemies, all on
+the same 1024 sheet so they lie exactly over each other:
+
+- `gorynych-gemini.png` the whole dragon, `gorynych_body-gemini.png` the body with three stumps;
+- `gorynych_<fire|poison|thunder>_head-gemini.png`: each head with the part of its neck the body
+  lacks (whatever of the whole dragon the body does not hold goes to the nearest mask colour);
+- `gorynych_dead-gemini.png`, `gorynych_dead_headless-gemini.png` (1536x1024).
+
+It prints each head's neck joint (where it meets its stump, as fractions of the sheet) for
+`crates/game/src/battle/rig.rs`, and writes target/gorynych.png to look at.

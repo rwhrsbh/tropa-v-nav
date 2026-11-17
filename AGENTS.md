@@ -15,7 +15,7 @@ how to set it up: [Where pictures are painted](docs/art_pipeline.md#where-pictur
   - [What never to touch](docs/README.md#what-never-to-touch)
   - [Before calling any picture or sound done](docs/README.md#before-calling-any-picture-or-sound-done)
 - [Open work](docs/todo.md)
-  - [Gorynych as one body with three heads](docs/todo.md#gorynych-as-one-body-with-three-heads)
+  - [Watch Gorynych in a real fight](docs/todo.md#watch-gorynych-in-a-real-fight)
 - [Pictures](docs/art_pipeline.md)
   - [Where pictures are painted](docs/art_pipeline.md#where-pictures-are-painted)
   - [Style](docs/art_pipeline.md#style)

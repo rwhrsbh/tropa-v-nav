@@ -93,6 +93,14 @@ as `<scene>` + `Read this aloud, once, exactly as written:` + the text.
   `tropaRecord`), lite model `gemini-3.8-flash-lite-tts` with the style in the Style box.
 - Read each line as the listener hears it: "Я здесь, уродина" sounded like the bogatyr calling
   himself ugly.
+- Who speaks: the heroes, and the bosses listed in `MASTERS` (`crates/game/src/audio.rs`): a
+  boss has `start`, `phase2`, `death` and `gloat` lines, five takes each. A new boss gets its lines
+  in all three `barks.<lang>.txt` (ru-old with stressed vowels in capitals) and `voice.ftl` files,
+  a voice and persona in `barks.voices.txt`, and its id in `MASTERS`.
+- Personas say "a native Russian speaker with no foreign accent at all" when a voice drifts into
+  an accent (Vikhor's first voice spoke with an English one), and ask for every word to be clear:
+  a "howling", "gusty" manner made the model mumble. Lines the check cannot hear (a drawn-out
+  "Унесу-у!", a rare word as "загодя") are rewritten plainer rather than forced through.
 
 ## Checking every clip
 
