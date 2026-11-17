@@ -804,3 +804,18 @@ the same 1024 sheet so they lie exactly over each other:
 
 It prints each head's neck joint (where it meets its stump, as fractions of the sheet) for
 `crates/game/src/battle/rig.rs`, and writes target/gorynych.png to look at.
+
+### `voice_once.py`
+
+Keeps the first saying of a clip the speech model said twice, or began to say again.
+
+```
+python tools/voice_once.py <file.wav> [...]          # cut these at their longest inner pause
+python tools/voice_once.py --scan <folder> [<who>]   # list clips that look said twice
+python tools/voice_once.py --text <lang> <key> ...   # keep only the line's first saying, found
+                                                     # by Whisper (also drops a prompt read aloud)
+```
+
+A doubled clip has a long pause in its middle (over 0.6 s) with speech on both sides; the cut is
+made just after the first saying, with a short fade. The scan only lists: listen before cutting,
+since a slow line ("Тише… тише…") pauses on purpose.

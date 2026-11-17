@@ -122,6 +122,14 @@ key is out of quota", record on the AI Studio page instead, which has its own qu
 6. `python tools/voice_in.py --named` checks every clip with Whisper and takes in the good ones.
    Lines it turns down are recorded again (drop them from `localStorage.tropaDone`).
 
+A speech model now and then says a line twice, starts it again, or reads its prompt aloud before
+the line. `python tools/voice_once.py --text <lang> <key> ...` keeps only the line's first saying,
+found by Whisper's word times (it also drops a prompt read first); `voice_once.py <file.wav>` cuts
+at the clip's longest inner pause instead, for a line Whisper cannot follow. Never cut by pauses
+blindly over a whole set: a line with "…" pauses on purpose, and a blind pass once cut "Горше,
+горше…" after its first word. Find the doubled ones by comparing how many words Whisper hears with
+how many the line has (1.6 times or more), then listen.
+
 When an account says "Quota limit reached", switch that tab to another model with a Scene field
 (`gemini-2.5-pro-preview-tts`) or to the next account. Several accounts in several tabs record at
 once only while each tab is on screen: Chrome throttles the timers of a hidden tab to about one a
