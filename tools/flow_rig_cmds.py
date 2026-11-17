@@ -19,7 +19,7 @@ def attach(foe, first):
     lines = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]
     if first:
         lines += [f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/rig_{foe}.png", "wait 9000"]
-    lines += [f"click getByText('rig_{foe}.png').last()", "wait 1000", ADD, "wait 800"]
+    lines += [f'click "text=rig_{foe}.png >> visible=true >> nth=0"', "wait 1000", ADD, "wait 800", "press Escape", "wait 500"]
     return lines
 
 
@@ -51,7 +51,7 @@ def main():
                 f"background, square 1:1, one single image, no text. Only {head} is gone, cut off and absent; at the neck, a raw bloody neck "
                 "stump with a little dark blood under it. Plain green where the head was. Nothing else changes.")
     out = attach(foe, True) + ask(mask, f"{foe}_mask") + attach(foe, False) + ask(body, f"{foe}_body") + attach(foe, False) + ask(dead, f"{foe}_dead")
-    out += ['click "[role=group] img >> nth=0" --button right', "wait 1000", 'click "text=Добавить в запрос"', "wait 1000"]
+    out += ['click "[role=group] img >> nth=0" --button right', "wait 1000", 'click "text=Добавить в запрос"', "wait 1000", "press Escape", "wait 500"]
     out += ask(headless, f"{foe}_deadhl")
     print("\n".join(out))
 
