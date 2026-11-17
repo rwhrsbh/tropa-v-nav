@@ -86,6 +86,14 @@ height). `tools/pose_in.py <flow pic> <rest stem> <out stem>` takes a pose in at
 picture's scale and foot line. Kot Bayun has a second set `kot_bayun_ground*` used while he is off
 his post (`bayun_perch` flag gone).
 
+A blow can have a picture of its own, named after the move: `<id>_<move id>` (for example
+`gorynych_fire_fire_breath`) is drawn instead of `_strike` while that move lunges, when it exists.
+
+How tall a foe stands is `crates/game/src/battle/stature.rs`: `(id, stature, fill)`, stature in
+men (1.0 is a man, 345 px), fill how much of its picture's height the figure takes. The drawn
+height is capped at 560 px; a foe whose sheet holds more than the figure (Gorynych) sets its own
+height in its module instead.
+
 Painting the missing poses of a foe in Flow:
 
 - `python tools/flow_pose_cmds.py <id> [strike hurt guard cast]` prints the Browser MCP block for
@@ -166,6 +174,18 @@ and both corpses) and writes the body with three stumps, each head with its neck
 sheet, and the corpses. In the game (`crates/game/src/battle/gorynych.rs`) the body is drawn once
 behind; each head unit draws only its head, which covers its stump; a head cut off flies and leaves
 the stump, one that grows back is drawn again, and with no head left the body lies down.
+
+- The sheet: the dragon stands at the right of a 1024 square (`WIDE = 0.62` of its width in the
+  tool), the left kept for the breath. In the game `gorynych.rs` holds `SHEET` (the drawn height of
+  that square, past the 560 cap), `DRAGON_X` (the dragon's middle on the sheet, put on its place
+  on the stage), `HEADS` (each head's x on the sheet: its intent and bar stand under it) and
+  `head_top` (where each head's top is, so its intent stands just over it). Change the tool's
+  `WIDE` and these follow from its output; the rig joints in `rig.rs` are what the tool prints.
+- Necks are cut at the chest (`gor3_body.png`): a head's every pose then starts at its stump and
+  covers it. Poses are Flow edits of the whole dragon with one head moved
+  (`gor3_<head>_<strike|hurt|guard|cast>.png`); the tool keeps what moved plus that head's neck.
+- Breath (`gor3_<head>_<fire_breath|acid_spit|thunder_roar>.png`) is painted on `gor3_pad.png`,
+  the dragon shrunk and set right so the fire, venom or lightning fits; the tool maps it back.
 
 ## Maimed heroes on the Edge
 
