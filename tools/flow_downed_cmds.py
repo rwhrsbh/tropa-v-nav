@@ -56,13 +56,26 @@ def prompt(hero, mark):
             "the missing part was, nothing new added, no other limb moved, exactly as many remaining arms and legs as before.")
 
 
-def upload(hero):
-    pic = Image.open(os.path.join(HEROES, f"{hero}_downed-gemini.png")).convert("RGBA")
+def upload(hero, base=""):
+    """Puts `<hero><base>_downed` on a green square for Flow and returns the file's name."""
+    pic = Image.open(os.path.join(HEROES, f"{hero}{base}_downed-gemini.png")).convert("RGBA")
     side = max(pic.size)
     sq = Image.new("RGBA", (side, side), (0, 255, 0, 255))
     sq.alpha_composite(pic, ((side - pic.width) // 2, (side - pic.height) // 2))
-    path = os.path.join(ROOT, "_inbox", "flow_up", f"down_{hero}.png")
-    sq.convert("RGB").save(path)
+    name = f"down_{hero}{base}.png"
+    sq.convert("RGB").save(os.path.join(ROOT, "_inbox", "flow_up", name))
+    return name
+
+
+def behead(hero, base):
+    """A beheading of the hero's maimed downed picture: asked of the whole picture at once, Flow
+    takes the head and leaves the arm (the Bogatyr's shield came off, his arm stayed)."""
+    who, pr, _, _ = WHO[hero]
+    arms = {"_noarms": "armless", "_noweapon": "one-armed", "_noshield": "one-armed"}[base]
+    return (f"Edit the attached picture: keep the SAME {arms} {who}, {pr} pose, framing, size, position, colours, painted style, "
+            f"every bloody shoulder stump and plain green background pixel for pixel, square 1:1, one single image, no text. Only "
+            f"this changes: {pr} whole head with all the hair" + (" and the beard" if pr == "his" else "") + ", cut off at the "
+            "neck, leaving a raw bloody neck stump. Plain green where the head was, nothing new added, no arm added or moved.")
 
 
 def missing(hero):
@@ -70,22 +83,33 @@ def missing(hero):
     return [m for m in MARKS if have(f"{hero}{m}") and not have(f"{hero}{m}_downed")]
 
 
+def asks(name, prompts):
+    out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200",
+           f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/{name}", "wait 9000"]
+    for i, p in enumerate(prompts):
+        # the ingredients panel is still open after the upload
+        out += ([] if i == 0 else ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]) + [
+                f'click "text={name} >> visible=true >> nth=0"', "wait 1000",
+                "eval \"() => { const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Добавить в запрос'); if(b){b.click(); return 'added'} return 'direct' }\"",
+                "wait 800", "press Escape", "wait 500",
+                "click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{p}"',
+                "click getByRole('button', { name: 'Начать генерацию' })", "wait 3000"]
+    return out
+
+
 def main():
     hero = sys.argv[1]
     marks = sys.argv[2:] or missing(hero)
-    upload(hero)
-    out = ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200",
-           f"upload getByRole('button', {{ name: 'Загрузить' }}).last() {UP}/down_{hero}.png", "wait 9000"]
-    for i, m in enumerate(marks):
-        # the ingredients panel is still open after the upload
-        out += ([] if i == 0 else ["click getByRole('button', { name: 'Добавить ингредиенты в окно запроса' })", "wait 1200"]) + [
-                f'click "text=down_{hero}.png >> visible=true >> nth=0"', "wait 1000",
-                "eval \"() => { const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Добавить в запрос'); if(b){b.click(); return 'added'} return 'direct' }\"",
-                "wait 800", "press Escape", "wait 500",
-                "click getByRole('textbox', { name: 'Что вы хотите создать?' })", f'type "{prompt(hero, m)}"',
-                "click getByRole('button', { name: 'Начать генерацию' })", "wait 3000"]
+    have = lambda s: os.path.exists(os.path.join(HEROES, f"{s}_downed-gemini.png"))
+    # a headless maimed pose comes from its maimed downed picture once that exists
+    chained = [m for m in marks if m.startswith("_headless_") and have(hero + m[len("_headless"):])]
+    plain = [m for m in marks if m not in chained]
+    out = asks(upload(hero), [prompt(hero, m) for m in plain]) if plain else []
+    for m in chained:
+        base = m[len("_headless"):]
+        out += asks(upload(hero, base), [behead(hero, base)])
     print("\n".join(out))
-    print(" ".join(marks), file=sys.stderr)
+    print(" ".join(plain), "| from the maimed:", " ".join(chained), file=sys.stderr)
 
 
 if __name__ == "__main__":
