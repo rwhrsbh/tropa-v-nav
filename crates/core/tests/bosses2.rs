@@ -49,7 +49,7 @@ fn gore_takes_half_while_a_gore_card_is_held() {
     let t = foe(&s, 0);
     play(&c, &mut s, 0, "t_hit", Some(t));
     assert_eq!(hp - s.enemies[0].hp, 10);
-    s.heroes[0].hand.push(Card { uid: 9999, def: "gore".into(), upgraded: false, free: false });
+    s.heroes[0].hand.push(Card { uid: 9999, def: "gore".into(), upgraded: false, free: false, ..Default::default() });
     let hp = s.enemies[0].hp;
     play(&c, &mut s, 0, "t_hit", Some(t));
     assert_eq!(hp - s.enemies[0].hp, 5, "held grief halves the blow");

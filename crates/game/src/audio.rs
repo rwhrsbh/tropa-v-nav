@@ -19,7 +19,7 @@ const SFX: &[&str] = &[
 /// Each status laid on has its own sound, `status_<kind>`; one without falls back to `status`.
 const STATUSES: &[nav_core::StatusKind] = {
     use nav_core::StatusKind::*;
-    &[Strength, Drowse, TempStrength, Fortitude, Vulnerable, Weak, Rot, Hex, Bleed, Fear, Thorns, HuntMark, Valor, Stun, Mist, Chained, Gloom]
+    &[Strength, Drowse, TempStrength, Fortitude, Vulnerable, Weak, Rot, Hex, Bleed, Fear, Thorns, HuntMark, Valor, Stun, Mist, Chained, Gloom, Luck, Evade, Charm, Flattery]
 };
 
 /// The sound of `status` being laid on.
@@ -29,6 +29,13 @@ pub fn status_sound(status: nav_core::StatusKind) -> String {
 
 /// How many ways a body with no head has of saying something.
 const GURGLES: u32 = 8;
+/// Takes of Kuzma's hammer on the anvil, `forge_<k>`: a random one each time, never the one heard last.
+const FORGE_TAKES: u32 = 5;
+/// The sounds of the three later heroes: the plate going on and coming off, a dodge.
+const LATER: &[&str] = &["plate_on", "plate_off", "dodge"];
+/// The greedy hollow: the lever pulled and the drums set rattling, then a small win, the big one,
+/// a loss.
+const HOLLOW: &[&str] = &["hollow_pull", "hollow_win", "hollow_jackpot", "hollow_lose"];
 
 pub fn plugin(app: &mut App) {
     // unattended screenshot runs (dev) stay silent
@@ -146,7 +153,9 @@ fn load(mut commands: Commands, art: Res<Art>, assets: Res<AssetServer>, db: Res
     let mut sfx = Sfx::default();
     let foes = db.0.enemies.keys().map(|foe| format!("death_{foe}"));
     let gurgles = (1..=GURGLES).map(|k| format!("gurgle_{k}"));
-    for name in SFX.iter().map(|n| n.to_string()).chain(foes).chain(gurgles).chain(STATUSES.iter().map(|s| status_sound(*s))) {
+    let forge = (1..=FORGE_TAKES).map(|k| format!("forge_{k}"));
+    let later = LATER.iter().chain(HOLLOW).map(|n| n.to_string());
+    for name in SFX.iter().map(|n| n.to_string()).chain(foes).chain(gurgles).chain(forge).chain(later).chain(STATUSES.iter().map(|s| status_sound(*s))) {
         let stem = format!("sfx/{name}");
         // generated audio first, synthesised stand-in second
         let path = art.find(&stem, "ogg", "flow").filter(|p| p.ends_with("-flow.ogg")).or_else(|| art.find(&stem, "wav", "flow"));
@@ -157,10 +166,24 @@ fn load(mut commands: Commands, art: Res<Art>, assets: Res<AssetServer>, db: Res
     commands.insert_resource(sfx);
 }
 
-fn cue_sounds(mut commands: Commands, cues: Res<Cues>, sfx: Res<Sfx>, mixer: Res<Mixer>, session: Res<Session>) {
+fn cue_sounds(mut commands: Commands, cues: Res<Cues>, sfx: Res<Sfx>, mixer: Res<Mixer>, session: Res<Session>, mut forge: Local<ForgeTakes>) {
     // one sound of a kind per frame: an area attack is one crash, not six
     let mut played: Vec<String> = Vec::new();
     for e in &cues.0 {
+        // Kuzma's hammer rings on the anvil: a different take each time
+        if let Event::Forged { .. } = e {
+            if !played.iter().any(|p| p.starts_with("forge_")) {
+                let k = forge.next();
+                let name = format!("forge_{k}");
+                sfx.play_or(&mut commands, &name, "block", &mixer, 1.0);
+                played.push(name);
+            }
+            continue;
+        }
+        // the forge's own count rising, and the plate's durability, are heard as the hammer and the plate
+        if let Event::Status { status: nav_core::StatusKind::Forge | nav_core::StatusKind::Plate, .. } = e {
+            continue;
+        }
         // each foe dies its own way, when it has one
         if let Event::EnemyDied { enemy } = e {
             let own = session.shown.enemy(*enemy).map(|f| format!("death_{}", f.def)).filter(|n| sfx.0.contains_key(n));
@@ -204,12 +227,39 @@ fn cue_sounds(mut commands: Commands, cues: Res<Cues>, sfx: Res<Sfx>, mixer: Res
             Event::GoldStolen { .. } | Event::GoldReturned { .. } | Event::GoldScattered { .. } => ("gold", 0.9),
             Event::Ended { won: true } => ("victory", 1.0),
             Event::Ended { won: false } => ("defeat", 1.0),
+            Event::Plated { on: true, .. } => ("plate_on", 1.0),
+            Event::Plated { on: false, .. } => ("plate_off", 1.0),
+            Event::Dodged { .. } => ("dodge", 0.9),
             _ => continue,
         };
         if !played.iter().any(|p| p == name) {
             played.push(name.to_string());
             sfx.play(&mut commands, name, &mixer, gain);
         }
+    }
+}
+
+/// Which take of the hammer played last, so the next is another.
+#[derive(Default)]
+struct ForgeTakes {
+    last: u32,
+    seed: u32,
+}
+
+impl ForgeTakes {
+    fn next(&mut self) -> u32 {
+        if self.seed == 0 {
+            self.seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(1) | 1;
+        }
+        self.seed ^= self.seed << 13;
+        self.seed ^= self.seed >> 17;
+        self.seed ^= self.seed << 5;
+        let mut k = self.seed % FORGE_TAKES + 1;
+        if k == self.last {
+            k = k % FORGE_TAKES + 1;
+        }
+        self.last = k;
+        k
     }
 }
 
@@ -413,6 +463,8 @@ fn ambient_tracks(state: AppState, run: Option<&nav_core::Run>) -> (Vec<String>,
         AppState::Map | AppState::Reward => (vec![format!("map_act{act}"), "map_act1".into(), "map".into()], false),
         AppState::Rest => one("rest"),
         AppState::Shop => one("shop"),
+        // the greedy hollow has a tune of its own to gamble to
+        AppState::Omen if run.is_some_and(|r| matches!(r.stage, nav_core::Stage::Hollow { .. })) => (vec!["hollow".into(), "omen".into()], false),
         AppState::Omen => one("omen"),
         AppState::RunEnd if run.is_some_and(|r| r.stage == nav_core::Stage::Victory) => (vec!["credits".into(), "end".into()], false),
         AppState::RunEnd => (vec!["defeat".into(), "end".into()], true),

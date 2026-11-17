@@ -27,6 +27,8 @@ const DRUMS_W: f32 = 3.0 * FACE + 2.0 * DRUM_GAP;
 /// When each drum stops, seconds after the pull; a little later the hollow says what it took or gave.
 const STOPS: [f32; 3] = [1.3, 1.9, 2.6];
 const SHOW_AT: f32 = 3.0;
+/// How long the result is read alone before a relic or a flask won flies off to the belt.
+const GAIN_AFTER: f32 = 1.4;
 const EDGE: Color = Color::srgb(0.42, 0.33, 0.22);
 const LOSS: Color = Color::srgb(0.85, 0.32, 0.25);
 
@@ -96,9 +98,11 @@ fn loot_icon(commands: &mut Commands, row: Entity, loot: &Loot, hero: &str, art:
         Loot::Potion(id) => {
             commands.spawn((art.node(assets, &format!("potions/{id}"), theme::SOOT), whole, Pickable::IGNORE, ChildOf(slot)));
         }
-        Loot::Arm(_) => {
-            let hand: Handle<Image> = assets.load(crate::art::path(&format!("hands/{hero}_paper.png")));
-            commands.spawn((ImageNode::new(hand), Node { width: percent(100), ..default() }, Pickable::IGNORE, ChildOf(slot)));
+        Loot::Arm(arm) => {
+            // the hero's own arm, cut from their figure (tools/armicon.py); the paper hand of the
+            // old heroes if it is missing
+            let hand = art.image(assets, &format!("hands/{hero}_arm_{}", arm_word(*arm))).unwrap_or_else(|| assets.load(crate::art::path(&format!("hands/{hero}_paper.png"))));
+            commands.spawn((ImageNode::new(hand), whole, Pickable::IGNORE, ChildOf(slot)));
         }
         Loot::Gold(n) => {
             commands.entity(slot).insert((BackgroundColor(Color::srgb(0.45, 0.30, 0.10)), BorderColor::all(theme::CANDLE), Node { width: px(72), height: px(72), border: UiRect::all(px(3)), border_radius: BorderRadius::MAX, justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() }));
@@ -178,6 +182,7 @@ fn draw_hollow(
     assets: Res<AssetServer>,
     mut pick: ResMut<Pick>,
     mut reels: ResMut<Reels>,
+    mut bar: ResMut<crate::between::BarHold>,
 ) {
     let Some(net) = net else { return };
     let (Some(run), Some(me)) = (net.node.state.as_ref(), net.node.my_slot()) else { return };
@@ -185,6 +190,8 @@ fn draw_hollow(
         if reels.seen != 0 || pick.0.is_some() {
             *reels = Reels::default();
             pick.0 = None;
+            // the next hollow counts its spins from nothing again
+            bar.0 = 0;
         }
         return;
     };
@@ -578,11 +585,21 @@ fn turn_drums(
     mut after: Query<&mut Visibility, (With<AfterSpin>, Without<WhileTurning>)>,
     mut during: Query<&mut Visibility, (With<WhileTurning>, Without<AfterSpin>)>,
     mut hold: ResMut<crate::between::BarHold>,
+    mut gains: ResMut<crate::deck_fx::HoldGains>,
     sfx: Res<crate::audio::Sfx>,
     mixer: Res<crate::audio::Mixer>,
 ) {
     if reels.turning() {
+        // the lever is pulled and the drums set rattling, as the spin begins
+        if reels.t == 0.0 {
+            sfx.play(&mut commands, "hollow_pull", &mixer, 1.0);
+        }
         reels.t += time.delta_secs();
+    } else if reels.t < SHOW_AT + GAIN_AFTER {
+        // the drums stand; the clock runs on a little while the result is read
+        reels.t += time.delta_secs();
+    }
+    if reels.turning() {
         for k in 0..3 {
             if !reels.stopped[k] && reels.t >= STOPS[k] {
                 reels.stopped[k] = true;
@@ -594,6 +611,9 @@ fn turn_drums(
         tf.translation = Val2::px(0.0, strip_y(reels.at(drum.0)));
     }
     let shown = !reels.turning();
+    // a relic or a flask won flies to the belt only once the drums have stopped and the result
+    // has been read
+    gains.set_if_neq(crate::deck_fx::HoldGains(reels.t < SHOW_AT + GAIN_AFTER));
     for mut vis in &mut after {
         vis.set_if_neq(if shown { Visibility::Inherited } else { Visibility::Hidden });
     }
@@ -612,14 +632,18 @@ fn turn_drums(
             _ => None,
         });
         if let Some(spin) = spin {
-            let sound = if spin.tier > 0 {
-                "gold"
-            } else if spin.lost.iter().any(|l| matches!(l, Loot::Arm(_))) {
-                "limb_off"
+            let (sound, fallback) = if spin.tier == 3 {
+                ("hollow_jackpot", "gold")
+            } else if spin.tier > 0 {
+                ("hollow_win", "gold")
             } else {
-                "status"
+                ("hollow_lose", "status")
             };
-            sfx.play(&mut commands, sound, &mixer, 1.0);
+            sfx.play_or(&mut commands, sound, fallback, &mixer, 1.0);
+            // an arm the hollow took is heard going, after the groan of the loss
+            if spin.tier == 0 && spin.lost.iter().any(|l| matches!(l, Loot::Arm(_))) {
+                sfx.play(&mut commands, "limb_off", &mixer, 0.9);
+            }
         }
     }
 }

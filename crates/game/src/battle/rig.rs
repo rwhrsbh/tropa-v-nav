@@ -80,6 +80,13 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("heroes/volkolak", &[(Part::Shield, Vec2::new(0.70, 0.43), 0.8), (Part::Head, Vec2::new(0.58, 0.24), 1.0), (Part::Arm, Vec2::new(0.29, 0.42), 1.0)]),
     // the beast keeps the man's arms: the shield arm is the near one, as it is on the man
     ("heroes/volkolak_beast", &[(Part::Shield, Vec2::new(0.654, 0.36), 1.0), (Part::Head, Vec2::new(0.70, 0.24), 1.2), (Part::Arm, Vec2::new(0.265, 0.30), 0.8)]),
+    ("heroes/kuzma", &[(Part::Head, Vec2::new(0.492, 0.189), 1.0), (Part::Shield, Vec2::new(0.654, 0.380), 0.8), (Part::Arm, Vec2::new(0.270, 0.374), 1.0)]),
+    // in plate the sledgehammer rests on his shoulder: the arm turns at the elbow, gently
+    ("heroes/kuzma_beast", &[(Part::Head, Vec2::new(0.454, 0.187), 1.0), (Part::Shield, Vec2::new(0.220, 0.406), 0.8), (Part::Arm, Vec2::new(0.79, 0.27), 0.6)]),
+    // the club rests on his shoulder: the arm turns at the elbow, not at the club's end
+    ("heroes/ivan", &[(Part::Head, Vec2::new(0.513, 0.209), 1.0), (Part::Shield, Vec2::new(0.667, 0.364), 0.8), (Part::Arm, Vec2::new(0.35, 0.36), 0.8)]),
+    // her braid comes off with the head: it nods at the neck, not halfway down the braid
+    ("heroes/lisa", &[(Part::Head, Vec2::new(0.58, 0.18), 1.0), (Part::Shield, Vec2::new(0.757, 0.428), 0.8), (Part::Arm, Vec2::new(0.468, 0.428), 1.0)]),
     ("heroes/skomoroh", &[(Part::Shield, Vec2::new(0.69, 0.44), 0.8), (Part::Head, Vec2::new(0.57, 0.22), 1.0), (Part::Arm, Vec2::new(0.20, 0.37), 0.8)]),
     ("enemies/bannik", &[(Part::Head, Vec2::new(0.584, 0.305), 1.0), (Part::Shield, Vec2::new(0.788, 0.373), 0.8), (Part::Arm, Vec2::new(0.55, 0.38), 0.9)]),
     ("enemies/ovinnik", &[(Part::Head, Vec2::new(0.178, 0.228), 1.0), (Part::Shield, Vec2::new(0.342, 0.415), 0.8), (Part::Arm, Vec2::new(0.183, 0.419), 1.0)]),

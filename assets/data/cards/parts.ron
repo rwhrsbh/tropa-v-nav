@@ -22,4 +22,13 @@
     (id: "own_head_emelya", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
     (id: "own_weapon_emelya", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
     (id: "own_shield_emelya", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_head_kuzma", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_weapon_kuzma", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_shield_kuzma", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_head_ivan", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_weapon_ivan", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_shield_ivan", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_head_lisa", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_weapon_lisa", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
+    (id: "own_shield_lisa", kind: Status, rarity: Special, cost: 0, keywords: [Exhaust]),
 ]

@@ -86,6 +86,8 @@ pub fn family_of(c: &Content, id: &str) -> Vec<&'static str> {
                     (StatusKind::Fortitude, _) => add("block"),
                     (StatusKind::Drowse, _) => add("drowse"),
                     (StatusKind::Valor, _) => add("valor"),
+                    (StatusKind::Luck, _) => add("luck"),
+                    (StatusKind::Evade | StatusKind::Charm | StatusKind::Flattery, _) => add("guile"),
                     _ => {}
                 },
                 Effect::Damage(_, Tgt::AllFoes) | Effect::Hits(_, _, Tgt::AllFoes) => add("aoe"),
@@ -103,6 +105,12 @@ pub fn family_of(c: &Content, id: &str) -> Vec<&'static str> {
                 Effect::Shift => add("shift"),
                 Effect::PikeWill => add("pike"),
                 Effect::Echo(_) => add("echo"),
+                // Kuzma's forge and plate
+                Effect::Forge(_) | Effect::Mark(_) | Effect::Plate(_) | Effect::Reforge(..) | Effect::Upgrade(..) => add("forge"),
+                // Ivan's luck
+                Effect::Luck { .. } => add("luck"),
+                // Lisa's copies of others' cards
+                Effect::Alien { .. } | Effect::Pick { .. } | Effect::DrawFor(..) | Effect::Transmute(..) => add("alien"),
                 Effect::If(_, a, b) => {
                     walk(a, add);
                     walk(b, add);
@@ -114,6 +122,33 @@ pub fn family_of(c: &Content, id: &str) -> Vec<&'static str> {
     }
     let view = def.view(id.ends_with('+'), nav_core::Form::Human);
     walk(&view.effects, &mut add);
+    // a number of chance is Ivan's own: his range cards feed his luck
+    if !nav_core::craft::ranges(&view.effects).is_empty() {
+        add("luck");
+    }
+    // a card that only asks after the new heroes' state (in plate, Чужие in hand, luck) belongs
+    // to that family too: its conditions and amounts are read as written
+    let said = format!("{:?}{:?}", view.effects, view.passives);
+    if said.contains("InPlate") || said.contains("Forge") {
+        add("forge");
+    }
+    if said.contains("Alien") {
+        add("alien");
+    }
+    if said.contains("Luck") || said.contains("lucky") {
+        add("luck");
+    }
+    if said.contains("Stash") {
+        add("stash");
+    }
+    if said.contains("\"borrow\"") || said.contains("Provoke") || said.contains("dodged") {
+        add("guile");
+    }
+    // a card of Kuzma's that plays otherwise in plate is part of his forging
+    let plated = def.view(id.ends_with('+'), nav_core::Form::Beast);
+    if def.hero == "kuzma" && format!("{:?}", plated.effects) != format!("{:?}", view.effects) {
+        add("forge");
+    }
     for p in &view.passives {
         walk(&p.effects, &mut add);
     }

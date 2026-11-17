@@ -24,6 +24,12 @@ pub fn hero_color(hero: &str) -> Color {
         "znaharka" => Color::srgb(0.85, 0.62, 0.22),
         "skomoroh" => Color::srgb(0.48, 0.36, 0.56),
         "emelya" => Color::srgb(0.78, 0.74, 0.62),
+        // the smith: iron dark from the forge
+        "kuzma" => Color::srgb(0.40, 0.42, 0.47),
+        // the fool: his patched blue kaftan
+        "ivan" => Color::srgb(0.27, 0.40, 0.80),
+        // the fox: ginger
+        "lisa" => Color::srgb(0.90, 0.42, 0.10),
         _ => DIM,
     }
 }
