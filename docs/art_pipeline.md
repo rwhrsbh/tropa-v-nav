@@ -187,6 +187,18 @@ the stump, one that grows back is drawn again, and with no head left the body li
 - Breath (`gor3_<head>_<fire_breath|acid_spit|thunder_roar>.png`) is painted on `gor3_pad.png`,
   the dragon shrunk and set right so the fire, venom or lightning fits; the tool maps it back.
 
+## Checking every foe
+
+- `python tools/foe_sheet.py <id> ...` (or `--all <file of ids>`) writes `target/foe_<id>.png`: the
+  resting picture, head over body with the rig's head joint as a red dot and anything the parts
+  miss of the resting picture in magenta, the head alone, both corpses, every pose. Look at each
+  row: the same character in every picture (Solovey's poses and corpses once showed another
+  man), the same colours (zlyden once struck in brown skin), a pose for every move kind, the head
+  joint on the neck, no green fringe, nothing cut at an edge.
+- `python tools/rig_fill.py <id> ... --dry` counts what neither head nor body (nor arm or shield)
+  holds of the resting picture. Anything there is a hole in the standing figure: give it to the
+  body (the head stays as cut) and look again.
+
 ## Maimed heroes on the Edge
 
 A hero down on the Edge kneels in `<hero>_downed`; one short of the head or an arm kneels in

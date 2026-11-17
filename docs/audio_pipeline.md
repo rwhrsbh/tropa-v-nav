@@ -102,6 +102,31 @@ as `<scene>` + `Read this aloud, once, exactly as written:` + the text.
   a "howling", "gusty" manner made the model mumble. Lines the check cannot hear (a drawn-out
   "Унесу-у!", a rare word as "загодя") are rewritten plainer rather than forced through.
 
+### When the API quota is gone: AI Studio in the browser
+
+Every key's speech models share one daily quota; when `tts_api.py` says "every model on every
+key is out of quota", record on the AI Studio page instead, which has its own quota per account.
+
+1. `python tools/barkpage.py` writes `_inbox/barkpage.js` with every line still missing.
+2. Open `https://aistudio.google.com/u/<n>/generate-speech?model=gemini-3.1-flash-tts-preview`
+   (there are six accounts, u/0 to u/5), press "Create new dialog".
+3. Load the script: inject a file input (`input#tropaFile` whose change stores the text in
+   `localStorage.tropaPage`), `upload "#tropaFile" _inbox/barkpage.js`, then in a separate call
+   `(0,eval)(localStorage.tropaPage)`.
+4. Pick the speaker's voice (barks.voices.txt) in the speaker panel: open it, `fill` the voice
+   search, click the voice, Escape. Opening the panel drops the browser tool's hold on the tab:
+   `tab select` it again before the next step.
+5. Set the Scene textarea to `tropaStyle(<who>, <lang>)` through the native value setter and an
+   `input` event; one language per run. Start `tropaRecord(<who>, <n>, <lang>)` without awaiting it
+   and read `window.tropaLog` later. Each clip lands in Downloads as `tropa__<lang>__<key>.wav`.
+6. `python tools/voice_in.py --named` checks every clip with Whisper and takes in the good ones.
+   Lines it turns down are recorded again (drop them from `localStorage.tropaDone`).
+
+When an account says "Quota limit reached", switch that tab to another model with a Scene field
+(`gemini-2.5-pro-preview-tts`) or to the next account. Several accounts in several tabs record at
+once only while each tab is on screen: Chrome throttles the timers of a hidden tab to about one a
+minute and the recording all but stops there.
+
 ## Checking every clip
 
 - `tools/voice_in.py <lang> <key>` / `--named`: a local Whisper (`tools/hear.py`, GPU) scores the

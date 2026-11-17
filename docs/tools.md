@@ -769,6 +769,20 @@ fetch them by eye: `python tools/downed_in.py <tile> <hero><mark>` takes one in.
 WEAPON / SHIELD say which arm is which in each hero's downed picture: the weapon arm is the one
 `_noweapon` loses.
 
+### `foe_sheet.py`
+
+Sheets a foe's every picture to look at: is it all there and does it all fit together?
+
+```
+python tools/foe_sheet.py <id> [<id> ...]        # target/foe_<id>.png each
+python tools/foe_sheet.py --all <file>           # the ids listed in a file, one per line
+```
+
+One row per foe: the resting picture; head over body with the rig's head joint marked (red dot,
+read from crates/game/src/battle/rig.rs) and anything the parts miss of the resting picture in
+magenta; the head alone; both corpses; every pose (`_strike`, `_hurt`, `_guard`, `_cast` and any
+`_<move id>`). On grey, so a black figure shows and a green fringe stands out.
+
 ### `gorynych_in.py`
 
 Takes Gorynych into the game as one body with three heads on their own necks.

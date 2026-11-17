@@ -22,6 +22,7 @@ how to set it up: [Where pictures are painted](docs/art_pipeline.md#where-pictur
   - [Keying and sizes](docs/art_pipeline.md#keying-and-sizes)
   - [Foe poses](docs/art_pipeline.md#foe-poses)
   - [Rig parts and corpses (the dismemberment)](docs/art_pipeline.md#rig-parts-and-corpses-the-dismemberment)
+  - [Checking every foe](docs/art_pipeline.md#checking-every-foe)
   - [Maimed heroes on the Edge](docs/art_pipeline.md#maimed-heroes-on-the-edge)
   - [Other kinds](docs/art_pipeline.md#other-kinds)
 - [Sound and voice](docs/audio_pipeline.md)
