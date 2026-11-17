@@ -897,7 +897,7 @@ fn sync_units(
         let wide = (!is_hero || stem == "heroes/emelya") && art.aspect(&stem).is_some_and(|a| a > 0.9);
         // a foe of known stature is drawn as tall as it stands, a raven small, a giant huge
         let tall = match unit {
-            UnitRef::Enemy(uid) => shown.enemy(uid).and_then(|e| stature::height_of(&e.def)),
+            UnitRef::Enemy(uid) => shown.enemy(uid).and_then(|e| gorynych::height_of(&e.def).or_else(|| stature::height_of(&e.def))),
             UnitRef::Hero(_) => None,
         };
         let draw = match tall {
@@ -941,7 +941,7 @@ fn sync_units(
                 u.spawn((
                     // over a picture that spills above its slot, the intent rises with it, so it
                     // stays over the head and not on the face
-                    Node { height: px(HEAD_ROOM), align_items: AlignItems::Center, top: px(-(draw.y - size.y)), left: px(gorynych::intent_shift(&def)), ..default() },
+                    Node { height: px(HEAD_ROOM), align_items: AlignItems::Center, top: px(-(draw.y - size.y) + gorynych::head_top(&def) * draw.y), left: px(gorynych::intent_shift(&def)), ..default() },
                     // text is never hidden by a sprite, this unit's or a neighbour's
                     GlobalZIndex(20),
                     Pickable::IGNORE,
@@ -1143,6 +1143,7 @@ pub(crate) fn pose_base(mut stem: &str) -> &str {
 
 fn swap_form_art(
     session: Res<Session>,
+    db: Res<Db>,
     art: Res<Art>,
     assets: Res<AssetServer>,
     mut preloaded: Local<Preloaded>,
@@ -1159,6 +1160,14 @@ fn swap_form_art(
             for mark in ["", "_headless", "_noweapon", "_noshield", "_noarms", "_headless_noweapon", "_headless_noshield", "_headless_noarms"] {
                 for pose in ["", "_strike", "_cast", "_hurt", "_guard", "_downed"] {
                     if let Some(handle) = art.image(&assets, &format!("{stem}{mark}{pose}")) {
+                        preloaded.handles.push(handle);
+                    }
+                }
+            }
+            // a foe's own blows (see `blow` below)
+            if let Some(def) = stem.strip_prefix("enemies/").and_then(|d| db.0.enemies.get(d)) {
+                for mv in &def.moves {
+                    if let Some(handle) = art.image(&assets, &format!("{stem}_{}", mv.id)) {
                         preloaded.handles.push(handle);
                     }
                 }
@@ -1210,7 +1219,20 @@ fn swap_form_art(
         if downed && painted && art.image(&assets, &format!("{want}_downed")).is_some() {
             want = format!("{want}_downed");
         }
-        if let Some(pose) = pose.filter(|_| !downed && painted) {
+        // a foe's blow may have a picture of its own, named after the move: Gorynych's heads
+        // breathe fire, spit venom and roar thunder instead of only lunging
+        let blow = match (s.unit, s.anim) {
+            (UnitRef::Enemy(uid), Some((Anim::Lunge, t))) if (0.12..0.38).contains(&t) => session
+                .shown
+                .enemy(uid)
+                .and_then(|e| e.intent.as_ref().and_then(|i| db.0.enemies.get(&e.def)?.moves.get(i.mv)))
+                .map(|m| format!("{want}_{}", m.id))
+                .filter(|b| art.image(&assets, b).is_some()),
+            _ => None,
+        };
+        if let Some(b) = blow {
+            want = b;
+        } else if let Some(pose) = pose.filter(|_| !downed && painted) {
             if art.image(&assets, &format!("{want}{pose}")).is_some() {
                 want = format!("{want}{pose}");
             }

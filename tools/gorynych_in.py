@@ -31,6 +31,12 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 EN = os.path.join(ROOT, "assets", "enemies")
 SIDE = 1024
 HEADS = (("fire", (255, 0, 255)), ("poison", (0, 255, 255)), ("thunder", (255, 255, 0)))
+# how much of the sheet's width the dragon takes
+WIDE = 0.62
+# gor3_pad.png: gor3.png shrunk by 0.62 and set at (379, 359), green on the left for the breath
+PAD = (0.62, 379, 359)
+# blows of their own, painted on gor3_pad.png: gor3_<head>_<move>.png
+BREATH = {"fire": "fire_breath", "poison": "acid_spit", "thunder": "thunder_roar"}
 
 
 def main():
@@ -41,14 +47,24 @@ def main():
     mask = np.array(Image.open(pic("gor3_mask.png")).convert("RGB").resize(rest.size, Image.NEAREST)).astype(int)
     # one placing for all: the whole dragon's box, fitted to the sheet, feet near the bottom
     box = rest.getchannel("A").point(lambda v: 255 if v > 24 else 0).getbbox()
-    k = min(0.94 * SIDE / (box[2] - box[0]), 0.92 * SIDE / (box[3] - box[1]))
-    at = ((SIDE - round((box[2] - box[0]) * k)) // 2, round(SIDE * 0.957) - round((box[3] - box[1]) * k))
+    # the dragon stands at the right of its sheet, WIDE of it wide: the left is kept for the fire,
+    # venom and lightning its heads breathe out (see the game's stature for its height)
+    k = min(WIDE * SIDE / (box[2] - box[0]), 0.92 * SIDE / (box[3] - box[1]))
+    at = (SIDE - round((box[2] - box[0]) * k) - round(0.02 * SIDE), round(SIDE * 0.957) - round((box[3] - box[1]) * k))
 
     def place(im):
-        im = im.crop(box)
+        # the whole picture, not only the box: a head lunging past the resting outline keeps its snout
         im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
         sheet = Image.new("RGBA", (SIDE, SIDE))
-        sheet.alpha_composite(im, at)
+        sheet.paste(im, (round(at[0] - box[0] * k), round(at[1] - box[1] * k)), im)
+        return sheet
+
+    def place_pad(im):
+        # a picture painted on gor3_pad.png: the dragon shrunk by PAD[0] and set at PAD[1:]
+        f = k / PAD[0]
+        im = im.resize((round(im.width * f), round(im.height * f)), Image.LANCZOS)
+        sheet = Image.new("RGBA", (SIDE, SIDE))
+        sheet.paste(im, (round(at[0] - box[0] * k - PAD[1] * f), round(at[1] - box[1] * k - PAD[2] * f)), im)
         return sheet
 
     R, B = np.array(place(rest)), np.array(place(body))
@@ -76,6 +92,42 @@ def main():
         seam = sel & ndimage.binary_dilation(held, iterations=3)
         ys, xs = np.nonzero(seam if seam.any() else sel)
         joints.append((name, xs.mean() / SIDE, ys.mean() / SIDE))
+    # poses: Flow pictures of the whole dragon with one head moved, `gor3_<head>_<pose>.png`; the
+    # head's pose picture is what moved (what differs from the whole dragon) and its own neck down
+    # over the stump, the part of it joined to that neck
+    for i, (name, _) in enumerate(HEADS):
+        own = np.array(out[f"gorynych_{name}_head"])[..., 3] > 24
+        for pose in ("strike", "hurt", "guard", "cast", BREATH[name]):
+            path = pic(f"gor3_{name}_{pose}.png")
+            if not os.path.exists(path):
+                continue
+            padded = pose == BREATH[name]
+            keyed = key_flood(Image.open(path).resize(rest.size, Image.LANCZOS), tol=90)
+            P = np.array(place_pad(keyed) if padded else place(keyed))
+            there = P[..., 3] > 24
+            moved = there & (~whole | (np.abs(P[..., :3].astype(int) - R[..., :3].astype(int)).sum(axis=2) > 70))
+            # a neck laid over the dark body differs from it only in places: close the gaps
+            moved = ndimage.binary_closing(ndimage.binary_opening(moved, iterations=2), iterations=10) & there
+            # what moved near this head, never another head's neck or the body
+            others = np.zeros_like(own)
+            for j, (n2, _) in enumerate(HEADS):
+                if j != i:
+                    others |= np.array(out[f"gorynych_{n2}_head"])[..., 3] > 24
+            # another head's neck stays out only where nothing moved: a lunge may cross it
+            keep = there & ((own & ~others) | moved)
+            lab, n = ndimage.label(keep)
+            if n > 1:
+                # the pieces of any size: specks of repaint elsewhere drop out
+                sizes = ndimage.sum(np.ones(lab.shape), lab, range(1, n + 1))
+                keep = np.isin(lab, [t + 1 for t, z in enumerate(sizes) if z > 0.08 * sizes.max()])
+            part = np.zeros_like(P)
+            part[keep] = P[keep]
+            if padded:
+                # fire, venom and lightning glow: the green ground shows through their soft edges
+                rgb = part[..., :3].astype(int)
+                rgb[..., 1] = np.minimum(rgb[..., 1], np.maximum(rgb[..., 0], rgb[..., 2]))
+                part[..., :3] = rgb.astype(np.uint8)
+            out[f"gorynych_{name}_{pose}"] = Image.fromarray(part)
     for name, im in out.items():
         path = os.path.join(EN, f"{name}-gemini.png")
         im.save(path)
@@ -93,6 +145,23 @@ def main():
         despeckle(os.path.join(EN, f"{name}-gemini.png"))
         corpses.append(sheet)
     # to look at: body alone, each head alone in its place, the heads over the body, the corpses
+    poses = [out[k] for k in out if any(k.endswith(p) for p in ("_strike", "_hurt", "_guard", "_cast"))]
+    for n, mv in BREATH.items():
+        if f"gorynych_{n}_{mv}" in out:
+            t = out["gorynych_body"].copy()
+            for n2, _ in HEADS:
+                t.alpha_composite(out[f"gorynych_{n}_{mv}"] if n2 == n else out[f"gorynych_{n2}_head"])
+            t.convert("RGBA").save(os.path.join(ROOT, "target", f"gorynych_{mv}.png"))
+    if poses:
+        # each pose over the body, to look at
+        ps = Image.new("RGBA", (4 * 320, 3 * 320), (90, 90, 90, 255))
+        for i, (n, _) in enumerate(HEADS):
+            for j, pose in enumerate(("strike", "hurt", "guard", "cast")):
+                t = out["gorynych_body"].copy()
+                for n2, _ in HEADS:
+                    t.alpha_composite(out.get(f"gorynych_{n}_{pose}") if n2 == n and f"gorynych_{n}_{pose}" in out else out[f"gorynych_{n2}_head"])
+                ps.alpha_composite(t.resize((320, 320)), (j * 320, i * 320))
+        ps.convert("RGB").save(os.path.join(ROOT, "target", "gorynych_poses.png"))
     tiles = [out["gorynych_body"]] + [out[f"gorynych_{n}_head"] for n, _ in HEADS]
     over = out["gorynych_body"].copy()
     for n, _ in HEADS:

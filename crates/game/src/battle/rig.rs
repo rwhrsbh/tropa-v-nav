@@ -144,9 +144,9 @@ const FIGURES: &[(&str, &[Cut])] = &[
     ("enemies/gagana", &[(Part::Head, Vec2::new(0.292, 0.259), 1.0), (Part::Shield, Vec2::new(0.789, 0.573), 0.8), (Part::Arm, Vec2::new(0.571, 0.182), 1.0)]),
     // Gorynych's heads are units of their own: each is drawn as its head and neck alone over an
     // empty body, on the one sheet the shared body (`battle::gorynych`) is drawn on
-    ("enemies/gorynych_fire", &[(Part::Head, Vec2::new(0.236, 0.501), 1.0)]),
-    ("enemies/gorynych_poison", &[(Part::Head, Vec2::new(0.385, 0.301), 1.0)]),
-    ("enemies/gorynych_thunder", &[(Part::Head, Vec2::new(0.476, 0.406), 1.0)]),
+    ("enemies/gorynych_fire", &[(Part::Head, Vec2::new(0.494, 0.671), 1.0)]),
+    ("enemies/gorynych_poison", &[(Part::Head, Vec2::new(0.609, 0.475), 1.0)]),
+    ("enemies/gorynych_thunder", &[(Part::Head, Vec2::new(0.666, 0.598), 1.0)]),
     ("enemies/solovey", &[(Part::Head, Vec2::new(0.379, 0.303), 1.0), (Part::Shield, Vec2::new(0.378, 0.258), 0.8), (Part::Arm, Vec2::new(0.279, 0.269), 1.0)]),
     ("enemies/korochun", &[(Part::Head, Vec2::new(0.496, 0.219), 1.0), (Part::Shield, Vec2::new(0.661, 0.436), 0.8), (Part::Arm, Vec2::new(0.172, 0.202), 1.0)]),
     ("enemies/vodyanoy_tsar", &[(Part::Head, Vec2::new(0.473, 0.405), 1.0), (Part::Shield, Vec2::new(0.657, 0.472), 0.8), (Part::Arm, Vec2::new(0.148, 0.037), 1.0)]),
