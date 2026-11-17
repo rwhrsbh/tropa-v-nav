@@ -20,7 +20,7 @@ B = os.path.join(ROOT, "_inbox", "flow_up", "batch")
 # words in Flow's own title for a tile, and the pose they name
 WORDS = (("reel", "hurt"), ("recoil", "hurt"), ("flinch", "hurt"), ("pain", "hurt"), ("struck", "hurt"),
          ("defens", "guard"), ("crouch", "guard"), ("guard", "guard"), ("brac", "guard"),
-         ("cast", "cast"), ("curse", "cast"), ("hiss", "cast"), ("screech", "cast"), ("scream", "cast"), ("chant", "cast"), ("howl", "cast"),
+         ("cast", "cast"), ("curse", "cast"), ("hiss", "cast"), ("whistl", "cast"), ("bone cage", "cast"), ("screech", "cast"), ("scream", "cast"), ("chant", "cast"), ("howl", "cast"),
          ("attack", "strike"), ("lung", "strike"), ("strik", "strike"), ("swing", "strike"), ("blow", "strike"))
 
 
