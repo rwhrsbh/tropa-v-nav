@@ -120,6 +120,11 @@ pub(super) fn chips(l10n: &L10n, db: &nav_core::Content, session: &Session, unit
                 };
                 out.push(Chip { icon: "status/lost_limb".into(), n: (h.lost_limbs > 1).then_some(h.lost_limbs as i32), shown: None, good: Some(false), name: l10n.t(&key), help: help(l10n, &key) });
             }
+            // a foe's move Lisa copied, held in her hand until played or the turn ends
+            let copied = real.hand.iter().filter(|c| c.def == nav_core::craft::STOLEN_MOVE).count() as i32;
+            if copied > 0 {
+                out.push(Chip { icon: "status/stolen".into(), n: (copied > 1).then_some(copied), shown: None, good: Some(true), name: l10n.t("trait-copied-move"), help: help(l10n, "trait-copied-move") });
+            }
             // every mark on the hero that has a name: the banes the foes laid, and the boons
             // their own cards left for later (a free rune, a foresight)
             for (flag, n) in &real.flags {

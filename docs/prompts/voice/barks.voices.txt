@@ -19,3 +19,6 @@ gore = Achernar | Gore, the spirit of woe and misfortune. A thin, clinging, sorr
 domovoy = Algenib | The domovoy, a grumpy old house spirit. Gruff, crotchety little old man's voice, muttering and scolding like an angry grandfather; brisk and fussy.
 chernobog = Schedar | Chernobog, the black god of darkness. Deep, vast, cold, slow and majestic voice of an ancient dark god; quiet menace, utterly certain; every word heavy.
 zhlya = Vindemiatrix | A woman: Zhlya, the spirit of mourning who scatters funeral ash. Strictly a female voice, never male. A keening, sing-song lament of a professional mourner, sorrowful and eerie; every word clear.
+kuzma = Iapetus | A Slavic village blacksmith of forty in battle. Low, steady, warm baritone with gravel in it; unhurried and plain-spoken, a working man's dry humour; strong, never shouting for show.
+ivan = Achird | Ivanushka the fool, a cheerful lanky village lad of twenty. Bright, open, slightly goofy young man's voice; carefree, laughing easily, surprised by everything; even in pain more startled than afraid.
+lisa = Despina | A woman: Lisa the fox, a sly young red-haired trickster. Strictly a female voice, never male. Silky, purring, teasing woman's voice with a smile in it; flattering and mocking at once; sharp when hurt.

@@ -14,7 +14,7 @@ use bevy::ui_widgets::{observe, Activate, Button};
 use nav_core::*;
 
 /// The heroes in the order the lobby shows them.
-const HEROES: [&str; 7] = ["bogatyr", "vorozheya", "volhv", "volkolak", "znaharka", "skomoroh", "emelya"];
+pub const HEROES: [&str; 10] = ["bogatyr", "vorozheya", "volhv", "volkolak", "znaharka", "skomoroh", "emelya", "kuzma", "ivan", "lisa"];
 /// How large a card is shown, how many to a row, and the gaps.
 const K: f32 = 0.72;
 const COLS: f32 = 8.0;
@@ -86,8 +86,14 @@ fn enter_library(
     });
     commands.spawn((theme::text(l10n.t("library-title"), &fonts.title, 56.0, theme::BONE), ChildOf(root)));
 
-    // one tab for each hero, the chosen one lit in its own colour
-    let tabs = commands.spawn((Node { column_gap: px(10), ..default() }, Pickable::IGNORE, ChildOf(root))).id();
+    // one tab for each hero in its own colour, five to a row; the chosen one lit
+    let tabs = commands
+        .spawn((
+            Node { max_width: px(1500), flex_wrap: FlexWrap::Wrap, justify_content: JustifyContent::Center, column_gap: px(10), row_gap: px(8), ..default() },
+            Pickable::IGNORE,
+            ChildOf(root),
+        ))
+        .id();
     for id in HEROES {
         let lit = id == hero;
         let hue = theme::hero_color(id);
@@ -97,8 +103,8 @@ fn enter_library(
             crate::battle::Btn(if lit { theme::PEAT } else { theme::SOOT }),
             Node { padding: UiRect::axes(px(20), px(8)), border: UiRect::all(px(2)), border_radius: BorderRadius::all(px(8)), ..default() },
             BackgroundColor(if lit { theme::PEAT } else { theme::SOOT }),
-            BorderColor::all(if lit { hue } else { theme::DIM.with_alpha(0.5) }),
-            children![theme::text(l10n.t(&format!("hero-{id}")), &fonts.title, 24.0, if lit { hue.lighter(0.15) } else { theme::BONE })],
+            BorderColor::all(if lit { hue.lighter(0.2) } else { hue.with_alpha(0.6) }),
+            children![theme::text(l10n.t(&format!("hero-{id}")), &fonts.title, 24.0, if lit { hue.lighter(0.3) } else { hue.lighter(0.12) })],
             observe(move |_: On<Activate>, mut shelf: ResMut<Shelf>, mut next: ResMut<NextState<AppState>>| {
                 shelf.0 = id;
                 // the screen is laid out again for the hero chosen

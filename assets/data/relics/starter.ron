@@ -65,4 +65,29 @@
     (id: "em_r_crown", rarity: Rare, hero: "emelya", passives: [(on: CombatStart, effects: [Energy(N(1), Me), Apply(Drowse, N(2), Me)])]),
     (id: "em_r_bell", rarity: Rare, hero: "emelya", passives: [(on: Kill, effects: [PikeWill])]),
     (id: "em_r_featherbed", rarity: Rare, hero: "emelya", passives: [(on: TurnEnd, effects: [Apply(Drowse, N(2), Me)])]),
+    // ---- Кузьма ----
+    (
+        // Молот Кузьмы: за каждую сыгранную карту с Ковкой случайный союзник получает 2 щита
+        id: "kz_hammer", rarity: Starter, hero: "kuzma",
+        passives: [(on: ForgePlayed, effects: [Block(N(2), RandomAlly)])],
+    ),
+    // Подкованная лошадка: у Коробейника всё на 20% дешевле для Кузьмы (это считает забег)
+    (id: "kz_alt_horse", rarity: Starter, hero: "kuzma"),
+    (id: "kz_alt_anvil_chip", rarity: Starter, hero: "kuzma", passives: [(on: CombatStart, effects: [Forge(N(3))])]),
+    // ---- Иванушка ----
+    (
+        // Подкова: бой начинается с 2 Удачи
+        id: "iv_horseshoe", rarity: Starter, hero: "ivan",
+        passives: [(on: CombatStart, effects: [Apply(Luck, N(2), Me)])],
+    ),
+    (id: "iv_alt_kopeck", rarity: Starter, hero: "ivan", passives: [(on: RollMax, effects: [OncePerTurn("iv_alt_kopeck", [Draw(N(1))])])]),
+    (id: "iv_alt_rattle", rarity: Starter, hero: "ivan", passives: [(on: LuckHitAlly, effects: [Block(N(4), Me)])]),
+    // ---- Лиса ----
+    (
+        // Лисий хвост: первая Чужая карта в бою стоит 0
+        id: "li_fox_tail", rarity: Starter, hero: "lisa",
+        passives: [(on: CombatStart, effects: [Flag("alien_free", 1)])],
+    ),
+    (id: "li_alt_hen_feather", rarity: Starter, hero: "lisa", passives: [(on: CombatStart, effects: [Apply(Evade, N(1), Me)])]),
+    (id: "li_alt_ring", rarity: Starter, hero: "lisa", passives: [(on: AlienPlayed, effects: [OncePerTurn("li_alt_ring", [Block(N(3), Me)])])]),
 ]

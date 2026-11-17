@@ -57,4 +57,33 @@
             "em_sloth", "em_sloth",
         ],
     ),
+    (
+        // Кузьма: в Кузне куёт Латы и помогает отряду, на 15 Ковки надевает Латы и бьёт.
+        id: "kuzma", max_hp: 80, mechanic: Forge, relic: "kz_hammer", alt_relics: ["kz_alt_horse", "kz_alt_anvil_chip"],
+        deck: [
+            "kz_strike", "kz_strike", "kz_strike", "kz_strike",
+            "kz_defend", "kz_defend", "kz_defend", "kz_defend",
+            "kz_bellows", "kz_humble",
+        ],
+    ),
+    (
+        // Иванушка-дурачок: числа на картах выпадают случайно, каждая такая карта копит Удачу,
+        // карты Удачи бьют наугад — врага или своего.
+        id: "ivan", max_hp: 75, mechanic: Luck, relic: "iv_horseshoe", alt_relics: ["iv_alt_kopeck", "iv_alt_rattle"],
+        deck: [
+            "iv_club", "iv_club", "iv_club", "iv_club",
+            "iv_cover", "iv_cover", "iv_cover", "iv_cover",
+            "iv_tumble", "iv_pockets",
+        ],
+    ),
+    (
+        // Лиса Патрикеевна: каждый ход 4 своих карты и 1 Чужая — копия чужой карты; Увёртка,
+        // Очарование, Лесть, Позаимствовать и Заначка.
+        id: "lisa", max_hp: 70, mechanic: Sly, relic: "li_fox_tail", alt_relics: ["li_alt_hen_feather", "li_alt_ring"],
+        deck: [
+            "li_snap", "li_snap", "li_snap", "li_snap",
+            "li_hop", "li_hop", "li_hop", "li_hop",
+            "li_peek", "li_tail_flick",
+        ],
+    ),
 ]

@@ -173,7 +173,7 @@ mask-Bear-help = Attacks deal +3 damage.
 mask-Goat = Goat
 mask-Goat-help = Every card you play gives a random ally 2 Block.
 mask-Mara = Mara
-mask-Mara-help = Every blow applies 7.5 Fear.
+mask-Mara-help = Every blow applies 7.5% Fear.
 
 fx-consumecurses = Respond: consume every Curse on the target.
 fx-once = Once per combat: { $body }
@@ -419,11 +419,11 @@ herb-henbane = Henbane
 herb-valerian = Valerian
 herb-st_john = St John's Wort
 herb-nettle-help = In a brew: Bleed on enemies and Thorns. Spilt: 1 Bleed to all enemies.
-herb-henbane-help = In a brew: Fear and Rot on enemies. Spilt: 5 Fear to all enemies.
+herb-henbane-help = In a brew: Fear and Rot on enemies. Spilt: 5% Fear to all enemies.
 herb-valerian-help = In a brew: Weak on enemies and Block for allies. Spilt: 1 Weak to a random enemy.
 herb-st_john-help = In a brew: Strength and healing. Spilt: 1 temporary Strength.
 herb-nettle-spill = 1 Bleed to all enemies
-herb-henbane-spill = 5 Fear to all enemies
+herb-henbane-spill = 5% Fear to all enemies
 herb-valerian-spill = 1 Weak to a random enemy
 herb-st_john-spill = +1 Strength this turn
 
@@ -441,7 +441,7 @@ mech-Moon = As a man the Volkolak gains 1 Moon for every attack he plays; at the
 mech-Brew-name = Cauldron
 mech-Brew = A herb does a little at once and goes into the Cauldron, up to four. Brew turns the herbs into a potion by recipe. Fern flower stands in for any herb and doubles the brew. One herb too many spills the oldest, which works weakly.
 mech-Masks-name = Masks
-mech-Masks = The Skomoroh wears one mask at a time. Bear: attacks deal +3 damage. Goat: every card played gives a random ally 2 Block. Mara: every blow gives the foe 7.5 Fear, up to 75; a frightened foe may miss its attack.
+mech-Masks = The Skomoroh wears one mask at a time. Bear: attacks deal +3 damage. Goat: every card played gives a random ally 2 Block. Mara: every blow gives the foe 7.5% Fear, up to 75%; a frightened foe may miss its attack.
 mech-Sloth-name = Drowse
 mech-Sloth = Every Energy left unspent in a turn gives Yemelya 1 Drowse. His cards spend Drowse on blows and Block, and those with a blue cost are paid for with it. None of his cards strike a chosen target: only a random foe, or all of them.
 

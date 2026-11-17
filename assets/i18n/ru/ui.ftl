@@ -613,12 +613,12 @@ hollow-prize-3 = Три жар-птицы: { $what }
 hollow-prize-potion-1 = ещё одно зелье
 hollow-prize-potion-2 = ещё два зелья
 hollow-prize-potion-3 = ещё четыре зелья
-hollow-prize-relic-1 = ещё одна реликвия
+hollow-prize-relic-1 = 50 золота
 hollow-prize-relic-2 = редкая реликвия
 hollow-prize-relic-3 = редкая реликвия и ещё одна
-hollow-prize-arm-1 = редкая реликвия
-hollow-prize-arm-2 = редкая реликвия и 100 золота
-hollow-prize-arm-3 = две реликвии, одна редкая, и 200 золота
+hollow-prize-arm-1 = обычная реликвия
+hollow-prize-arm-2 = редкая реликвия
+hollow-prize-arm-3 = редкая реликвия и 100 золота
 hollow-prize-seam = Любые три знака: рука прирастёт как была, даром
 hollow-spin = Крутить
 hollow-leave = Уйти от дупла
@@ -644,7 +644,9 @@ hollow-seam-lost = Не сойдётся: { $n }% здоровья уйдёт н
 menu-library = Книга карт
 library-title = Книга карт
 library-count = Открыто { $open } из { $all } · уровень героя { $level }
-library-locked = Откроется{ "\u000A" }на { $n }-м уровне
+library-locked =
+    Откроется
+    на { $n }-м уровне
 lobby-circle-help-title = Круг Нави
 lobby-circle-help = Сложность похода. Хост выбирает любой открытый круг; новый открывается победой на самом высоком. Условия складываются: на каждом круге действуют и все предыдущие.
 lobby-circle-1 = Элитных врагов на карте больше.

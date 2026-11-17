@@ -21,7 +21,8 @@ pub fn plugin(app: &mut App) {
         .add_systems(OnEnter(AppState::Coop), |mut w: Single<&mut Window>| w.ime_enabled = crate::touch::enabled())
         .add_systems(OnExit(AppState::Coop), |mut w: Single<&mut Window>| w.ime_enabled = false)
         .add_systems(OnEnter(AppState::Lobby), |mut status: ResMut<NetStatus>| status.dirty = true)
-        .add_systems(Update, (draw_lobby, copy_code).run_if(in_state(AppState::Lobby)));
+        .init_resource::<HeroRowAt>()
+        .add_systems(Update, (draw_lobby, copy_code, roll_heroes).chain().run_if(in_state(AppState::Lobby)));
 }
 
 /// The most that can be typed: a Steam code is six letters, an address with its port more.
@@ -311,6 +312,7 @@ fn draw_lobby(
     art: Res<Art>,
     assets: Res<AssetServer>,
     profile: Res<crate::profile::Profile>,
+    row_at: Res<HeroRowAt>,
     mut next: ResMut<NextState<AppState>>,
 ) {
     let Some(net) = net else {
@@ -566,14 +568,56 @@ fn draw_lobby(
         }
     }
 
-    // every hero's face: a hero another player took is dimmed and says whose it is
+    // every hero's face: a hero another player took is dimmed and says whose it is. The row is
+    // narrower than the screen and rolls sideways, by the wheel or by the slider under it
+    let window = commands
+        .spawn((
+            HeroRow,
+            Node {
+                position_type: PositionType::Absolute,
+                top: px(670),
+                left: px((STAGE_W - HERO_ROW_W) / 2.0),
+                width: px(HERO_ROW_W),
+                height: px(250),
+                overflow: Overflow::scroll_x(),
+                ..default()
+            },
+            ScrollPosition(Vec2::new(row_at.0, 0.0)),
+            ChildOf(root),
+        ))
+        .id();
     commands.spawn((
-        Node { position_type: PositionType::Absolute, top: px(690), width: px(STAGE_W), column_gap: px(26), justify_content: JustifyContent::Center, align_items: AlignItems::End, ..default() },
-        Pickable::IGNORE,
+        HeroSlider,
+        Button,
+        Hovered::default(),
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(930),
+            left: px((STAGE_W - HERO_ROW_W) / 2.0),
+            width: px(HERO_ROW_W),
+            height: px(14),
+            border: UiRect::all(px(1)),
+            border_radius: BorderRadius::all(px(7)),
+            ..default()
+        },
+        BackgroundColor(theme::SOOT),
+        BorderColor::all(theme::DIM.with_alpha(0.5)),
+        children![(
+            HeroThumb,
+            Node { position_type: PositionType::Absolute, top: px(1), height: px(10), width: percent(30), left: percent(0), border_radius: BorderRadius::all(px(5)), ..default() },
+            BackgroundColor(theme::CANDLE.with_alpha(0.8)),
+            Pickable::IGNORE,
+        )],
         ChildOf(root),
+    ));
+    commands.spawn((
+        Node { column_gap: px(22), align_items: AlignItems::End, padding: UiRect::axes(px(12), px(4)), flex_shrink: 0.0, ..default() },
+        Pickable { should_block_lower: false, is_hoverable: false },
+        ChildOf(window),
     ))
     .with_children(|row| {
-        for hero in db.0.heroes.keys() {
+        let order: Vec<&String> = crate::library::HEROES.iter().filter_map(|h| db.0.heroes.get_key_value(*h).map(|(k, _)| k)).chain(db.0.heroes.keys().filter(|k| !crate::library::HEROES.contains(&k.as_str()))).collect();
+        for hero in order {
             let owner = lobby.players.iter().find(|pl| pl.peer != me && pl.hero.as_deref() == Some(hero.as_str()));
             let picked = mine.is_some_and(|m| m.hero.as_deref() == Some(hero.as_str()));
             let color = theme::hero_color(hero);
@@ -583,7 +627,7 @@ fn draw_lobby(
                 Button,
                 Hovered::default(),
                 Btn(theme::SOOT),
-                Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: px(6), padding: UiRect::all(px(4)), ..default() },
+                Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: px(6), padding: UiRect::all(px(4)), flex_shrink: 0.0, ..default() },
                 BackgroundColor(theme::SOOT),
             ));
             button.with_children(|b| {
@@ -739,4 +783,74 @@ fn draw_lobby(
             }
         });
     });
+}
+
+/// How wide the row of heroes' faces is; what does not fit rolls sideways.
+const HERO_ROW_W: f32 = 1240.0;
+
+/// The row of faces, the slider under it and its moving piece.
+#[derive(Component)]
+struct HeroRow;
+#[derive(Component)]
+struct HeroSlider;
+#[derive(Component)]
+struct HeroThumb;
+
+/// How far the row is rolled, kept while the lobby is drawn anew.
+#[derive(Resource, Default)]
+struct HeroRowAt(f32);
+
+/// The wheel rolls the row of heroes sideways, and so does its slider, dragged or pressed anywhere
+/// along it; the slider's piece is as long as the share of the row in sight.
+#[allow(clippy::too_many_arguments)]
+fn roll_heroes(
+    mut wheel: MessageReader<bevy::input::mouse::MouseWheel>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    window: Single<&Window, With<bevy::window::PrimaryWindow>>,
+    pointers: Query<(&bevy::picking::pointer::PointerId, &bevy::picking::pointer::PointerLocation)>,
+    mut rows: Query<(&mut ScrollPosition, &ComputedNode, &Children), With<HeroRow>>,
+    nodes: Query<&ComputedNode, Without<HeroRow>>,
+    sliders: Query<(&ComputedNode, &UiGlobalTransform, &Hovered), With<HeroSlider>>,
+    mut thumbs: Query<&mut Node, With<HeroThumb>>,
+    mut at_: ResMut<HeroRowAt>,
+    mut held: Local<bool>,
+) {
+    use bevy::input::mouse::MouseScrollUnit;
+    let turned: f32 = wheel.read().map(|w| if w.unit == MouseScrollUnit::Line { (w.y + w.x) * 110.0 } else { w.y + w.x }).sum();
+    let Ok((mut at, frame, kids)) = rows.single_mut() else { return };
+    let Some(inner) = kids.first().and_then(|k| nodes.get(*k).ok()) else { return };
+    let seen = frame.size().x * frame.inverse_scale_factor();
+    let all = inner.size().x * inner.inverse_scale_factor();
+    let most = (all - seen).max(0.0);
+    let share = if all > 0.0 { (seen / all).clamp(0.08, 1.0) } else { 1.0 };
+    let mut to = at.0.x - turned;
+    if let Ok((track, place, over)) = sliders.single() {
+        if mouse.just_pressed(MouseButton::Left) && over.get() && most > 1.0 {
+            *held = true;
+        }
+        if !mouse.pressed(MouseButton::Left) {
+            *held = false;
+        }
+        let cursor = pointers.iter().find(|(id, _)| id.is_mouse()).and_then(|(_, l)| l.location.as_ref()).map(|l| l.position * window.scale_factor());
+        if let (true, Some(cursor)) = (*held, cursor) {
+            let length = track.size().x;
+            let left = place.translation.x - length / 2.0;
+            let piece = length * share;
+            if length > piece {
+                to = ((cursor.x - left - piece / 2.0) / (length - piece)).clamp(0.0, 1.0) * most;
+            }
+        }
+    }
+    let to = to.clamp(0.0, most);
+    if (at.0.x - to).abs() > 0.01 {
+        at.0.x = to;
+    }
+    at_.0 = to;
+    for mut thumb in &mut thumbs {
+        let (width, left) = (percent(share * 100.0), percent(if most > 0.0 { to / most * (1.0 - share) * 100.0 } else { 0.0 }));
+        if thumb.width != width || thumb.left != left {
+            thumb.width = width;
+            thumb.left = left;
+        }
+    }
 }

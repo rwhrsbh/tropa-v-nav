@@ -611,12 +611,12 @@ hollow-prize-3 = Three firebirds: { $what }
 hollow-prize-potion-1 = one more potion
 hollow-prize-potion-2 = two more potions
 hollow-prize-potion-3 = four more potions
-hollow-prize-relic-1 = one more relic
+hollow-prize-relic-1 = 50 gold
 hollow-prize-relic-2 = a rare relic
 hollow-prize-relic-3 = a rare relic and one more
-hollow-prize-arm-1 = a rare relic
-hollow-prize-arm-2 = a rare relic and 100 gold
-hollow-prize-arm-3 = two relics, one of them rare, and 200 gold
+hollow-prize-arm-1 = a common relic
+hollow-prize-arm-2 = a rare relic
+hollow-prize-arm-3 = a rare relic and 100 gold
 hollow-prize-seam = Any three alike: the arm grows back as it was, for nothing
 hollow-spin = Turn
 hollow-leave = Leave the hollow
@@ -642,7 +642,9 @@ hollow-seam-lost = No match: { $n }% of max HP is gone for good, and no arm
 menu-library = Book of Cards
 library-title = Book of Cards
 library-count = { $open } of { $all } opened · hero level { $level }
-library-locked = Opens at{ "\u000A" }level { $n }
+library-locked =
+    Opens at
+    level { $n }
 lobby-circle-help-title = Circle of Nav
 lobby-circle-help = The run's difficulty. The host picks any circle opened so far; a new one opens with a win on the highest. Rules stack: each circle keeps all the ones before it.
 lobby-circle-1 = More elites on the map.

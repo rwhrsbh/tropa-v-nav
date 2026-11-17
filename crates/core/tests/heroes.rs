@@ -357,24 +357,27 @@ fn every_hero_card_can_be_played() {
     for def in c.cards.values().filter(|d| !d.hero.is_empty()) {
         for upgraded in [false, true] {
             for beast in [false, true] {
-                if beast && def.hero != "volkolak" {
+                if beast && def.hero != "volkolak" && def.hero != "kuzma" {
                     continue;
                 }
                 let party = [hero(&def.hero, &[]), hero("t_plain", &[])];
                 let (mut s, _) = start(&c, &party, &ids(&["dummy", "dummy"]), 11);
                 if beast {
                     s.heroes[0].form = Form::Beast;
+                    if def.hero == "kuzma" {
+                        s.heroes[0].statuses.insert(StatusKind::Plate, 40);
+                    }
                 }
                 s.heroes[0].energy = 9;
                 s.heroes[0].statuses.insert(StatusKind::Drowse, 30);
-                s.heroes[0].hand.push(Card { uid: 9000, def: def.id.clone(), upgraded, free: false });
+                s.heroes[0].hand.push(Card { uid: 9000, def: def.id.clone(), upgraded, free: false, ..Default::default() });
                 let view = def.view(upgraded, s.heroes[0].form);
                 if view.has(Keyword::Unplayable) {
                     continue;
                 }
                 let target = match view.target {
                     CardTarget::None => None,
-                    CardTarget::Enemy => Some(UnitRef::Enemy(s.enemies[0].uid)),
+                    CardTarget::Enemy | CardTarget::Anyone => Some(UnitRef::Enemy(s.enemies[0].uid)),
                     CardTarget::Ally | CardTarget::AnyHero => Some(UnitRef::Hero(1)),
                     CardTarget::Downed => {
                         s.heroes[1].downed = true;
@@ -384,6 +387,16 @@ fn every_hero_card_can_be_played() {
                 };
                 let res = apply(&c, &mut s, 0, &CombatAction::Play { card: 9000, target });
                 assert!(res.is_ok(), "{} (upgraded {upgraded}, beast {beast}): {res:?}", def.id);
+                // a card that asks for a pick out of a pile gets one
+                for _ in 0..4 {
+                    let Some(p) = s.heroes[0].picking.clone() else { break };
+                    let card = nav_core::craft::pickable_cards(&c, &s, &p)[0];
+                    apply(&c, &mut s, 0, &CombatAction::Pick { card }).unwrap();
+                }
+                while s.heroes[0].choosing.is_some() {
+                    let card = s.heroes[0].hand[0].uid;
+                    apply(&c, &mut s, 0, &CombatAction::Discard { card }).unwrap();
+                }
                 // and the round can still be closed afterwards
                 if s.phase == Phase::Heroes {
                     end_round(&c, &mut s);
@@ -569,7 +582,7 @@ fn some_of_yemelyas_cards_are_paid_for_in_sleep() {
 
 #[test]
 fn the_pikes_will_plays_the_top_of_the_deck_for_nothing() {
-    let card = |uid, def: &str| Card { uid, def: def.into(), upgraded: false, free: false };
+    let card = |uid, def: &str| Card { uid, def: def.into(), upgraded: false, free: false, ..Default::default() };
     let (c, mut s) = fight("emelya", &["em_pike_fetch"], &["dummy"]);
     s.heroes[0].discard.clear();
     s.heroes[0].draw = vec![card(9001, "em_lie"), card(9002, "em_stove_door")];
@@ -616,4 +629,176 @@ fn a_card_that_shifts_the_man_shifts_the_beast_too() {
         }
     }
     assert!(bad.is_empty(), "{bad:?}");
+}
+
+// ---- Kuzma ----
+
+#[test]
+fn kuzma_marks_two_cards_and_a_marked_card_forges() {
+    let (c, mut s) = fight("kuzma", &["kz_strike", "kz_strike", "kz_strike", "kz_strike", "kz_strike"], &["dummy"]);
+    let marked: Vec<u32> = s.heroes[0].hand.iter().filter(|c| c.forged).map(|c| c.uid).collect();
+    assert_eq!(marked.len(), 2);
+    let foe = foe(&s, 0);
+    apply(&c, &mut s, 0, &CombatAction::Play { card: marked[0], target: Some(foe) }).unwrap();
+    assert_eq!(s.status(ME, S::Forge), 1);
+    // the mark is gone with the card
+    assert!(s.heroes[0].discard.iter().all(|c| !c.forged));
+}
+
+#[test]
+fn at_fifteen_the_plate_goes_on_and_takes_the_blows_until_it_breaks() {
+    let (c, mut s) = fight("kuzma", &["kz_svarog_anvil", "kz_svarog_anvil", "kz_svarog_anvil"], &["dummy"]);
+    for _ in 0..3 {
+        let card = s.heroes[0].hand.iter().find(|c| c.def == "kz_svarog_anvil").unwrap().uid;
+        apply(&c, &mut s, 0, &CombatAction::Play { card, target: None }).unwrap();
+    }
+    assert_eq!(s.heroes[0].form, Form::Beast, "18 forged: plated");
+    assert_eq!(s.status(ME, S::Plate), 40);
+    assert_eq!(s.heroes[0].block, 0, "no block in the plate");
+    let hp = s.heroes[0].hp;
+    nav_core::combat::test_hit_hero(&c, &mut s, 0, 30);
+    assert_eq!((s.heroes[0].hp, s.status(ME, S::Plate)), (hp, 10));
+    nav_core::combat::test_hit_hero(&c, &mut s, 0, 15);
+    assert_eq!(s.heroes[0].form, Form::Human, "knocked off");
+    assert_eq!(s.heroes[0].hp, hp - 5);
+}
+
+#[test]
+fn reforged_strength_leaves_the_foe_for_the_rest_of_the_fight() {
+    let (c, mut s) = fight("kuzma", &["kz_disarm"], &["dummy"]);
+    let card = s.heroes[0].hand[0].uid;
+    let foe = foe(&s, 0);
+    apply(&c, &mut s, 0, &CombatAction::Play { card, target: Some(foe) }).unwrap();
+    assert_eq!(s.status(foe, S::Strength), -3);
+    assert_eq!(s.status(ME, S::Strength), 3, "alone, it is Kuzma's");
+    end_round(&c, &mut s);
+    assert_eq!((s.status(foe, S::Strength), s.status(ME, S::Strength)), (-3, 3), "kept through the fight");
+}
+
+// ---- Ivanushka ----
+
+#[test]
+fn a_marked_card_shows_its_number_in_hand_and_plays_it_and_luck_grows() {
+    let (c, mut s) = fight("ivan", &["iv_club", "iv_club", "iv_club", "iv_club", "iv_club"], &["dummy"]);
+    let card = s.heroes[0].hand[0].clone();
+    assert_eq!(card.rolls.len(), 1);
+    let n = card.rolls[0];
+    assert!((4..=9).contains(&n));
+    let luck = s.status(ME, S::Luck);
+    let foe = foe(&s, 0);
+    let hp = s.enemies[0].hp;
+    apply(&c, &mut s, 0, &CombatAction::Play { card: card.uid, target: Some(foe) }).unwrap();
+    assert_eq!(s.enemies[0].hp, hp - n);
+    assert_eq!(s.status(ME, S::Luck), luck + 1);
+}
+
+#[test]
+fn a_card_of_luck_falls_somewhere_and_burns_the_luck() {
+    let (c, mut s) = fight("ivan", &["iv_tumble"], &["dummy"]);
+    s.heroes[0].statuses.insert(S::Luck, 5);
+    let card = s.heroes[0].hand[0].uid;
+    let hp = s.enemies[0].hp;
+    apply(&c, &mut s, 0, &CombatAction::Play { card, target: None }).unwrap();
+    assert_eq!(s.status(ME, S::Luck), 0);
+    assert!(s.enemies[0].hp == hp - 10 || s.heroes[0].block == 10);
+}
+
+// ---- Lisa ----
+
+#[test]
+fn lisa_draws_four_of_her_own_and_one_of_someone_elses() {
+    let c = content();
+    let party = [with(&c, "lisa", &["li_snap"; 10]), with(&c, "bogatyr", &["bogatyr_strike"; 10])];
+    let (s, _) = start(&c, &party, &ids(&["dummy"]), 3);
+    let h = &s.heroes[0];
+    assert_eq!(h.hand.len(), 5);
+    assert_eq!(h.hand.iter().filter(|c| c.alien).count(), 1);
+    assert_eq!(h.hand.iter().find(|c| c.alien).unwrap().def, "bogatyr_strike");
+}
+
+#[test]
+fn a_copy_costs_what_the_original_does_and_is_gone_once_played() {
+    let c = content();
+    let party = [with(&c, "lisa", &["li_snap"; 10]), with(&c, "bogatyr", &["bogatyr_strike"; 10])];
+    let (mut s, _) = start(&c, &party, &ids(&["dummy"]), 3);
+    s.heroes[0].flags.remove("alien_free");
+    let copy = s.heroes[0].hand.iter().find(|c| c.alien).unwrap().uid;
+    let e = s.heroes[0].energy;
+    let foe = foe(&s, 0);
+    apply(&c, &mut s, 0, &CombatAction::Play { card: copy, target: Some(foe) }).unwrap();
+    assert_eq!(s.heroes[0].energy, e - 1);
+    assert!(s.heroes[0].discard.is_empty() && s.heroes[0].exhaust.is_empty(), "nowhere to be found");
+}
+
+#[test]
+fn one_dodge_at_most_and_it_slips_a_whole_blow() {
+    let (c, mut s) = fight("lisa", &["li_tail_flick", "li_tail_flick"], &["dummy"]);
+    for card in s.heroes[0].hand.iter().filter(|c| c.def == "li_tail_flick").map(|c| c.uid).collect::<Vec<_>>() {
+        apply(&c, &mut s, 0, &CombatAction::Play { card, target: None }).unwrap();
+    }
+    assert_eq!(s.status(ME, S::Evade), 1);
+    let hp = s.heroes[0].hp;
+    nav_core::combat::test_hit_hero(&c, &mut s, 0, 20);
+    assert_eq!(s.heroes[0].hp, hp);
+    nav_core::combat::test_hit_hero(&c, &mut s, 0, 5);
+    assert_eq!(s.heroes[0].hp, hp - 5);
+}
+
+#[test]
+fn lisa_picks_a_card_from_an_allys_discard() {
+    let c = content();
+    let party = [with(&c, "lisa", &["li_discard_dig"; 10]), with(&c, "bogatyr", &["bogatyr_strike"; 10])];
+    let (mut s, _) = start(&c, &party, &ids(&["dummy"]), 3);
+    s.heroes[0].energy = 5;
+    let gone = s.heroes[1].hand.remove(0);
+    s.heroes[1].discard.push(gone.clone());
+    let card = s.heroes[0].hand.iter().find(|c| c.def == "li_discard_dig").unwrap().uid;
+    apply(&c, &mut s, 0, &CombatAction::Play { card, target: Some(UnitRef::Hero(1)) }).unwrap();
+    assert!(s.heroes[0].picking.is_some());
+    apply(&c, &mut s, 0, &CombatAction::Pick { card: gone.uid }).unwrap();
+    assert!(s.heroes[0].picking.is_none());
+    assert!(s.heroes[1].discard.iter().any(|c| c.uid == gone.uid), "the owner loses nothing");
+    assert_eq!(s.heroes[0].hand.iter().filter(|c| c.alien).count(), 2);
+}
+
+#[test]
+fn a_charmed_foe_strikes_one_of_its_own() {
+    let (c, mut s) = fight("lisa", &["li_charm"], &["grey_wolf", "grey_wolf"]);
+    let wolf = foe(&s, 0);
+    let card = s.heroes[0].hand.iter().find(|c| c.def == "li_charm").unwrap().uid;
+    apply(&c, &mut s, 0, &CombatAction::Play { card, target: Some(wolf) }).unwrap();
+    let hp = s.heroes[0].hp + s.heroes[0].block;
+    let other = s.enemies[1].hp;
+    s.enemies[1].intent = None;
+    end_round(&c, &mut s);
+    assert_eq!(s.heroes[0].hp + s.heroes[0].block >= hp - 0, true);
+    assert!(s.enemies[1].hp < other, "the other wolf took the bite");
+}
+
+#[test]
+fn borrowing_from_a_foe_with_no_strength_still_brings_some() {
+    let (c, mut s) = fight("lisa", &["li_borrow"], &["dummy"]);
+    let target = foe(&s, 0);
+    assert_eq!(s.status(target, S::Strength), 0);
+    let card = s.heroes[0].hand.iter().find(|c| c.def == "li_borrow").unwrap().uid;
+    apply(&c, &mut s, 0, &CombatAction::Play { card, target: Some(target) }).unwrap();
+    assert_eq!(s.status(ME, S::TempStrength), nav_core::craft::BORROW_MIN);
+}
+
+#[test]
+fn a_pick_whose_pile_ran_dry_is_let_go_so_the_turn_can_end() {
+    let c = content();
+    let party = [with(&c, "lisa", &["li_discard_dig"; 10]), with(&c, "bogatyr", &["bogatyr_strike"; 10])];
+    let (mut s, _) = start(&c, &party, &ids(&["dummy"]), 3);
+    s.heroes[0].energy = 5;
+    let gone = s.heroes[1].hand.remove(0);
+    s.heroes[1].discard.push(gone);
+    let card = s.heroes[0].hand.iter().find(|c| c.def == "li_discard_dig").unwrap().uid;
+    apply(&c, &mut s, 0, &CombatAction::Play { card, target: Some(UnitRef::Hero(1)) }).unwrap();
+    assert!(s.heroes[0].picking.is_some());
+    // the ally's discard empties before Lisa picks
+    s.heroes[1].discard.clear();
+    apply(&c, &mut s, 1, &CombatAction::Ready(true)).unwrap();
+    assert!(s.heroes[0].picking.is_none());
+    apply(&c, &mut s, 0, &CombatAction::Ready(true)).unwrap();
 }
