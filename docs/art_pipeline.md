@@ -23,6 +23,15 @@ Generations there cost no credits (the settings panel shows the cost: 0).
 - Take a picture out with `download "[role=group] img >> nth=0" --path <file>` (nth=0 is the
   newest tile; the image is 1024 px). No menu clicks needed. The old way (right-click → «Скачать» →
   «1K» into Downloads, then `tools/flowart.py`) also works.
+- Work in parallel: open a second Flow project in another tab (`tab new <project url>`, then
+  `tab select <id>` between calls) and send whole batches without waiting (upload once, then one
+  prompt after another 3 s apart). While a picture is still being painted its tile already shows
+  the attached input (a ~150 KB file): wait until the titles stop changing, or reload, before
+  taking tiles. After a reload the grid only holds 512-pixel previews: name the tiles by eye from
+  the previews, then open each wanted tile (its edit view) and save the big picture, tagging the
+  `img` wider than 300 pixels: `eval` it a `data-big` attribute and `download "img[data-big]"`.
+- Flow's own titles say roughly what is in each tile; they come back in finishing order, never in
+  the order sent. Always sheet a batch and name every tile by eye.
 
 **Gemini** (gemini.google.com, account u/3) is the fallback. Never the Flash-Lite model (the user
 rejects its quality; check the model picker first). Downloads need one real click on the page
@@ -35,6 +44,14 @@ first. The limit is a rolling ~5 hour window.
 The master style tail is in `prompts/00_etalons.md`. Figures are painted on flat pure green
 `#00FF00`, no ground, no shadow, no green on the figure, the whole figure inside the frame with a
 margin. Heroes face right, foes face left.
+
+Before writing a hero's look into a new prompt, sheet two or three of that hero's existing pictures
+and describe what is there (a look written from memory once cost ten repaints). Yemelya: "a plump
+clean-shaven grown peasant man with a round face and a blond bowl haircut, in a patched off-white
+linen shirt with a red collar and a red sash, grey trousers and bast shoes", always "grown man".
+Flow's child-safety filter sometimes refuses a Yemelya gore picture anyway: never reword the prompt
+to get past it. Tell the user which tile was refused; they resend the same prompt in Flow and it
+passes on the second or third try. Reload, then take the new picture from the edit view.
 
 ## Keying and sizes
 
@@ -126,6 +143,28 @@ them.
 
 `tools/rigparts.py` is the part cutter under `rig_in.py` (`PARTS=head,arm` limits the parts,
 `GROW=` widens the seam). Describe wings, claws and paws per creature, never generic "arms".
+
+## Maimed heroes on the Edge
+
+A hero down on the Edge kneels in `<hero>_downed`; one short of the head or an arm kneels in
+`<hero><mark>_downed`, `<mark>` one of `_noweapon`, `_noshield`, `_noarms`, `_headless`,
+`_headless_noweapon`, `_headless_noshield`, `_headless_noarms` (`short_of` in
+`crates/game/src/battle.rs`). Without one the hero stands in the maimed standing picture instead of
+kneeling. Every hero form has all of them (`volkolak_beast` too).
+
+- `python tools/flow_downed_cmds.py <hero> [<mark> ...]` prints the Browser MCP commands: it puts
+  the downed picture on a green square (`_inbox/flow_up/down_<hero>.png`) and asks one removal edit
+  per mark. A headless maimed mark is asked of the maimed downed picture once that exists, beheading
+  only: asked of the whole picture at once, Flow took the Bogatyr's shield and left the arm.
+- Name each arm by what it holds in the downed picture (`WHO` in the tool): the weapon arm is the
+  one `_noweapon` loses. On the Volkolak man and beast the shield arm is the near arm, the weapon
+  arm the knife arm / far arm. Where an arm reaches the ground, say so ("the long arm that goes
+  down to the clawed hand on the ground"): otherwise Flow cuts the shoulder and leaves the hand.
+- Always remove, never add: asking Flow to paint a stump onto a figure that just lacks an arm reads
+  as a third arm. Two whole arms plus a stump is three arms: repaint.
+- Check every tile against the downed picture: Flow often removes only what the arm holds, or
+  nothing at all. Then `python tools/downed_in.py <tile> <hero><mark>` lays it back exactly where
+  the downed picture lies.
 
 ## Other kinds
 

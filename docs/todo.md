@@ -20,14 +20,3 @@ To do:
 2. In the battle screen draw the shared body once and each head unit on its own neck; a dead
    head leaves its stump, and `Event::Summoned` (sent when it regrows) puts it back.
 3. When all three are dead the body falls as `gorynych_dead`.
-
-## Fight poses for the new foes
-
-About forty foes lack some of `_strike`, `_hurt`, `_guard`, `_cast`.
-`python tools/flow_pose_cmds.py <id>` prints the Flow commands for the missing ones; take them
-in with `tools/pose_in.py`. Check every pose by eye: extra arms and doubled weapons happen.
-
-## Rig parts for the rest of the new wave
-
-pugach, tugarin, vedmak, wolf_herder, spinner, upyr_knyaz, chernobog, zhlya, vikhor:
-`tools/flow_rig_cmds.py`, then `tools/rig_in.py` (see art_pipeline.md).

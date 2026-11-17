@@ -734,3 +734,37 @@ python tools/make_tools_doc.py
 
 Run it after adding or changing a tool; the page groups the tools by what they work on. A tool
 whose docstring is missing shows up under "Undocumented": write one.
+
+## Undocumented or other
+
+### `downed_in.py`
+
+Takes a maimed hero's picture on the Edge, painted in Flow by tools/flow_downed_cmds.py, into the game.
+
+```
+python tools/downed_in.py <flow picture> <hero><mark>
+```
+
+The Flow picture is an edit of `_inbox/flow_up/down_<hero>.png`, the hero's downed picture on a
+green square; it is scaled back to that square, cut back to the downed picture's own sheet, keyed
+(tools/key_flood.py) and saved as `assets/heroes/<hero><mark>_downed-gemini.png`, so it lies exactly
+where the whole downed picture lies.
+
+### `flow_downed_cmds.py`
+
+Prints the Browser MCP commands that paint a maimed hero's picture on the Edge (`_downed`) in Flow.
+
+```
+python tools/flow_downed_cmds.py <hero> [<mark> ...]
+```
+
+A hero down on the Edge kneels in `<hero>_downed`; one who has lost the head or an arm kneels in
+`<hero><mark>_downed` (`_noweapon`, `_noshield`, `_noarms`, `_headless`, `_headless_noweapon`, ...,
+see `short_of` in crates/game/src/battle.rs). Each is an edit of the hero's whole downed picture:
+the commands upload it on a green square (`_inbox/flow_up/down_<hero>.png`, written here), then ask
+for one edit per missing mark without waiting, and print nothing else. With no marks, every mark the
+hero has a standing picture for and no downed one yet. Flow orders the tiles as they finish, so
+fetch them by eye: `python tools/downed_in.py <tile> <hero><mark>` takes one in.
+
+WEAPON / SHIELD say which arm is which in each hero's downed picture: the weapon arm is the one
+`_noweapon` loses.
