@@ -38,6 +38,7 @@ mod aim;
 mod fit_text;
 mod fx;
 mod gore;
+mod gorynych;
 mod held;
 mod impact;
 pub(crate) mod piles;
@@ -64,7 +65,7 @@ pub fn plugin(app: &mut App) {
             Update,
             (
                 playback,
-                (sync_units, gore::lay_out_the_headless, sync_hand, live_costs, sync_potions, flask_menu, count_relics, cue_effects).chain(),
+                (sync_units, gorynych::draw_body, gore::lay_out_the_headless, sync_hand, live_costs, sync_potions, flask_menu, count_relics, cue_effects).chain(),
                 no_eyes,
                 (pick_hover, layout_hand, layout_units, swap_form_art, animate_sprites, update_labels, update_intent_icons, update_bars, update_tooltip),
                 (floaters, fly_ghosts, dying, style_buttons, impact::shake_screen, turn_timer, send_pings, show_pings, light_bonuses),
@@ -381,6 +382,10 @@ fn unit_place(shown: &Combat, unit: UnitRef) -> Option<(Vec2, Vec2)> {
         UnitRef::Hero(i) => shown.hero(i).map(|_| (hero_spot(i, shown.heroes.len()), HERO_SIZE)),
         UnitRef::Enemy(uid) => {
             let i = shown.enemies.iter().position(|e| e.uid == uid)?;
+            // Gorynych's heads stand on one body
+            if let Some(foot) = gorynych::place(shown, &shown.enemies[i].def) {
+                return Some((foot, ENEMY_SIZE));
+            }
             Some((stands::foe(uid, || shown.enemies.iter().map(|e| (e.uid, e.alive)).collect()).unwrap_or_else(|| enemy_foot(i, shown.enemies.len())), ENEMY_SIZE))
         }
     }
@@ -907,6 +912,14 @@ fn sync_units(
             UnitRef::Hero(i) => shown.hero(i).map_or(draw, |h| draw * hp_stature(&db.0, &h.def, h.max_hp)),
             UnitRef::Enemy(_) => draw,
         };
+        // a head of Gorynych stands under itself but is drawn back onto the shared body, its bar
+        // and name lower than its left neighbour's so the three stay readable
+        let def = match unit {
+            UnitRef::Enemy(uid) => shown.enemy(uid).map(|e| e.def.to_string()).unwrap_or_default(),
+            UnitRef::Hero(_) => String::new(),
+        };
+        let shift = gorynych::picture_shift(&def);
+        let drop = gorynych::rank(&def).map_or(0.0, |r| r as f32 * 48.0);
         commands
             .spawn((
                 UnitWidget { unit, pos: origin },
@@ -928,7 +941,7 @@ fn sync_units(
                 u.spawn((
                     // over a picture that spills above its slot, the intent rises with it, so it
                     // stays over the head and not on the face
-                    Node { height: px(HEAD_ROOM), align_items: AlignItems::Center, top: px(-(draw.y - size.y)), ..default() },
+                    Node { height: px(HEAD_ROOM), align_items: AlignItems::Center, top: px(-(draw.y - size.y)), left: px(gorynych::intent_shift(&def)), ..default() },
                     // text is never hidden by a sprite, this unit's or a neighbour's
                     GlobalZIndex(20),
                     Pickable::IGNORE,
@@ -984,7 +997,7 @@ fn sync_units(
                         Node {
                             width: px(draw.x),
                             height: px(draw.y),
-                            margin: UiRect { left: px((size.x - draw.x) / 2.0), right: px((size.x - draw.x) / 2.0), top: px(size.y - draw.y), bottom: px(0) },
+                            margin: UiRect { left: px((size.x - draw.x) / 2.0 + shift), right: px((size.x - draw.x) / 2.0 - shift), top: px(size.y - draw.y), bottom: px(0) },
                             flex_shrink: 0.0,
                             ..default()
                         }
@@ -1002,7 +1015,7 @@ fn sync_units(
                     Node {
                         width: px(180),
                         height: px(22),
-                        margin: UiRect::top(px(8)),
+                        margin: UiRect::top(px(8.0 + drop)),
                         border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(px(7)),
                         align_items: AlignItems::Center,
@@ -1517,6 +1530,8 @@ fn dying(
                 // drawn from what every player's game knows alike (who died, by how hard a
                 // blow), so the same parts fly the same way on every screen
                 let (weight, lost) = blows.0.get(&unit).copied().unwrap_or((0.0, 0));
+                // a head of Gorynych always comes off
+                let weight = if gorynych::is_head(&stem) { 9.0 } else { weight };
                 let seed = match unit {
                     UnitRef::Enemy(u) => u as u32,
                     UnitRef::Hero(i) => 1000 + i as u32,
