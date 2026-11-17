@@ -9,10 +9,24 @@ Prompts by kind live in [`prompts/`](prompts/): `00_etalons.md` (style, heroes, 
 **Google Flow** (https://flow.google.com, project `2380bc42-…`, Nano Banana 2.1) is the main tool.
 Generations there cost no credits (the settings panel shows the cost: 0).
 
-- Drive it through the **Browser MCP** extension (`mcp__browsermcp__browser`; server added with
-  `claude mcp add browsermcp -s user -- cmd /c npx -y @browsermcp/mcp@latest`, which needs
-  `MSYS_NO_PATHCONV=1` from Git Bash and a restart of Claude Code). Claude-in-Chrome works too
-  when it connects.
+- Drive it through **Browser MCP**: every `tools/flow_*_cmds.py` prints command blocks for its
+  one tool, `browser` (`mcp__browsermcp__browser`). Setting it up:
+  1. The server is declared for the project in `.mcp.json` at the repository root
+     (`@browsermcp/mcp@2.5.0`, started with `cmd /c npx`, which Windows needs; on macOS or Linux
+     change the command to `npx` and drop `/c`). It needs Node.js 18+ on the PATH. Claude Code
+     asks once to allow the project's server; say yes, or run `/mcp` and enable it there.
+  2. Install the **Browser MCP** extension from the Chrome Web Store (browsermcp.io) into the
+     Chrome you work in, open the extension and press **Connect** on the tab it should drive.
+  3. Restart Claude Code; `/mcp` lists `browsermcp` as connected. Check with one call:
+     `tab list`.
+  4. Sign in to Flow yourself in that Chrome (the agent never types passwords). The project page
+     is `flow.google.com/u/<n>/project/<id>`, `<n>` being that Google account's number in the
+     browser.
+  Commands take one per line in one call: `goto`, `tab list|new|select`, `click`, `type`,
+  `press`, `upload <target> <file>`, `download <target> --path <file>`, `eval "<js>"`,
+  `wait <ms>`, `screenshot`, `reload`, `back`. One call may run at most about five minutes, so
+  long batches are sent in parts. Claude-in-Chrome works too when it connects, but the scripts
+  are written for Browser MCP.
 - Settings (button «Триггер настроек»): aspect 1:1 / 3:4 / 16:9 and the number of pictures x1–x4.
   Always pick the aspect *and* write it in the prompt: the default 16:9 crops tall figures.
 - Attach a picture: «Добавить ингредиенты» → «Загрузить» (`upload … <file>`) → click its name in

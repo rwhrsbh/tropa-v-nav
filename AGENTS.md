@@ -3,6 +3,9 @@
 Rust/Bevy 0.20 co-op deckbuilder. This file only points the way: the rules and recipes live in
 `docs/`, read the one you need when you need it.
 
+Browser work (Flow, AI Studio) goes through Browser MCP, declared for the project in `.mcp.json`;
+how to set it up: [Where pictures are painted](docs/art_pipeline.md#where-pictures-are-painted).
+
 ## Contents
 
 - [How we work](docs/README.md)
