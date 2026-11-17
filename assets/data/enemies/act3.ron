@@ -115,8 +115,13 @@
             (id: "ice_scythe", intent: Attack, targeted: true, effects: [Damage(N(26), Target), AddCard(card: "ice_shard", pile: Draw, to: Target), Hook("winter")]),
             (id: "blizzard", intent: AttackAll, effects: [Damage(N(14), AllFoes), Hook("winter")]),
             (id: "frost_breath", intent: Special, effects: [Hook("freeze"), Block(N(20), Me), Hook("winter")]),
+            // her winter deepens into the white death
+            (id: "white_death", intent: AttackAll, effects: [Damage(N(20), AllFoes), Hook("winter")]),
+            (id: "frozen_heart", intent: Buff, effects: [Hook("freeze"), Apply(Strength, N(2), Me), Block(N(15), Me)]),
         ],
         opening: [0],
         pattern: [1, 2, 3, 1, 2, 0],
+        phase2_at: 50,
+        phase2: [5, 4, 1, 4, 2, 1],
     ),
 ]
